@@ -1,3 +1,4 @@
-[submodule "Libraries/RFramework"]
+[submodule "Library/RFramework"]
 	path = Library/RFramework
 	url = git@github.com:1187493252/RFramework.git
+
