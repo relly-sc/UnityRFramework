@@ -1,0 +1,29 @@
+{
+  "name": "com.relly-sc.unityrframework",
+  "version": "1.0.0",
+  "displayName": "UnityRFramework",
+  "description": "",
+  "documentationUrl": "https://github.com/relly-sc/UnityRFramework/blob/main/README.md",
+  "licensesUrl": "https://github.com/relly-sc/UnityRFramework/blob/main/LICENSE",
+  "author": {
+    "name": "relly",
+    "email": "1187493252@qq.com",
+    "url": ""
+  },
+  "keywords": [
+    "unityrframework",
+    "UnityRFramework"
+  ],
+  "dependencies": {
+    "com.tuyoogame.yooasset": "3.0.1-beta",
+    "com.cysharp.unitask": "2.5.10",
+    "com.code-philosophy.hybridclr": "8.11.0"
+  },
+  "samples": [
+    {
+      "displayName": "GameMain",
+      "description": "",
+      "path": "Samples~/GameMain"
+    }
+  ]
+}
