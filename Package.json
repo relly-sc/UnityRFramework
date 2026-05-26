@@ -16,7 +16,7 @@
   ],
   "dependencies": {
     "com.tuyoogame.yooasset": "3.0.1-beta",
-    "com.cysharp.unitask": "2.5.10",
+    "com.cysharp.unitask": "2.5.11",
     "com.code-philosophy.hybridclr": "8.11.0"
   },
   "samples": [

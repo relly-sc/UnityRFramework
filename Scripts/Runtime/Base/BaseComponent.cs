@@ -69,7 +69,7 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 获取或设置编辑器资源辅助器。
         /// </summary>
-        public IResourceManager EditorResourceHelper
+        public IResourceModule EditorResourceHelper
         {
             get;
             set;
