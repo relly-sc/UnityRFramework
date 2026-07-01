@@ -8,11 +8,15 @@ using UnityEngine.SceneManagement;
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// 游戏入口。
+    /// 游戏入口，管理所有 UnityRFrameworkComponent 的注册与查询。
     /// </summary>
+    /// <remarks>
+    /// 使用 C# 标准 LinkedList 管理 UnityRFrameworkComponent，
+    /// 不再封装自定义 LinkedList 包装类——标准库已足够。
+    /// </remarks>
     public static class UnityRFrameworkComponentEntry
     {
-        private static readonly RFrameworkLinkedList<UnityRFrameworkComponent> s_UnityRFrameworkComponents = new RFrameworkLinkedList<UnityRFrameworkComponent>();
+        private static readonly LinkedList<UnityRFrameworkComponent> unityRFrameworkComponents = new LinkedList<UnityRFrameworkComponent>();
 
         /// <summary>
         /// 游戏框架所在的场景编号。
@@ -36,7 +40,7 @@ namespace UnityRFramework.Runtime
         /// <returns>要获取的游戏框架组件。</returns>
         public static UnityRFrameworkComponent GetComponent(Type type)
         {
-            LinkedListNode<UnityRFrameworkComponent> current = s_UnityRFrameworkComponents.First;
+            LinkedListNode<UnityRFrameworkComponent> current = unityRFrameworkComponents.First;
             while (current != null)
             {
                 if (current.Value.GetType() == type)
@@ -57,7 +61,7 @@ namespace UnityRFramework.Runtime
         /// <returns>要获取的游戏框架组件。</returns>
         public static UnityRFrameworkComponent GetComponent(string typeName)
         {
-            LinkedListNode<UnityRFrameworkComponent> current = s_UnityRFrameworkComponents.First;
+            LinkedListNode<UnityRFrameworkComponent> current = unityRFrameworkComponents.First;
             while (current != null)
             {
                 Type type = current.Value.GetType();
@@ -86,7 +90,7 @@ namespace UnityRFramework.Runtime
                 baseComponent = null;
             }
 
-            s_UnityRFrameworkComponents.Clear();
+            unityRFrameworkComponents.Clear();
 
             if (shutdownType == ShutdownType.None)
             {
@@ -123,7 +127,7 @@ namespace UnityRFramework.Runtime
 
             Type type = gameFrameworkComponent.GetType();
 
-            LinkedListNode<UnityRFrameworkComponent> current = s_UnityRFrameworkComponents.First;
+            LinkedListNode<UnityRFrameworkComponent> current = unityRFrameworkComponents.First;
             while (current != null)
             {
                 if (current.Value.GetType() == type)
@@ -135,7 +139,7 @@ namespace UnityRFramework.Runtime
                 current = current.Next;
             }
 
-            s_UnityRFrameworkComponents.AddLast(gameFrameworkComponent);
+            unityRFrameworkComponents.AddLast(gameFrameworkComponent);
         }
     }
 }

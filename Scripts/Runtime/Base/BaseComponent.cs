@@ -1,7 +1,6 @@
 
 
 using RFramework;
-using RFramework.Resource;
 using System;
 using UnityEngine;
 
@@ -16,38 +15,37 @@ namespace UnityRFramework.Runtime
     {
         private const int DefaultDpi = 96;  // default windows dpi
 
-        private float m_GameSpeedBeforePause = 1f;
+        private float gameSpeedBeforePause = 1f;
 
         [SerializeField]
-        private bool m_EditorResourceMode = true;
-
-
-        [SerializeField]
-        private string m_TextHelperTypeName = "UnityGameFramework.Runtime.DefaultTextHelper";
+        private bool editorResourceMode = true;
 
         [SerializeField]
-        private string m_VersionHelperTypeName = "UnityGameFramework.Runtime.DefaultVersionHelper";
+        private string textHelperTypeName = "UnityRFramework.Runtime.DefaultTextHelper";
 
         [SerializeField]
-        private string m_LogHelperTypeName = "UnityGameFramework.Runtime.DefaultLogHelper";
+        private string versionHelperTypeName = "UnityRFramework.Runtime.DefaultVersionHelper";
 
         [SerializeField]
-        private string m_CompressionHelperTypeName = "UnityGameFramework.Runtime.DefaultCompressionHelper";
+        private string logHelperTypeName = "UnityRFramework.Runtime.DefaultLogHelper";
 
         [SerializeField]
-        private string m_JsonHelperTypeName = "UnityGameFramework.Runtime.DefaultJsonHelper";
+        private string compressionHelperTypeName = "UnityRFramework.Runtime.DefaultCompressionHelper";
 
         [SerializeField]
-        private int m_FrameRate = 30;
+        private string jsonHelperTypeName = "UnityRFramework.Runtime.DefaultJsonHelper";
 
         [SerializeField]
-        private float m_GameSpeed = 1f;
+        private int frameRate = 30;
 
         [SerializeField]
-        private bool m_RunInBackground = true;
+        private float gameSpeed = 1f;
 
         [SerializeField]
-        private bool m_NeverSleep = true;
+        private bool runInBackground = true;
+
+        [SerializeField]
+        private bool neverSleep = true;
 
         /// <summary>
         /// 获取或设置是否使用编辑器资源模式（仅编辑器内有效）。
@@ -56,24 +54,15 @@ namespace UnityRFramework.Runtime
         {
             get
             {
-                return m_EditorResourceMode;
+                return editorResourceMode;
             }
             set
             {
-                m_EditorResourceMode = value;
+                editorResourceMode = value;
             }
         }
 
 
-
-        /// <summary>
-        /// 获取或设置编辑器资源辅助器。
-        /// </summary>
-        public IResourceModule EditorResourceHelper
-        {
-            get;
-            set;
-        }
 
         /// <summary>
         /// 获取或设置游戏帧率。
@@ -82,11 +71,11 @@ namespace UnityRFramework.Runtime
         {
             get
             {
-                return m_FrameRate;
+                return frameRate;
             }
             set
             {
-                Application.targetFrameRate = m_FrameRate = value;
+                Application.targetFrameRate = frameRate = value;
             }
         }
 
@@ -97,11 +86,11 @@ namespace UnityRFramework.Runtime
         {
             get
             {
-                return m_GameSpeed;
+                return gameSpeed;
             }
             set
             {
-                Time.timeScale = m_GameSpeed = value >= 0f ? value : 0f;
+                Time.timeScale = gameSpeed = value >= 0f ? value : 0f;
             }
         }
 
@@ -112,7 +101,7 @@ namespace UnityRFramework.Runtime
         {
             get
             {
-                return m_GameSpeed <= 0f;
+                return gameSpeed <= 0f;
             }
         }
 
@@ -123,7 +112,7 @@ namespace UnityRFramework.Runtime
         {
             get
             {
-                return m_GameSpeed == 1f;
+                return gameSpeed == 1f;
             }
         }
 
@@ -134,11 +123,11 @@ namespace UnityRFramework.Runtime
         {
             get
             {
-                return m_RunInBackground;
+                return runInBackground;
             }
             set
             {
-                Application.runInBackground = m_RunInBackground = value;
+                Application.runInBackground = runInBackground = value;
             }
         }
 
@@ -149,11 +138,11 @@ namespace UnityRFramework.Runtime
         {
             get
             {
-                return m_NeverSleep;
+                return neverSleep;
             }
             set
             {
-                m_NeverSleep = value;
+                neverSleep = value;
                 Screen.sleepTimeout = value ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
             }
         }
@@ -181,16 +170,16 @@ namespace UnityRFramework.Runtime
                 Utility.Converter.ScreenDpi = DefaultDpi;
             }
 
-            m_EditorResourceMode &= Application.isEditor;
-            if (m_EditorResourceMode)
+            editorResourceMode &= Application.isEditor;
+            if (editorResourceMode)
             {
                 Log.Info("During this run, Game Framework will use editor resource files, which you should validate first.");
             }
 
-            Application.targetFrameRate = m_FrameRate;
-            Time.timeScale = m_GameSpeed;
-            Application.runInBackground = m_RunInBackground;
-            Screen.sleepTimeout = m_NeverSleep ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
+            Application.targetFrameRate = frameRate;
+            Time.timeScale = gameSpeed;
+            Application.runInBackground = runInBackground;
+            Screen.sleepTimeout = neverSleep ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
 #else
             Log.Error("Game Framework only applies with Unity 5.3 and above, but current Unity version is {0}.", Application.unityVersion);
             GameEntry.Shutdown(ShutdownType.Quit);
@@ -232,7 +221,7 @@ namespace UnityRFramework.Runtime
                 return;
             }
 
-            m_GameSpeedBeforePause = GameSpeed;
+            gameSpeedBeforePause = GameSpeed;
             GameSpeed = 0f;
         }
 
@@ -246,7 +235,7 @@ namespace UnityRFramework.Runtime
                 return;
             }
 
-            GameSpeed = m_GameSpeedBeforePause;
+            GameSpeed = gameSpeedBeforePause;
         }
 
         /// <summary>
@@ -269,22 +258,22 @@ namespace UnityRFramework.Runtime
 
         private void InitTextHelper()
         {
-            if (string.IsNullOrEmpty(m_TextHelperTypeName))
+            if (string.IsNullOrEmpty(textHelperTypeName))
             {
                 return;
             }
 
-            Type textHelperType = Utility.Assembly.GetType(m_TextHelperTypeName);
+            Type textHelperType = Utility.Assembly.GetType(textHelperTypeName);
             if (textHelperType == null)
             {
-                Log.Error("Can not find text helper type '{0}'.", m_TextHelperTypeName);
+                Log.Error("Can not find text helper type '{0}'.", textHelperTypeName);
                 return;
             }
 
             Utility.Text.ITextHelper textHelper = (Utility.Text.ITextHelper)Activator.CreateInstance(textHelperType);
             if (textHelper == null)
             {
-                Log.Error("Can not create text helper instance '{0}'.", m_TextHelperTypeName);
+                Log.Error("Can not create text helper instance '{0}'.", textHelperTypeName);
                 return;
             }
 
@@ -298,21 +287,21 @@ namespace UnityRFramework.Runtime
 
         private void InitLogHelper()
         {
-            if (string.IsNullOrEmpty(m_LogHelperTypeName))
+            if (string.IsNullOrEmpty(logHelperTypeName))
             {
                 return;
             }
 
-            Type logHelperType = Utility.Assembly.GetType(m_LogHelperTypeName);
+            Type logHelperType = Utility.Assembly.GetType(logHelperTypeName);
             if (logHelperType == null)
             {
-                throw new RFrameworkException(Utility.Text.Format("Can not find log helper type '{0}'.", m_LogHelperTypeName));
+                throw new RFrameworkException(Utility.Text.Format("Can not find log helper type '{0}'.", logHelperTypeName));
             }
 
             RFrameworkLog.ILogHelper logHelper = (RFrameworkLog.ILogHelper)Activator.CreateInstance(logHelperType);
             if (logHelper == null)
             {
-                throw new RFrameworkException(Utility.Text.Format("Can not create log helper instance '{0}'.", m_LogHelperTypeName));
+                throw new RFrameworkException(Utility.Text.Format("Can not create log helper instance '{0}'.", logHelperTypeName));
             }
 
             RFrameworkLog.SetLogHelper(logHelper);
@@ -325,22 +314,22 @@ namespace UnityRFramework.Runtime
 
         private void InitJsonHelper()
         {
-            if (string.IsNullOrEmpty(m_JsonHelperTypeName))
+            if (string.IsNullOrEmpty(jsonHelperTypeName))
             {
                 return;
             }
 
-            Type jsonHelperType = Utility.Assembly.GetType(m_JsonHelperTypeName);
+            Type jsonHelperType = Utility.Assembly.GetType(jsonHelperTypeName);
             if (jsonHelperType == null)
             {
-                Log.Error("Can not find JSON helper type '{0}'.", m_JsonHelperTypeName);
+                Log.Error("Can not find JSON helper type '{0}'.", jsonHelperTypeName);
                 return;
             }
 
             Utility.Json.IJsonHelper jsonHelper = (Utility.Json.IJsonHelper)Activator.CreateInstance(jsonHelperType);
             if (jsonHelper == null)
             {
-                Log.Error("Can not create JSON helper instance '{0}'.", m_JsonHelperTypeName);
+                Log.Error("Can not create JSON helper instance '{0}'.", jsonHelperTypeName);
                 return;
             }
 
