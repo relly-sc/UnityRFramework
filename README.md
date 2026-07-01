@@ -152,7 +152,7 @@ GameEntry.Event.FireAsync(complexEventArgs);
 // 取消订阅
 GameEntry.Event.Unsubscribe<PlayerDeadEventArgs>(OnPlayerDead);
 
-// 使用 EventGroup 批量管理生命周期（详细说明见 框架设计.md 5.8 节）
+// EventGroup 管理订阅生命周期——Dispose() 一键取消组内所有订阅，杜绝遗漏
 private EventGroup eventGroup;
 
 private void OnEnable()
@@ -196,28 +196,9 @@ Assets/UnityRFramework/
 └── Prefabs/                         ← UnityRFramework.prefab
 ```
 
-## 代码风格
-
-- UTF-8 without BOM，LF 换行
-- 驼峰命名：私有字段 `camelCase`（不加 `_`），公有 `PascalCase`，接口 `I` 前缀
-- 4 空格缩进，Allman 花括号（左花括号换行）
-- 中文注释，公开成员必须 XML 注释
-- 模块命名：接口 `IXxxModule`，实现 `XxxModule`
-
-详见 `框架设计.md` 第六章。
-
 ## 参考项目
 
 - [GameFramework](https://github.com/EllanJiang/GameFramework) — 架构参考，取其结构去其重量
 - [StarForce](https://github.com/EllanJiang/StarForce) — GF 官方示例，参考 GameEntry + 扩展方法模式
 - [UniFramework](https://github.com/gmhevinci/UniFramework) — 轻量级工具集，已集成 UniLog（日志文件写入）
 
-## 反模式禁令
-
-- 禁止 `GameObject.Find()` / `FindObjectOfType()`
-- 禁止 `DontDestroyOnLoad` 单例滥用
-- 禁止 500+ 行 God MonoBehaviour
-- 禁止跨对象 `GetComponent<XXX>()` 硬引用
-- 禁止魔法字符串（tag / layer / animator 参数）
-- 禁止 `Update()` 中写可用事件驱动的逻辑
-- 禁止直接使用 `Debug.Log`，一律通过框架的 `LogModule` 输出
