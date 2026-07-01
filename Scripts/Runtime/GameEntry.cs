@@ -1,33 +1,23 @@
-using System.ComponentModel;
-using Unity.Collections;
 using UnityEngine;
 
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// 框架入口组件。
-    /// 挂在启动场景的 "RFramework" 根节点上，
-    /// 提供所有内置模块的强类型静态访问入口，以及自定义组件的泛型查询方法。
+    /// 框架入口组件。挂在启动场景的 "RFramework" 根节点上，
+    /// 提供所有内置模块的强类型静态访问入口和自定义组件的泛型查询方法。
     /// </summary>
     /// <remarks>
-    /// 设计约束：
-    /// 1. 内置模块属性采用 static 缓存 + 懒加载模式：
-    ///    - 首次访问时从 ComponentEntry 查找并缓存。
-    ///    - 后续访问直接返回缓存，避免每次 O(N) 遍历。
-    ///    - Unity 重载了 == 运算符，MonoBehaviour 销毁后 cache == null 为 true，
-    ///      因此框架重启后缓存自动失效，无需手动清理。
-    /// 2. Inspector 字段仅用于编辑器下的可视化发现——OnValidate 自动填充。
-    /// 3. 不暴露 Instance 单例——外部代码不需要访问 GameEntry 实例本身。
+    /// 内置模块属性采用 static 缓存 + 懒加载：首次访问查找并缓存，后续 O(1)。
+    /// Unity 重载了 == 运算符，MonoBehaviour 销毁后缓存自动失效。不暴露 Instance 单例。
     /// </remarks>
     [AddComponentMenu("UnityRFramework/Game Entry")]
     [DisallowMultipleComponent]
     public sealed class GameEntry : MonoBehaviour
     {
-
-
         // ====== 内置模块缓存（static，利用 Unity == 重载自动失效） ======
         private static BaseComponent baseCache;
         private static PoolComponent poolCache;
+        private static EventComponent eventCache;
 
         // ====== 强类型静态快捷入口（内置模块） ======
 
@@ -39,7 +29,9 @@ namespace UnityRFramework.Runtime
             get
             {
                 if (baseCache == null)
+                {
                     baseCache = Get<BaseComponent>();
+                }
                 return baseCache;
             }
         }
@@ -52,8 +44,25 @@ namespace UnityRFramework.Runtime
             get
             {
                 if (poolCache == null)
+                {
                     poolCache = Get<PoolComponent>();
+                }
                 return poolCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取事件组件。
+        /// </summary>
+        public static EventComponent Event
+        {
+            get
+            {
+                if (eventCache == null)
+                {
+                    eventCache = Get<EventComponent>();
+                }
+                return eventCache;
             }
         }
 
@@ -76,7 +85,5 @@ namespace UnityRFramework.Runtime
         {
             DontDestroyOnLoad(gameObject);
         }
-
-
     }
 }

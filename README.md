@@ -31,7 +31,7 @@ Unity Client
 ├── Framework 层 (AOT — 接口 + 核心实现)
 │   ├── Log / Event / Pool / Timer    ← Phase 0 基石
 │   ├── Resource / Config            ← Phase 1 核心
-│   ├── Procedure / UI / Audio       ← Phase 2 游戏流程
+│   ├── Procedure / Scene / UI / Audio ← Phase 2 游戏流程
 │   └── Save / Network               ← Phase 3 扩展
 │
 └── Game / HotUpdate 层 (热更 DLL)
@@ -44,8 +44,9 @@ Unity Client
 |------|------|----------|:--:|
 | Log | 统一日志输出（控制台/文件），级别过滤 | `ILogModule` | ✅ |
 | Pool | GameObject 池 + class 池，委托注入 | `IPoolModule` | ✅ |
-| Event | 解耦消息通信，`Subscribe<T>` / `Publish<T>` | `IEventBus` | 待建 |
+| Event | 解耦消息通信，类型路由，`Fire<T>` / `FireAsync<T>`，零 GC struct 消息 | `IEventModule` | ✅ |
 | Timer | 帧计时器 + 时间计时器 | `ITimerModule` | 待建 |
+| Scene | 场景加载管理（异步加载/卸载、过渡动画、场景栈） | `ISceneModule` | 待建 |
 | Resource | YooAsset 封装，异步加载，引用计数 | `IResourceModule` | 待建 |
 | Config | Luban 集成，二段式加载 | `IConfigModule` | 待建 |
 | Procedure | FSM 状态机引擎 | `IProcedureModule` | 待建 |
@@ -65,6 +66,8 @@ Unity Client
 ├─ GameEntry            ← 框架入口，Inspector 可视化所有子模块
 ├─ "Base"               ← 框架基础设施
 │    └─ BaseComponent   (Helpers + Update 驱动 + Shutdown)
+├─ "Event"              ← 事件模块
+│    └─ EventComponent  (EventModule 包装)
 ├─ "Pool"               ← 对象池模块
 │    └─ PoolComponent   (PoolModule 包装)
 └─ ...（将来每个模块一个子节点 + Component）
@@ -125,6 +128,46 @@ var bullet = bulletPool.Spawn();   // SetActive(true)
 bulletPool.Unspawn(bullet);        // SetActive(false) + 挂回 parent
 ```
 
+## Event 模块使用示例
+
+Event 模块支持 struct（零 GC 栈分配）和 class（引用传递）两种消息类型，提供同步发布和线程安全异步发布双模式。
+
+```csharp
+// 定义消息（struct = 零 GC）
+public struct PlayerDeadEventArgs
+{
+    public int playerId;
+    public Vector3 position;
+}
+
+// 订阅
+GameEntry.Event.Subscribe<PlayerDeadEventArgs>(OnPlayerDead);
+
+// 同步发布（零 GC，栈分配，立即分发）
+GameEntry.Event.Fire(new PlayerDeadEventArgs { playerId = 1, position = pos });
+
+// 异步发布（线程安全，下一帧分发）
+GameEntry.Event.FireAsync(complexEventArgs);
+
+// 取消订阅
+GameEntry.Event.Unsubscribe<PlayerDeadEventArgs>(OnPlayerDead);
+
+// 使用 EventGroup 批量管理生命周期（详细说明见 框架设计.md 5.8 节）
+private EventGroup eventGroup;
+
+private void OnEnable()
+{
+    eventGroup = GameEntry.Event.CreateGroup();
+    eventGroup.Subscribe<PlayerDeadEventArgs>(OnPlayerDead);
+    eventGroup.Subscribe<DamageEventArgs>(OnDamage);
+}
+
+private void OnDisable()
+{
+    eventGroup.Dispose();  // 自动取消所有订阅
+}
+```
+
 ## 与 GameFramework 的核心差异
 
 | 维度 | GameFramework | UnityRFramework |
@@ -141,12 +184,14 @@ Assets/UnityRFramework/
 ├── Library/RFramework/RFramework/  ← 纯 C# 模块，不依赖 UnityEngine
 │   ├── Base/                        ← RFrameworkModule、RFrameworkModuleEntry
 │   ├── Log/                         ← RFrameworkLog、RFrameworkLogLevel
-│   └── Pool/                        ← IPoolModule、PoolModule、ObjectPool<T>
+│   ├── Pool/                        ← IPoolModule、PoolModule、ObjectPool<T>
+│   └── Event/                       ← IEventModule、EventModule、EventGroup
 ├── Scripts/Runtime/                 ← Unity 运行时
 │   ├── Base/                        ← UnityRFrameworkComponent、ComponentEntry
 │   ├── GameEntry.cs                 ← 框架入口 MonoBehaviour
 │   ├── Utility/                     ← DefaultLogHelper
-│   └── Pool/                        ← PoolComponent
+│   ├── Pool/                        ← PoolComponent
+│   └── Event/                       ← EventComponent
 ├── Scripts/Editor/                  ← 编辑器工具
 └── Prefabs/                         ← UnityRFramework.prefab
 ```

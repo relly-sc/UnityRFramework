@@ -9,15 +9,10 @@ using Object = UnityEngine.Object;
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// 对象池组件。
-    /// 作为 PoolModule 的运行时包装层，绑定 Unity 生命周期，
-    /// 暴露 Inspector 可查看的模块引用，转发所有池操作到 PoolModule。
+    /// 对象池组件。作为 PoolModule 的运行时包装层，绑定 Unity 生命周期，转发所有池操作到 PoolModule。
     /// </summary>
     /// <remarks>
-    /// 设计约束：
-    /// 1. 本组件不包含业务逻辑——所有逻辑在 PoolModule 中。
-    /// 2. 本组件仅负责创建 Module、缓存引用、转发调用。
-    /// 3. 保持 100 行以内——若膨胀说明逻辑泄漏进了 Component。
+    /// 设计约束：不包含业务逻辑（逻辑在 PoolModule 中），保持 100 行以内。
     /// </remarks>
     [AddComponentMenu("UnityRFramework/Pool")]
     [DisallowMultipleComponent]
