@@ -17,21 +17,54 @@ namespace UnityRFramework.Runtime
     /// </summary>
     public class DefaultLogHelper : RFrameworkLog.ILogHelper
     {
+        /// <summary>
+        /// 日志时间格式字符串。
+        /// </summary>
         private const string TimeFormat = "HH:mm:ss";
+        /// <summary>
+        /// 日志文件名时间格式字符串。
+        /// </summary>
         private const string FileTimeFormat = "yyyyMMddHHmmss";
+        /// <summary>
+        /// 单个日志文件的最大大小（字节）。
+        /// </summary>
         private const int MaxFileSize = 10 * 1024 * 1024;
 
 #if UNITY_STANDALONE
+        /// <summary>
+        /// 独立平台日志文件保留天数。
+        /// </summary>
         private const int MaxRetentionDays = 14;
 #else
+        /// <summary>
+        /// 移动平台日志文件保留天数。
+        /// </summary>
         private const int MaxRetentionDays = 7;
 #endif
 
+        /// <summary>
+        /// 日志文件的文件流。
+        /// </summary>
         private FileStream fileStream;
+        /// <summary>
+        /// 日志文件的流写入器。
+        /// </summary>
         private StreamWriter streamWriter;
+        /// <summary>
+        /// 日志行构建使用的 StringBuilder。
+        /// </summary>
         private StringBuilder stringBuilder = new StringBuilder();
+        /// <summary>
+        /// 当前日志文件分卷序号。
+        /// </summary>
         private int volumeIndex = 1;
+        /// <summary>
+        /// 日志文件存储目录路径。
+        /// </summary>
         private string logDirectory;
+        /// <summary>
+        /// 是否已释放资源。
+        /// </summary>
         private bool isDisposed;
 
         /// <summary>

@@ -53,7 +53,7 @@ Unity Client
 | Event | 解耦消息通信，类型路由，`Fire<T>` / `FireAsync<T>`，零 GC struct 消息 | `IEventModule` | ✅ |
 | Timer | 计时器，delay/interval/duration/maxTriggerCount 四参数模型，支持 ignorTimescale | `ITimerModule` | ✅ |
 | Resource | YooAsset v3 封装，异步加载，引用计数 | `IResourceModule` | ✅ |
-| Config | Luban 集成，IConfigHelper 桥接，BootstrapConfig + RuntimeConfig 两段加载 | `IConfigModule` | ✅ |
+| Config | Luban 集成，IConfigHelper 桥接，两段加载 | `IConfigModule` | ✅ |
 | Procedure | FSM 状态机引擎 | `IProcedureModule` | 待建 |
 | Entity | 游戏实体生命周期，实体组+对象池，父子附加 | `IEntityModule` | 待建 |
 | Scene | 场景加载管理（异步加载/卸载、过渡动画、场景栈） | `ISceneModule` | 待建 |
@@ -209,7 +209,7 @@ Assets/UnityRFramework/
 │   ├── Event/                       ← EventComponent
 │   ├── Timer/                       ← TimerComponent
 │   ├── Resource/                    ← ResourceComponent、DefaultResourceHelper（占位）
-│   └── Config/                      ← ConfigComponent、DefaultConfigHelper（占位）、BootstrapConfig
+│   └── Config/                      ← ConfigComponent、ConfigHelperBase（抽象基类）
 ├── Scripts/Editor/                  ← 编辑器工具
 └── Prefabs/                         ← UnityRFramework.prefab
 ```

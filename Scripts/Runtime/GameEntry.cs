@@ -15,12 +15,51 @@ namespace UnityRFramework.Runtime
     public sealed class GameEntry : MonoBehaviour
     {
         // ====== 内置模块缓存（static，利用 Unity == 重载自动失效） ======
+
+        /// <summary>
+        /// 基础组件缓存。
+        /// </summary>
         private static BaseComponent baseCache;
+
+        /// <summary>
+        /// 对象池组件缓存。
+        /// </summary>
         private static PoolComponent poolCache;
+
+        /// <summary>
+        /// 事件组件缓存。
+        /// </summary>
         private static EventComponent eventCache;
+
+        /// <summary>
+        /// 计时器组件缓存。
+        /// </summary>
         private static TimerComponent timerCache;
+
+        /// <summary>
+        /// 资源组件缓存。
+        /// </summary>
         private static ResourceComponent resourceCache;
+
+        /// <summary>
+        /// 配置组件缓存。
+        /// </summary>
         private static ConfigComponent configCache;
+
+        /// <summary>
+        /// 有限状态机组件缓存。
+        /// </summary>
+        private static FsmComponent fsmCache;
+
+        /// <summary>
+        /// 流程组件缓存。
+        /// </summary>
+        private static ProcedureComponent procedureCache;
+
+        /// <summary>
+        /// WebRequest 组件缓存。
+        /// </summary>
+        private static WebRequestComponent webRequestCache;
 
         // ====== 强类型静态快捷入口（内置模块） ======
 
@@ -114,6 +153,51 @@ namespace UnityRFramework.Runtime
             }
         }
 
+        /// <summary>
+        /// 获取有限状态机组件。
+        /// </summary>
+        public static FsmComponent Fsm
+        {
+            get
+            {
+                if (fsmCache == null)
+                {
+                    fsmCache = Get<FsmComponent>();
+                }
+                return fsmCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取流程组件。
+        /// </summary>
+        public static ProcedureComponent Procedure
+        {
+            get
+            {
+                if (procedureCache == null)
+                {
+                    procedureCache = Get<ProcedureComponent>();
+                }
+                return procedureCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取 WebRequest 组件。
+        /// </summary>
+        public static WebRequestComponent WebRequest
+        {
+            get
+            {
+                if (webRequestCache == null)
+                {
+                    webRequestCache = Get<WebRequestComponent>();
+                }
+                return webRequestCache;
+            }
+        }
+
         // ====== 泛型查询（自定义组件） ======
 
         /// <summary>
@@ -129,6 +213,9 @@ namespace UnityRFramework.Runtime
 
         // ====== 生命周期 ======
 
+        /// <summary>
+        /// 生命周期：唤醒。设置 DontDestroyOnLoad，确保框架节点跨场景存活。
+        /// </summary>
         private void Awake()
         {
             DontDestroyOnLoad(gameObject);

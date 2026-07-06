@@ -18,6 +18,9 @@ namespace UnityRFramework.Runtime
     [DisallowMultipleComponent]
     public sealed class PoolComponent : UnityRFrameworkComponent
     {
+        /// <summary>
+        /// 对象池模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// </summary>
         private IPoolModule poolModule;
 
         /// <summary>

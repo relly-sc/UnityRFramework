@@ -11,6 +11,9 @@ namespace UnityRFramework.Runtime
 /// </summary>
 public static class UnityExtension
 {
+    /// <summary>
+    /// 缓存的 Transform 列表，用于递归设置层级时临时存储子对象。
+    /// </summary>
     private static readonly List<Transform> s_CachedTransforms = new List<Transform>();
 
     /// <summary>

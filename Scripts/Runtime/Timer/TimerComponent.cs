@@ -15,6 +15,9 @@ namespace UnityRFramework.Runtime
     [DisallowMultipleComponent]
     public sealed class TimerComponent : UnityRFrameworkComponent
     {
+        /// <summary>
+        /// 计时器模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// </summary>
         private ITimerModule timerModule;
 
         /// <summary>

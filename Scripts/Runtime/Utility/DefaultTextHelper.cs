@@ -10,8 +10,14 @@ namespace UnityRFramework.Runtime
     /// </summary>
     public class DefaultTextHelper : Utility.Text.ITextHelper
     {
+        /// <summary>
+        /// StringBuilder 默认容量。
+        /// </summary>
         private const int StringBuilderCapacity = 1024;
 
+        /// <summary>
+        /// 线程本地缓存的 StringBuilder 实例。
+        /// </summary>
         [ThreadStatic]
         private static StringBuilder s_CachedStringBuilder = null;
 

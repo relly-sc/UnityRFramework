@@ -44,6 +44,9 @@ namespace UnityRFramework.Runtime
         [Tooltip("备用远程 CDN 地址")]
         private string fallbackHostServer = "";
 
+        /// <summary>
+        /// 资源模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// </summary>
         private IResourceModule resourceModule;
 
         protected override void Awake()

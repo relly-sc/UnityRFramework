@@ -16,6 +16,9 @@ namespace UnityRFramework.Runtime
     /// </remarks>
     public static class UnityRFrameworkComponentEntry
     {
+        /// <summary>
+        /// 已注册的游戏框架组件链表。
+        /// </summary>
         private static readonly LinkedList<UnityRFrameworkComponent> unityRFrameworkComponents = new LinkedList<UnityRFrameworkComponent>();
 
         /// <summary>

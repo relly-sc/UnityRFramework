@@ -14,9 +14,16 @@ namespace UnityRFramework.Runtime
     [DefaultExecutionOrder(-100)]
     public sealed class BaseComponent : UnityRFrameworkComponent
     {
-        private const int DefaultDpi = 96;  // default windows dpi
+    /// <summary>
+    /// 默认 DPI（Windows 标准 96）。
+    /// 当 Unity 无法获取屏幕 DPI 时使用此值。
+    /// </summary>
+    private const int DefaultDpi = 96;  // default windows dpi
 
-        private float gameSpeedBeforePause = 1f;
+    /// <summary>
+    /// 暂停前的游戏速度缓存，用于 ResumeGame 时恢复原速度。
+    /// </summary>
+    private float gameSpeedBeforePause = 1f;
 
         [SerializeField]
         private bool editorResourceMode = true;
@@ -151,6 +158,10 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 游戏框架组件初始化。
         /// </summary>
+        /// <summary>
+        /// 生命周期：唤醒并初始化所有 Helper 和框架设置。
+        /// 由 [DefaultExecutionOrder(-100)] 确保最先执行。
+        /// </summary>
         protected override void Awake()
         {
             base.Awake();
@@ -190,15 +201,24 @@ namespace UnityRFramework.Runtime
 #endif
         }
 
+        /// <summary>
+        /// 生命周期：Start（空实现，供未来扩展）。
+        /// </summary>
         private void Start()
         {
         }
 
+        /// <summary>
+        /// 生命周期：轮询。驱动 RFrameworkModuleEntry.Update。
+        /// </summary>
         private void Update()
         {
             RFrameworkModuleEntry.Update(Time.deltaTime, Time.unscaledDeltaTime);
         }
 
+        /// <summary>
+        /// 生命周期：应用退出。注销低内存回调，停止所有协程。
+        /// </summary>
         private void OnApplicationQuit()
         {
 #if UNITY_5_6_OR_NEWER
@@ -207,6 +227,9 @@ namespace UnityRFramework.Runtime
             StopAllCoroutines();
         }
 
+        /// <summary>
+        /// 生命周期：销毁。关闭所有框架模块并释放资源。
+        /// </summary>
         private void OnDestroy()
         {
             RFrameworkModuleEntry.Shutdown();
@@ -281,11 +304,17 @@ namespace UnityRFramework.Runtime
             Utility.Text.SetTextHelper(textHelper);
         }
 
+        /// <summary>
+        /// 初始化版本辅助器（当前为空实现，预留给 Expansion 层）。
+        /// </summary>
         private void InitVersionHelper()
         {
-
         }
 
+        /// <summary>
+        /// 初始化日志辅助器，通过反射创建 ILogHelper 实例并注入到 RFrameworkLog。
+        /// 必须在所有其他 InitXxxHelper 之前调用（后续代码依赖 Log 输出）。
+        /// </summary>
         private void InitLogHelper()
         {
             if (string.IsNullOrEmpty(logHelperTypeName))
@@ -308,11 +337,16 @@ namespace UnityRFramework.Runtime
             RFrameworkLog.SetLogHelper(logHelper);
         }
 
+        /// <summary>
+        /// 初始化压缩辅助器（当前为空实现，预留给 Expansion 层）。
+        /// </summary>
         private void InitCompressionHelper()
         {
-
         }
 
+        /// <summary>
+        /// 初始化 JSON 辅助器，通过反射创建 IJsonHelper 实例并注入到 Utility.Json。
+        /// </summary>
         private void InitJsonHelper()
         {
             if (string.IsNullOrEmpty(jsonHelperTypeName))
@@ -337,6 +371,10 @@ namespace UnityRFramework.Runtime
             Utility.Json.SetJsonHelper(jsonHelper);
         }
 
+        /// <summary>
+        /// 低内存回调（仅 Unity 5.6+ 有效）。
+        /// 当系统报告内存不足时触发，可用于释放未使用的资源。
+        /// </summary>
         private void OnLowMemory()
         {
             Log.Info("Low memory reported...");

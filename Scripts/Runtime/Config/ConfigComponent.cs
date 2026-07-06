@@ -26,6 +26,9 @@ namespace UnityRFramework.Runtime
         [Tooltip("配置辅助器类型全名。必须是继承自 ConfigHelperBase 的 MonoBehaviour。")]
         private string configHelperTypeName = "UnityRFramework.Runtime.DefaultConfigHelper";
 
+        /// <summary>
+        /// 配置模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// </summary>
         private IConfigModule configModule;
 
         protected override void Awake()
