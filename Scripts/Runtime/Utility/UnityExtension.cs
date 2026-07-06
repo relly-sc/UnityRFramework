@@ -3,6 +3,9 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+namespace UnityRFramework.Runtime
+{
+
 /// <summary>
 /// 对 Unity 的扩展方法。
 /// </summary>
@@ -338,4 +341,5 @@ public static class UnityExtension
     }
 
     #endregion Transform
+}
 }

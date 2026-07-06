@@ -1,4 +1,7 @@
 
+namespace UnityRFramework.Runtime
+{
+
 /// <summary>
 /// 对 string 的扩展方法。
 /// </summary>
@@ -57,4 +60,5 @@ public static class StringExtension
 
         return null;
     }
+}
 }

@@ -6,17 +6,23 @@
 
 ## 技术栈
 
-| 领域 | 选型 | 备注 |
-|------|------|------|
-| 资源更新 | YooAsset | 成熟稳定，支持分包、加密 |
-| 代码热更 | HybridCLR | 纯 C# 热更，无需 Lua / ILRuntime |
-| 异步 | UniTask | 零 GC 异步，替代协程 |
-| 配置 | Luban | 表格配置转代码 + 二进制 |
-| 序列化 | MemoryPack | 零 GC 序列化，性能优于 Protobuf |
-| UI | UGUI | 原生支持，生态成熟 |
-| 动画 | DOTween | 老牌补间动画库 |
-| 依赖注入 | VContainer | 前期不用，后期接入 |
-| 事件系统 | 前期自研 → 后期 MessagePipe | 用接口抽象，后期可无缝切换 |
+> **重要**：以下为 Runtime 层**默认实现方案**，通过 Helper 桥接模式接入，可自由替换。Library 层不依赖任何第三方库，仅定义纯 C# 接口。
+
+| 领域 | 默认实现 | 可替换方案 |
+|------|---------|-----------|
+| 资源管理 | YooAsset | Addressables、自管理 AssetBundle |
+| 配置表 | Luban | 自研解析器、JSON/CSV |
+| 代码热更 | HybridCLR | ILRuntime |
+| 异步 | Task（Library）/ UniTask（Runtime） | Awaitable、Coroutine |
+| 序列化 | MemoryPack | Protobuf、MessagePack |
+| UI | UGUI | UI Toolkit、FairyGUI |
+| 动画 | DOTween | 自研补间、Animator |
+| 依赖注入 | VContainer | Zenject、手动 DI |
+| 事件系统 | 自研 / MessagePipe | — |
+| 响应式 | R3 | UniRx |
+| 字符串 | ZString | StringBuilder |
+| LINQ | ZLinq | System.Linq |
+| 代码加固 | Obfuz | Beebyte、自定义混淆 |
 
 ## 三层架构
 
@@ -30,8 +36,8 @@ Unity Client
 │
 ├── Framework 层 (AOT — 接口 + 核心实现)
 │   ├── Log / Event / Pool / Timer    ← Phase 0 基石
-│   ├── Resource / Config            ← Phase 1 核心
-│   ├── Procedure / Scene / UI / Audio ← Phase 2 游戏流程
+│   ├── Resource / Config / Procedure ← Phase 1 核心
+│   ├── Entity / Scene / UI / Audio   ← Phase 2 游戏玩法
 │   └── Save / Network               ← Phase 3 扩展
 │
 └── Game / HotUpdate 层 (热更 DLL)
@@ -45,11 +51,12 @@ Unity Client
 | Log | 统一日志输出（控制台/文件），级别过滤 | `ILogModule` | ✅ |
 | Pool | GameObject 池 + class 池，委托注入 | `IPoolModule` | ✅ |
 | Event | 解耦消息通信，类型路由，`Fire<T>` / `FireAsync<T>`，零 GC struct 消息 | `IEventModule` | ✅ |
-| Timer | 帧计时器 + 时间计时器 | `ITimerModule` | 待建 |
-| Scene | 场景加载管理（异步加载/卸载、过渡动画、场景栈） | `ISceneModule` | 待建 |
-| Resource | YooAsset 封装，异步加载，引用计数 | `IResourceModule` | 待建 |
-| Config | Luban 集成，二段式加载 | `IConfigModule` | 待建 |
+| Timer | 计时器，delay/interval/duration/maxTriggerCount 四参数模型，支持 ignorTimescale | `ITimerModule` | ✅ |
+| Resource | YooAsset v3 封装，异步加载，引用计数 | `IResourceModule` | ✅ |
+| Config | Luban 集成，IConfigHelper 桥接，BootstrapConfig + RuntimeConfig 两段加载 | `IConfigModule` | ✅ |
 | Procedure | FSM 状态机引擎 | `IProcedureModule` | 待建 |
+| Entity | 游戏实体生命周期，实体组+对象池，父子附加 | `IEntityModule` | 待建 |
+| Scene | 场景加载管理（异步加载/卸载、过渡动画、场景栈） | `ISceneModule` | 待建 |
 | UI | UI 组管理，生命周期 | `IUIModule` | 待建 |
 | Audio | BGM/SFX/UI 三组，AudioSource 池 | `IAudioModule` | 待建 |
 | Save | MemoryPack 序列化，多槽位 | `ISaveModule` | 待建 |
@@ -63,14 +70,19 @@ Unity Client
 
 ```
 "UnityRFramework" (根节点, DontDestroyOnLoad)
-├─ GameEntry            ← 框架入口，Inspector 可视化所有子模块
-├─ "Base"               ← 框架基础设施
-│    └─ BaseComponent   (Helpers + Update 驱动 + Shutdown)
-├─ "Event"              ← 事件模块
-│    └─ EventComponent  (EventModule 包装)
-├─ "Pool"               ← 对象池模块
-│    └─ PoolComponent   (PoolModule 包装)
-└─ ...（将来每个模块一个子节点 + Component）
+├─ GameEntry             ← 框架入口，Inspector 可视化所有子模块
+├─ "Base"                ← 框架基础设施
+│    └─ BaseComponent    (Helpers + Update 驱动 + Shutdown)
+├─ "Event"               ← 事件模块
+│    └─ EventComponent   (EventModule 包装)
+├─ "Pool"                ← 对象池模块
+│    └─ PoolComponent    (PoolModule 包装)
+├─ "Timer"               ← 定时器模块
+│    └─ TimerComponent   (TimerModule 包装)
+├─ "Resource"            ← 资源模块
+│    └─ ResourceComponent (ResourceModule 包装)
+└─ "Config"              ← 配置模块
+     └─ ConfigComponent  (ConfigModule 包装)
 ```
 
 ### 访问模块
@@ -185,13 +197,19 @@ Assets/UnityRFramework/
 │   ├── Base/                        ← RFrameworkModule、RFrameworkModuleEntry
 │   ├── Log/                         ← RFrameworkLog、RFrameworkLogLevel
 │   ├── Pool/                        ← IPoolModule、PoolModule、ObjectPool<T>
-│   └── Event/                       ← IEventModule、EventModule、EventGroup
+│   ├── Event/                       ← IEventModule、EventModule、EventGroup
+│   ├── Timer/                       ← ITimerModule、TimerModule
+│   ├── Resource/                    ← IResourceModule、ResourceModule、IResourceHelper
+│   └── Config/                      ← IConfigModule、ConfigModule、IConfigHelper
 ├── Scripts/Runtime/                 ← Unity 运行时
 │   ├── Base/                        ← UnityRFrameworkComponent、ComponentEntry
 │   ├── GameEntry.cs                 ← 框架入口 MonoBehaviour
 │   ├── Utility/                     ← DefaultLogHelper
 │   ├── Pool/                        ← PoolComponent
-│   └── Event/                       ← EventComponent
+│   ├── Event/                       ← EventComponent
+│   ├── Timer/                       ← TimerComponent
+│   ├── Resource/                    ← ResourceComponent、DefaultResourceHelper（占位）
+│   └── Config/                      ← ConfigComponent、DefaultConfigHelper（占位）、BootstrapConfig
 ├── Scripts/Editor/                  ← 编辑器工具
 └── Prefabs/                         ← UnityRFramework.prefab
 ```

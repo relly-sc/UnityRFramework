@@ -18,6 +18,9 @@ namespace UnityRFramework.Runtime
         private static BaseComponent baseCache;
         private static PoolComponent poolCache;
         private static EventComponent eventCache;
+        private static TimerComponent timerCache;
+        private static ResourceComponent resourceCache;
+        private static ConfigComponent configCache;
 
         // ====== 强类型静态快捷入口（内置模块） ======
 
@@ -63,6 +66,51 @@ namespace UnityRFramework.Runtime
                     eventCache = Get<EventComponent>();
                 }
                 return eventCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取计时器组件。
+        /// </summary>
+        public static TimerComponent Timer
+        {
+            get
+            {
+                if (timerCache == null)
+                {
+                    timerCache = Get<TimerComponent>();
+                }
+                return timerCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取资源组件。
+        /// </summary>
+        public static ResourceComponent Resource
+        {
+            get
+            {
+                if (resourceCache == null)
+                {
+                    resourceCache = Get<ResourceComponent>();
+                }
+                return resourceCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取配置组件。
+        /// </summary>
+        public static ConfigComponent Config
+        {
+            get
+            {
+                if (configCache == null)
+                {
+                    configCache = Get<ConfigComponent>();
+                }
+                return configCache;
             }
         }
 

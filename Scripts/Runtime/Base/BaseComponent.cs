@@ -11,6 +11,7 @@ namespace UnityRFramework.Runtime
     /// </summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("UnityRFramework/Base")]
+    [DefaultExecutionOrder(-100)]
     public sealed class BaseComponent : UnityRFrameworkComponent
     {
         private const int DefaultDpi = 96;  // default windows dpi
@@ -154,9 +155,9 @@ namespace UnityRFramework.Runtime
         {
             base.Awake();
 
+            InitLogHelper();
             InitTextHelper();
             InitVersionHelper();
-            InitLogHelper();
 
             Log.Info("Unity Version: {0}", Application.unityVersion);
 
