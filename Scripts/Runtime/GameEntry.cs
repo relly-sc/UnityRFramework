@@ -66,6 +66,16 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private static EntityComponent entityCache;
 
+        /// <summary>
+        /// 场景组件缓存。
+        /// </summary>
+        private static SceneComponent sceneCache;
+
+        /// <summary>
+        /// UI 组件缓存。
+        /// </summary>
+        private static UIComponent uiCache;
+
         // ====== 强类型静态快捷入口（内置模块） ======
 
         /// <summary>
@@ -200,6 +210,36 @@ namespace UnityRFramework.Runtime
                     webRequestCache = Get<WebRequestComponent>();
                 }
                 return webRequestCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取场景组件。
+        /// </summary>
+        public static SceneComponent Scene
+        {
+            get
+            {
+                if (sceneCache == null)
+                {
+                    sceneCache = Get<SceneComponent>();
+                }
+                return sceneCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取 UI 组件。
+        /// </summary>
+        public static UIComponent UI
+        {
+            get
+            {
+                if (uiCache == null)
+                {
+                    uiCache = Get<UIComponent>();
+                }
+                return uiCache;
             }
         }
 
