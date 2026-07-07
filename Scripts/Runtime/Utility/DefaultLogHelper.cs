@@ -74,6 +74,13 @@ namespace UnityRFramework.Runtime
         /// <param name="message">日志内容。</param>
         public void Log(RFrameworkLogLevel level, object message)
         {
+            // Error 等级在调用 Debug.LogError 之前捕获完整堆栈，供文件写入
+            string errorStack = null;
+            if (level == RFrameworkLogLevel.Error)
+            {
+                errorStack = CaptureFullStackTrace();
+            }
+
             switch (level)
             {
                 case RFrameworkLogLevel.Info:
@@ -89,7 +96,7 @@ namespace UnityRFramework.Runtime
                     throw new RFrameworkException(message.ToString());
             }
 
-            WriteToFile(level, message);
+            WriteToFile(level, message, errorStack);
         }
 
         /// <summary>
@@ -140,8 +147,9 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 将日志内容写入文件。
         /// 通过 StackTrace 提取原始调用位置，跳过 RFrameworkLog / DefaultLogHelper 自身帧。
+        /// Error 级别额外写入完整堆栈跟踪，便于排查崩溃和异常。
         /// </summary>
-        private void WriteToFile(RFrameworkLogLevel level, object message)
+        private void WriteToFile(RFrameworkLogLevel level, object message, string errorStackTrace = null)
         {
             if (streamWriter == null)
             {
@@ -160,6 +168,13 @@ namespace UnityRFramework.Runtime
             AppendCallerFrame();
 
             streamWriter.WriteLine(stringBuilder.ToString());
+
+            // Error 级别写入完整堆栈
+            if (level == RFrameworkLogLevel.Error && !string.IsNullOrEmpty(errorStackTrace))
+            {
+                streamWriter.WriteLine("    --- Stack Trace ---");
+                streamWriter.Write(errorStackTrace);
+            }
 
             // Error 级别始终立即写入磁盘，防止崩溃时数据丢失
             if (level == RFrameworkLogLevel.Error)
@@ -182,6 +197,71 @@ namespace UnityRFramework.Runtime
                 RFrameworkLogLevel.Error => "Error",
                 _ => "???"
             };
+        }
+
+        /// <summary>
+        /// 捕获当前调用栈的完整帧信息（跳过框架内部帧），
+        /// 格式化为标准堆栈跟踪字符串，每条一行 "  at Class.Method (path:line)"。
+        /// </summary>
+        private static string CaptureFullStackTrace()
+        {
+            var stackTrace = new StackTrace(2, true);
+            StringBuilder sb = new StringBuilder();
+
+            for (int i = 0; i < stackTrace.FrameCount; i++)
+            {
+                StackFrame frame = stackTrace.GetFrame(i);
+                var method = frame.GetMethod();
+                if (method == null)
+                {
+                    continue;
+                }
+
+                string typeName = method.DeclaringType?.FullName ?? "?";
+
+                // 跳过框架内部堆栈帧
+                if (typeName.StartsWith("UnityEngine.Debug") ||
+                    typeName.StartsWith("UnityEngine.Logger") ||
+                    typeName.Contains("RFrameworkLog") ||
+                    typeName.Contains("DefaultLogHelper"))
+                {
+                    continue;
+                }
+
+                sb.Append("  at ");
+                sb.Append(typeName);
+
+                if (method.ReflectedType != null && method.ReflectedType != method.DeclaringType)
+                {
+                    sb.Append('.');
+                    sb.Append(method.ReflectedType.Name);
+                    sb.Append('.');
+                }
+                else
+                {
+                    sb.Append('.');
+                }
+
+                sb.Append(method.Name);
+                sb.Append(" (");
+
+                string fileName = frame.GetFileName();
+                if (!string.IsNullOrEmpty(fileName))
+                {
+                    sb.Append(fileName);
+                    int lineNum = frame.GetFileLineNumber();
+                    if (lineNum > 0)
+                    {
+                        sb.Append(':');
+                        sb.Append(lineNum);
+                    }
+                }
+
+                sb.Append(')');
+                sb.AppendLine();
+            }
+
+            return sb.ToString();
         }
 
         /// <summary>

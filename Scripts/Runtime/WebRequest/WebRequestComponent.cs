@@ -79,7 +79,6 @@ namespace UnityRFramework.Runtime
             WebRequestHelperBase helper = Helper.CreateHelper<WebRequestHelperBase>(webRequestHelperTypeName, null);
             if (helper != null)
             {
-                helper.name = $"{helper.GetType().Name} (WebRequest Helper)";
                 helper.transform.SetParent(transform);
                 webRequestModule.SetHelper(helper);
             }
