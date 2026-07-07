@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using RFramework.WebRequest;
@@ -22,6 +23,14 @@ namespace UnityRFramework.Runtime
         {
             var tcs = new TaskCompletionSource<WebResponse>();
             StartCoroutine(SendCoroutine(request, progress, ct, tcs));
+            return tcs.Task;
+        }
+
+        /// <inheritdoc />
+        public override Task DownloadFileAsync(WebRequestData request, string savePath, IProgress<float> progress, CancellationToken ct)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            StartCoroutine(DownloadFileCoroutine(request, savePath, progress, ct, tcs));
             return tcs.Task;
         }
 
@@ -66,6 +75,79 @@ namespace UnityRFramework.Runtime
             {
                 var response = BuildResponse(uwr);
                 tcs.TrySetResult(response);
+            }
+            catch (Exception ex)
+            {
+                tcs.TrySetException(ex);
+            }
+            finally
+            {
+                uwr.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// 流式下载协程：使用 DownloadHandlerFile 直接将数据写入磁盘，不经过内存缓存。
+        /// </summary>
+        private IEnumerator DownloadFileCoroutine(WebRequestData request, string savePath, IProgress<float> progress, CancellationToken ct, TaskCompletionSource<bool> tcs)
+        {
+            UnityWebRequest uwr = null;
+
+            // 阶段 1：创建请求，使用 DownloadHandlerFile
+            try
+            {
+                string dir = Path.GetDirectoryName(savePath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                {
+                    Directory.CreateDirectory(dir);
+                }
+
+                string method = MapMethod(request.Method);
+                uwr = new UnityWebRequest(request.Url, method);
+                uwr.downloadHandler = new DownloadHandlerFile(savePath) { removeFileOnAbort = true };
+
+                if (request.Headers != null)
+                {
+                    foreach (var kv in request.Headers)
+                    {
+                        uwr.SetRequestHeader(kv.Key, kv.Value);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                tcs.TrySetException(ex);
+                yield break;
+            }
+
+            // 阶段 2：等待完成
+            var asyncOp = uwr.SendWebRequest();
+            while (!asyncOp.isDone)
+            {
+                if (ct.IsCancellationRequested)
+                {
+                    uwr.Abort();
+                    uwr.Dispose();
+                    tcs.TrySetCanceled(ct);
+                    yield break;
+                }
+
+                progress?.Report(asyncOp.progress);
+                yield return null;
+            }
+
+            // 阶段 3：检查结果
+            try
+            {
+                if (uwr.result == UnityWebRequest.Result.Success)
+                {
+                    tcs.TrySetResult(true);
+                }
+                else
+                {
+                    tcs.TrySetException(new System.Exception(
+                        string.Format("Download failed: {0} ({1})", uwr.error, uwr.responseCode)));
+                }
             }
             catch (Exception ex)
             {

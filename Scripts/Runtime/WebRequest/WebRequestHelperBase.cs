@@ -31,6 +31,9 @@ namespace UnityRFramework.Runtime
         /// <returns>HTTP 响应。</returns>
         public abstract Task<WebResponse> SendAsync(WebRequestData request, IProgress<float> progress, CancellationToken ct);
 
+        /// <inheritdoc/>
+        public abstract Task DownloadFileAsync(WebRequestData request, string savePath, IProgress<float> progress, CancellationToken ct);
+
         #region 共享工具方法
 
         /// <summary>

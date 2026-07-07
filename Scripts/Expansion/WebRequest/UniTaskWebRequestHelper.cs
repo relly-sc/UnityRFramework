@@ -49,5 +49,57 @@ namespace UnityRFramework.Expansion.WebRequest
                 uwr?.Dispose();
             }
         }
+
+        /// <inheritdoc />
+        public override async Task DownloadFileAsync(WebRequestData request, string savePath, IProgress<float> progress, CancellationToken ct)
+        {
+            UnityWebRequest uwr = null;
+
+            try
+            {
+                // 自动创建父目录
+                string dir = System.IO.Path.GetDirectoryName(savePath);
+                if (!string.IsNullOrEmpty(dir) && !System.IO.Directory.Exists(dir))
+                {
+                    System.IO.Directory.CreateDirectory(dir);
+                }
+
+                uwr = new UnityWebRequest(request.Url, "GET");
+                uwr.downloadHandler = new DownloadHandlerFile(savePath) { removeFileOnAbort = true };
+
+                if (request.Headers != null)
+                {
+                    foreach (var kv in request.Headers)
+                    {
+                        uwr.SetRequestHeader(kv.Key, kv.Value);
+                    }
+                }
+
+                uwr.timeout = 0;
+
+                var asyncOp = uwr.SendWebRequest();
+
+                while (!asyncOp.isDone)
+                {
+                    await UniTask.Yield(PlayerLoopTiming.Update, ct);
+                    progress?.Report(asyncOp.progress);
+                }
+
+                if (uwr.result != UnityWebRequest.Result.Success)
+                {
+                    throw new System.Exception(
+                        string.Format("UniTask download failed: {0} ({1})", uwr.error, uwr.responseCode));
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                uwr?.Abort();
+                throw;
+            }
+            finally
+            {
+                uwr?.Dispose();
+            }
+        }
     }
 }

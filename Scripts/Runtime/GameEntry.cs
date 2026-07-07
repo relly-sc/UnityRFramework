@@ -86,6 +86,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private static LocalizationComponent localizationCache;
 
+        /// <summary>
+        /// 网络组件缓存。
+        /// </summary>
+        private static NetworkComponent networkCache;
+
         // ====== 强类型静态快捷入口（内置模块） ======
 
         /// <summary>
@@ -280,6 +285,21 @@ namespace UnityRFramework.Runtime
                     localizationCache = Get<LocalizationComponent>();
                 }
                 return localizationCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取网络组件。
+        /// </summary>
+        public static NetworkComponent Network
+        {
+            get
+            {
+                if (networkCache == null)
+                {
+                    networkCache = Get<NetworkComponent>();
+                }
+                return networkCache;
             }
         }
 
