@@ -61,6 +61,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private static WebRequestComponent webRequestCache;
 
+        /// <summary>
+        /// 实体组件缓存。
+        /// </summary>
+        private static EntityComponent entityCache;
+
         // ====== 强类型静态快捷入口（内置模块） ======
 
         /// <summary>
@@ -195,6 +200,21 @@ namespace UnityRFramework.Runtime
                     webRequestCache = Get<WebRequestComponent>();
                 }
                 return webRequestCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取实体组件。
+        /// </summary>
+        public static EntityComponent Entity
+        {
+            get
+            {
+                if (entityCache == null)
+                {
+                    entityCache = Get<EntityComponent>();
+                }
+                return entityCache;
             }
         }
 
