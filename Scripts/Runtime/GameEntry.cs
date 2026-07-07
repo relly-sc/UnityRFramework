@@ -76,6 +76,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private static UIComponent uiCache;
 
+        /// <summary>
+        /// 音频组件缓存。
+        /// </summary>
+        private static AudioComponent audioCache;
+
         // ====== 强类型静态快捷入口（内置模块） ======
 
         /// <summary>
@@ -240,6 +245,21 @@ namespace UnityRFramework.Runtime
                     uiCache = Get<UIComponent>();
                 }
                 return uiCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取音频组件。
+        /// </summary>
+        public static AudioComponent Audio
+        {
+            get
+            {
+                if (audioCache == null)
+                {
+                    audioCache = Get<AudioComponent>();
+                }
+                return audioCache;
             }
         }
 

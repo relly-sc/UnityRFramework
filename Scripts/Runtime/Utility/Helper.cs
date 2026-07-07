@@ -48,6 +48,7 @@ namespace UnityRFramework.Runtime
                 }
 
                 helper = (T)new GameObject().AddComponent(helperType);
+                helper.name = helperType.Name;
             }
             else if (customHelper == null)
             {
