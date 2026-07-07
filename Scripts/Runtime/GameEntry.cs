@@ -81,6 +81,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private static AudioComponent audioCache;
 
+        /// <summary>
+        /// 本地化组件缓存。
+        /// </summary>
+        private static LocalizationComponent localizationCache;
+
         // ====== 强类型静态快捷入口（内置模块） ======
 
         /// <summary>
@@ -260,6 +265,21 @@ namespace UnityRFramework.Runtime
                     audioCache = Get<AudioComponent>();
                 }
                 return audioCache;
+            }
+        }
+
+        /// <summary>
+        /// 获取本地化组件。
+        /// </summary>
+        public static LocalizationComponent Localization
+        {
+            get
+            {
+                if (localizationCache == null)
+                {
+                    localizationCache = Get<LocalizationComponent>();
+                }
+                return localizationCache;
             }
         }
 
