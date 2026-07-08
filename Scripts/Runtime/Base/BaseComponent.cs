@@ -14,31 +14,24 @@ namespace UnityRFramework.Runtime
     [DefaultExecutionOrder(-100)]
     public sealed class BaseComponent : UnityRFrameworkComponent
     {
-    /// <summary>
-    /// 默认 DPI（Windows 标准 96）。
-    /// 当 Unity 无法获取屏幕 DPI 时使用此值。
-    /// </summary>
-    private const int DefaultDpi = 96;  // default windows dpi
+        /// <summary>
+        /// 默认 DPI（Windows 标准 96）。
+        /// 当 Unity 无法获取屏幕 DPI 时使用此值。
+        /// </summary>
+        private const int DefaultDpi = 96;  // default windows dpi
 
-    /// <summary>
-    /// 暂停前的游戏速度缓存，用于 ResumeGame 时恢复原速度。
-    /// </summary>
-    private float gameSpeedBeforePause = 1f;
+        /// <summary>
+        /// 暂停前的游戏速度缓存，用于 ResumeGame 时恢复原速度。
+        /// </summary>
+        private float gameSpeedBeforePause = 1f;
 
-        [SerializeField]
-        private bool editorResourceMode = true;
+
 
         [SerializeField]
         private string textHelperTypeName = "UnityRFramework.Runtime.DefaultTextHelper";
 
         [SerializeField]
-        private string versionHelperTypeName = "UnityRFramework.Runtime.DefaultVersionHelper";
-
-        [SerializeField]
         private string logHelperTypeName = "UnityRFramework.Runtime.DefaultLogHelper";
-
-        [SerializeField]
-        private string compressionHelperTypeName = "UnityRFramework.Runtime.DefaultCompressionHelper";
 
         [SerializeField]
         private string jsonHelperTypeName = "UnityRFramework.Runtime.DefaultJsonHelper";
@@ -55,20 +48,6 @@ namespace UnityRFramework.Runtime
         [SerializeField]
         private bool neverSleep = true;
 
-        /// <summary>
-        /// 获取或设置是否使用编辑器资源模式（仅编辑器内有效）。
-        /// </summary>
-        public bool EditorResourceMode
-        {
-            get
-            {
-                return editorResourceMode;
-            }
-            set
-            {
-                editorResourceMode = value;
-            }
-        }
 
 
 
@@ -168,12 +147,10 @@ namespace UnityRFramework.Runtime
 
             InitLogHelper();
             InitTextHelper();
-            InitVersionHelper();
 
             Log.Info("Unity Version: {0}", Application.unityVersion);
 
 #if UNITY_5_3_OR_NEWER || UNITY_5_3
-            InitCompressionHelper();
             InitJsonHelper();
 
             Utility.Converter.ScreenDpi = Screen.dpi;
@@ -182,19 +159,15 @@ namespace UnityRFramework.Runtime
                 Utility.Converter.ScreenDpi = DefaultDpi;
             }
 
-            editorResourceMode &= Application.isEditor;
-            if (editorResourceMode)
-            {
-                Log.Info("During this run, Game Framework will use editor resource files, which you should validate first.");
-            }
+
 
             Application.targetFrameRate = frameRate;
             Time.timeScale = gameSpeed;
             Application.runInBackground = runInBackground;
             Screen.sleepTimeout = neverSleep ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
 #else
-            Log.Error("Game Framework only applies with Unity 5.3 and above, but current Unity version is {0}.", Application.unityVersion);
-            GameEntry.Shutdown(ShutdownType.Quit);
+            Log.Error(" UnityRFramework only applies with Unity 5.3 and above, but current Unity version is {0}.", Application.unityVersion);
+            UnityRFrameworkComponentEntry.Shutdown(ShutdownType.Quit);
 #endif
 #if UNITY_5_6_OR_NEWER
             Application.lowMemory += OnLowMemory;
@@ -305,13 +278,6 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>
-        /// 初始化版本辅助器（当前为空实现，预留给 Expansion 层）。
-        /// </summary>
-        private void InitVersionHelper()
-        {
-        }
-
-        /// <summary>
         /// 初始化日志辅助器，通过反射创建 ILogHelper 实例并注入到 RFrameworkLog。
         /// 必须在所有其他 InitXxxHelper 之前调用（后续代码依赖 Log 输出）。
         /// </summary>
@@ -335,13 +301,6 @@ namespace UnityRFramework.Runtime
             }
 
             RFrameworkLog.SetLogHelper(logHelper);
-        }
-
-        /// <summary>
-        /// 初始化压缩辅助器（当前为空实现，预留给 Expansion 层）。
-        /// </summary>
-        private void InitCompressionHelper()
-        {
         }
 
         /// <summary>
@@ -373,23 +332,23 @@ namespace UnityRFramework.Runtime
 
         /// <summary>
         /// 低内存回调（仅 Unity 5.6+ 有效）。
-        /// 当系统报告内存不足时触发，可用于释放未使用的资源。
+        /// 当系统报告内存不足时触发，释放对象池空闲对象和未使用的资源。
         /// </summary>
         private void OnLowMemory()
         {
-            Log.Info("Low memory reported...");
+            Log.Info("Low memory reported, releasing unused resources...");
 
-            // ObjectPoolComponent objectPoolComponent = ComponentEntry.GetComponent<ObjectPoolComponent>();
-            // if (objectPoolComponent != null)
-            // {
-            //     objectPoolComponent.ReleaseAllUnused();
-            // }
+            PoolComponent poolComponent = UnityRFrameworkComponentEntry.GetComponent<PoolComponent>();
+            if (poolComponent != null)
+            {
+                poolComponent.ReleaseAllUnused();
+            }
 
-            // ResourceComponent resourceCompoent = ComponentEntry.GetComponent<ResourceComponent>();
-            // if (resourceCompoent != null)
-            // {
-            //     resourceCompoent.ForceUnloadUnusedAssets(true);
-            // }
+            ResourceComponent resourceComponent = UnityRFrameworkComponentEntry.GetComponent<ResourceComponent>();
+            if (resourceComponent != null)
+            {
+                resourceComponent.UnloadUnusedAssets();
+            }
         }
     }
 }

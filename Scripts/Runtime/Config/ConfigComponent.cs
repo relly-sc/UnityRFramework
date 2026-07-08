@@ -107,6 +107,16 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>
+        /// 从 JSON 字符串加载配置表。适用于运行时动态生成配置、编辑器预览等场景。
+        /// </summary>
+        /// <typeparam name="T">配置行类型。</typeparam>
+        /// <param name="json">JSON 字符串。</param>
+        public void LoadConfigFromString<T>(string json) where T : class
+        {
+            configModule.LoadConfigFromString<T>(json);
+        }
+
+        /// <summary>
         /// 卸载指定类型的配置表。
         /// </summary>
         public void UnloadConfig<T>() where T : class

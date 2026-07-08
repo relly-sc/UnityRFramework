@@ -20,7 +20,7 @@ namespace UnityRFramework.Runtime
         /// </summary>
         [SerializeField]
         [Tooltip("网络辅助器类型全名。必须是继承自 NetworkHelperBase 的 MonoBehaviour。")]
-        private string networkHelperTypeName = "UnityRFramework.Expansion.Network.TcpNetworkHelper";
+        private string networkHelperTypeName = "UnityRFramework.Runtime.DefaultNetworkHelper";
 
         /// <summary>
         /// 心跳间隔（秒）。0 表示不发送心跳。
