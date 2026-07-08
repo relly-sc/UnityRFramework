@@ -380,7 +380,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9942c48f0d5cba646ad202102f05fc2e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  resourceHelperTypeName: UnityRFramework.Expansion.YooAssetResourceHelper
+  resourceHelperTypeName: UnityRFramework.Runtime.DefaultResourceHelper
   playMode: 0
   packageName: DefaultPackage
   defaultHostServer: 

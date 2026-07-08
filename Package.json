@@ -2,7 +2,7 @@
   "name": "com.relly-sc.unityrframework",
   "version": "1.0.0",
   "displayName": "UnityRFramework",
-  "description": "",
+  "description": "基于 GameFramework 分层架构的数据驱动、模块化 Unity 游戏框架。核心零第三方依赖；第三方集成（YooAsset、UniTask、HybridCLR 等）以可选 Samples 形式提供。",
   "documentationUrl": "https://github.com/relly-sc/UnityRFramework/blob/main/README.md",
   "licensesUrl": "https://github.com/relly-sc/UnityRFramework/blob/main/LICENSE",
   "author": {
@@ -12,18 +12,26 @@
   },
   "keywords": [
     "unityrframework",
-    "UnityRFramework"
+    "UnityRFramework",
+    "game-framework",
+    "gameframework"
   ],
-  "dependencies": {
-    "com.tuyoogame.yooasset": "3.0.3-beta",
-    "com.cysharp.unitask": "2.5.11",
-    "com.code-philosophy.hybridclr": "8.11.0"
-  },
+  "dependencies": {},
   "samples": [
     {
-      "displayName": "GameMain",
-      "description": "",
-      "path": "Samples~/GameMain"
+      "displayName": "Expansion",
+      "description": "可选的第三方集成：YooAsset 资源辅助器、UniTask Web 请求辅助器等。需手动安装对应第三方包（详见 Samples~/Expansion/README.md）。",
+      "path": "Samples~/Expansion"
+    },
+    {
+      "displayName": "Demo",
+      "description": "官方可运行 Demo，使用内置辅助器串通全部框架模块。不依赖任何第三方包。",
+      "path": "Samples~/Demo"
+    },
+    {
+      "displayName": "ExpansionDemo",
+      "description": "使用 Expansion 第三方辅助器（YooAsset、UniTask 等）的完整 Demo。需先安装对应第三方包并导入 Expansion Sample。",
+      "path": "Samples~/ExpansionDemo"
     }
   ]
 }

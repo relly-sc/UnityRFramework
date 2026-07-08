@@ -8,10 +8,28 @@
 Library/RFramework/RFramework/  ← 纯 C# 核心（.NET Standard 2.0，零 Unity/第三方依赖）
 Scripts/Runtime/                ← Unity 运行时（Component + Helper 默认实现）
 Scripts/Editor/                 ← 编辑器工具（Inspector、菜单项）
-Scripts/Expansion/              ← 第三方集成（YooAsset/Luban/KCP，按需编译）
+Samples~/Expansion/             ← 第三方集成（YooAsset/Luban/HybridCLR，按需 Import）
+Samples~/Demo/                  ← 官方示例（仅用内置 Helper，串通全部模块）
 ```
 
+> `Samples~` 以 `~` 结尾，Unity 不自动编译；经 Package Manager 的 **Import Sample** 才会进入项目编译。
+
 所有共享数据通过 Helper 桥接模式解耦：Library 定义 `IXxxHelper` 纯 C# 接口 → Runtime 提供默认实现 → Expansion 提供第三方实现。
+
+## 安装
+
+支持通过 Package Manager 的 **git URL** 导入：
+
+1. `Window → Package Manager → + → Add package from git URL`
+2. 填入仓库地址（如 `https://github.com/relly-sc/UnityRFramework.git?path=/Assets/UnityRFramework`，`path` 指向包根目录）
+3. 等待编译完成。
+
+**Samples（可选）**：在 Package Manager 中选中本包 → **Samples** → 点击 `Expansion` 或 `Demo` 的 **Import**。
+
+- `Expansion`：第三方集成（YooAsset 资源、UniTask Web 请求等）。UPM 不为 Sample 解析依赖，需手动安装其引用的包（YooAsset / UniTask / Luban / HybridCLR，按所用 Helper 而定）。详见 `Samples~/Expansion/README.md`。
+- `Demo`：官方可运行示例，**仅依赖内置 Helper、零第三方**；含演示用美术/音频资源，开发者可不导入。
+
+> 核心包 `dependencies` 为空：框架本身不强制任何第三方库，按需引入即可。
 
 ## 模块
 
