@@ -36,6 +36,13 @@ namespace UnityRFramework.Runtime
             base.Awake();
             configModule = RFrameworkModuleEntry.GetModule<IConfigModule>();
 
+            // IL2CPP 构建时 [SerializeField] private 字段可能因 stripping 被损毁，
+            // 防御性检查：值异常时回退到代码默认值
+            if (string.IsNullOrEmpty(configHelperTypeName) || configHelperTypeName.StartsWith("System."))
+            {
+                configHelperTypeName = "UnityRFramework.Runtime.DefaultConfigHelper";
+            }
+
             // 通过统一 Helper 创建器反射创建 MonoBehaviour 辅助器
             ConfigHelperBase helper = Helper.CreateHelper<ConfigHelperBase>(configHelperTypeName, null);
             if (helper != null)

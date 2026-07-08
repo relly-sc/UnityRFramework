@@ -1,0 +1,9 @@
+<linker>
+  <!-- 保留 UnityRFramework.Runtime 程序集中所有类型及其序列化字段 -->
+  <assembly fullname="Assembly-CSharp" preserve="all">
+  </assembly>
+
+  <!-- 保留 RFramework Library 程序集 -->
+  <assembly fullname="RFramework" preserve="all">
+  </assembly>
+</linker>
