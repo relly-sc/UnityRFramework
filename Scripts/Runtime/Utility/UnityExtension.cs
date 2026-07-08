@@ -3,12 +3,10 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace UnityRFramework.Runtime
-{
-
 /// <summary>
 /// 对 Unity 的扩展方法。
 /// </summary>
+/// <remarks>弱相关工具集：置于全局命名空间，免 using 直接可用。</remarks>
 public static class UnityExtension
 {
     /// <summary>
@@ -344,5 +342,4 @@ public static class UnityExtension
     }
 
     #endregion Transform
-}
 }

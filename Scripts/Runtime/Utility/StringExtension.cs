@@ -1,10 +1,8 @@
 
-namespace UnityRFramework.Runtime
-{
-
 /// <summary>
 /// 对 string 的扩展方法。
 /// </summary>
+/// <remarks>弱相关工具集：置于全局命名空间，免 using 直接可用。</remarks>
 public static class StringExtension
 {
     /// <summary>
@@ -60,5 +58,4 @@ public static class StringExtension
 
         return null;
     }
-}
 }
