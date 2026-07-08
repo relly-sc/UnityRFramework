@@ -1,222 +1,157 @@
 # UnityRFramework
 
-轻量级 Unity 游戏框架，参考 GameFramework 架构思路，面向 HybridCLR 热更 + YooAsset 资源管理的现代技术栈。
+基于 GameFramework 架构理念的轻量级 Unity 游戏框架。**Library 层纯 C#（零 UnityEngine 依赖）+ Runtime 层 Helper 桥接**，面向 HybridCLR 热更 + YooAsset 资源管理的现代技术栈。
 
-**设计理念：接口优先、组件归组件、逻辑归逻辑。用 C# 标准库，不做"为封装而封装"。**
-
-## 技术栈
-
-> **重要**：以下为 Runtime 层**默认实现方案**，通过 Helper 桥接模式接入，可自由替换。Library 层不依赖任何第三方库，仅定义纯 C# 接口。
-
-| 领域 | 默认实现 | 可替换方案 |
-|------|---------|-----------|
-| 资源管理 | YooAsset | Addressables、自管理 AssetBundle |
-| 配置表 | Luban | 自研解析器、JSON/CSV |
-| 代码热更 | HybridCLR | ILRuntime |
-| 异步 | Task（Library）/ UniTask（Runtime） | Awaitable、Coroutine |
-| 序列化 | MemoryPack | Protobuf、MessagePack |
-| UI | UGUI | UI Toolkit、FairyGUI |
-| 动画 | DOTween | 自研补间、Animator |
-| 依赖注入 | VContainer | Zenject、手动 DI |
-| 事件系统 | 自研 / MessagePipe | — |
-| 响应式 | R3 | UniRx |
-| 字符串 | ZString | StringBuilder |
-| LINQ | ZLinq | System.Linq |
-| 代码加固 | Obfuz | Beebyte、自定义混淆 |
-
-## 三层架构
+## 架构
 
 ```
-Unity Client
-├── Launcher 层 (AOT)
-│   ├── 启动入口
-│   ├── YooAsset 初始化
-│   ├── HybridCLR 初始化
-│   └── 热更 DLL 加载
-│
-├── Framework 层 (AOT — 接口 + 核心实现)
-│   ├── Log / Event / Pool / Timer    ← Phase 0 基石
-│   ├── Resource / Config / Procedure ← Phase 1 核心
-│   ├── Entity / Scene / UI / Audio   ← Phase 2 游戏玩法
-│   └── Save / Network               ← Phase 3 扩展
-│
-└── Game / HotUpdate 层 (热更 DLL)
-    └── Entry / Procedures / Gameplay / UI / Network
+Library/RFramework/RFramework/  ← 纯 C# 核心（.NET Standard 2.0，零 Unity/第三方依赖）
+Scripts/Runtime/                ← Unity 运行时（Component + Helper 默认实现）
+Scripts/Editor/                 ← 编辑器工具（Inspector、菜单项）
+Scripts/Expansion/              ← 第三方集成（YooAsset/Luban/KCP，按需编译）
 ```
 
-## 模块概览
+所有共享数据通过 Helper 桥接模式解耦：Library 定义 `IXxxHelper` 纯 C# 接口 → Runtime 提供默认实现 → Expansion 提供第三方实现。
 
-| 模块 | 职责 | 核心接口 | 状态 |
-|------|------|----------|:--:|
-| Log | 统一日志输出（控制台/文件），级别过滤 | `ILogModule` | ✅ |
-| Pool | GameObject 池 + class 池，委托注入 | `IPoolModule` | ✅ |
-| Event | 解耦消息通信，类型路由，`Fire<T>` / `FireAsync<T>`，零 GC struct 消息 | `IEventModule` | ✅ |
-| Timer | 计时器，delay/interval/duration/maxTriggerCount 四参数模型，支持 ignorTimescale | `ITimerModule` | ✅ |
-| Resource | YooAsset v3 封装，异步加载，引用计数 | `IResourceModule` | ✅ |
-| Config | Luban 集成，IConfigHelper 桥接，两段加载 | `IConfigModule` | ✅ |
-| Procedure | FSM 状态机引擎 | `IProcedureModule` | 待建 |
-| Entity | 游戏实体生命周期，实体组+对象池，父子附加 | `IEntityModule` | 待建 |
-| Scene | 场景加载管理（异步加载/卸载、过渡动画、场景栈） | `ISceneModule` | 待建 |
-| UI | UI 组管理，生命周期 | `IUIModule` | 待建 |
-| Audio | BGM/SFX/UI 三组，AudioSource 池 | `IAudioModule` | 待建 |
-| Save | MemoryPack 序列化，多槽位 | `ISaveModule` | 待建 |
-| Network | 连接管理，心跳，断线重连 | `INetworkModule` | 待建 |
+## 模块
+
+| 模块 | 职责 | 入口 | Helper 桥接 |
+|------|------|------|:--:|
+| **Base** | 框架基础设施：Helpers 注入、Update 驱动、帧率/游戏速度控制 | `GameEntry.Base` | Text / Log / JSON |
+| **Log** | 控制台 + 文件双输出，分卷归档，级别过滤 | `Log.Info/Warning/Error` | `ILogHelper` |
+| **Event** | 解耦消息通信，类型路由，`Fire<T>`（零 GC）+ `FireAsync<T>`（线程安全） | `GameEntry.Event` | — |
+| **Pool** | GameObject 池 + class 池，委托注入，预热 | `GameEntry.Pool` | — |
+| **Timer** | delay/interval/duration/maxTriggerCount 四参数模型 | `GameEntry.Timer` | — |
+| **Resource** | 资源异步加载，引用计数，并发去重 | `GameEntry.Resource` | `IResourceHelper`（默认 `Resources.Load`，可选 YooAsset） |
+| **WebRequest** | HTTP GET/POST/PUT/DELETE，并发控制，超时+重试，multipart 上传+进度 | `GameEntry.WebRequest` | `IWebRequestHelper`（默认 `UnityWebRequest`，可选 `UniTask`） |
+| **Config** | 配置表管理与查询，JSON（`DefaultConfigHelper`）+ Luban 双模式 | `GameEntry.Config` | `IConfigHelper` |
+| **Fsm** | 通用有限状态机，泛型 Owner，双缓冲安全 | `GameEntry.Fsm` | — |
+| **Procedure** | 游戏流程 FSM，Blackboard 跨状态共享数据 | `GameEntry.Procedure` | — |
+| **Entity** | 游戏实体生命周期，实体组+对象池，父子附加 | `GameEntry.Entity` | `IEntityHelper` |
+| **Scene** | 场景异步加载/卸载，状态追踪，防并发 | `GameEntry.Scene` | — |
+| **UI** | UI 窗口栈管理，层级排序，FullScreen 自动隐藏 | `GameEntry.UI` | `IUIHelper` |
+| **Audio** | BGM/SFX/UI 三组，AudioSource 池，淡入淡出 | `GameEntry.Audio` | `IAudioHelper` |
+| **Network** | 多通道管理，TCP/UDP/WebSocket 三协议，心跳/重连 | `GameEntry.Network` | `INetworkHelper`（默认 `TcpNetworkHelper`） |
+| **Localization** | 多语言管理，占位符格式化，Inspector 配置默认语言 | `GameEntry.Localization` | `ILocalizationHelper`（默认 CSV） |
 
 ## 快速开始
 
-### 场景配置
+### 1. 场景配置
 
-启动场景中挂 `UnityRFramework` 预制体（`Assets/UnityRFramework/Prefabs/UnityRFramework.prefab`），包含：
+将 `Assets/UnityRFramework/Prefabs/UnityRFramework.prefab` 拖入启动场景。预制体包含所有模块 Component，Inspector 中可切换 Helper 实现。
 
-```
-"UnityRFramework" (根节点, DontDestroyOnLoad)
-├─ GameEntry             ← 框架入口，Inspector 可视化所有子模块
-├─ "Base"                ← 框架基础设施
-│    └─ BaseComponent    (Helpers + Update 驱动 + Shutdown)
-├─ "Event"               ← 事件模块
-│    └─ EventComponent   (EventModule 包装)
-├─ "Pool"                ← 对象池模块
-│    └─ PoolComponent    (PoolModule 包装)
-├─ "Timer"               ← 定时器模块
-│    └─ TimerComponent   (TimerModule 包装)
-├─ "Resource"            ← 资源模块
-│    └─ ResourceComponent (ResourceModule 包装)
-└─ "Config"              ← 配置模块
-     └─ ConfigComponent  (ConfigModule 包装)
-```
-
-### 访问模块
-
-所有模块通过 `GameEntry` 统一入口访问：
+### 2. 访问模块
 
 ```csharp
-// 内置模块：强类型静态属性
-GameEntry.Pool.CreatePool<Bullet>("Bullet", ...);
+// 内置模块 — 强类型静态属性
+GameEntry.Pool.CreateGameObjectPool("Bullet", bulletPrefab, parent: bulletRoot);
 GameEntry.Base.FrameRate = 60;
+GameEntry.Localization.GetString("ui_login_button");
+GameEntry.Network.CreateChannel("Chat").ConnectAsync("127.0.0.1", 9000);
 
-// 自定义模块：泛型方法（零维护成本，不改 GameEntry）
+// 自定义模块 — 泛型方法
 var shop = GameEntry.Get<ShopComponent>();
-shop.BuyItem(itemId);
 ```
 
-## Component 设计原则
+### 3. 配置 Helper
 
-每个模块配一个薄 Component（≤50 行），挂在 `RFramework` 根节点上。Component 只做三件事：
+每个模块 Component 的 Inspector 中可通过下拉框切换 Helper 实现（如 Network 可选 `TcpNetworkHelper` / `UdpNetworkHelper` / `WebSocketNetworkHelper`），或运行时替换：
 
-1. **Inspector 配置注入** — `[SerializeField]` 暴露配置给策划
-2. **Unity 生命周期桥接** — 需要 `Update()` 的模块由 Component 驱动
-3. **GameEntry 统一入口** — 业务层通过 `GameEntry.Xxx` 访问模块
+```csharp
+GameEntry.Network.GetChannel("Login").SetHelper(new WebSocketNetworkHelper());
+```
 
-所有业务逻辑留在 Library 层 Module，Component 仅负责创建 Module、缓存引用、转发调用。
+## 使用示例
 
-## Pool 模块使用示例
-
-已完成的 Pool 模块支持 class 池和 GameObject 池，通过委托注入行为。
+### Pool
 
 ```csharp
 // class 池（委托回调）
 var pool = GameEntry.Pool.CreatePool<MyClass>("MyPool",
     createFunc: () => new MyClass(),
     onSpawn: obj => obj.Reset(),
-    onUnspawn: obj => obj.Clear(),
     capacity: 32);
-
-var obj = pool.Spawn();
-pool.Unspawn(obj);
-
-// class 池（IPoolable 接口，无需传委托）
-var dataPool = GameEntry.Pool.CreatePool<BulletData>("BulletData",
-    createFunc: () => new BulletData(),
-    capacity: 64);
 
 // GameObject 池（一行创建）
 var bulletPool = GameEntry.Pool.CreateGameObjectPool(
-    "Bullet", bulletPrefab,
-    parent: bulletRoot,
-    prewarmCount: 20,
-    capacity: 64);
+    "Bullet", bulletPrefab, parent: bulletRoot, prewarmCount: 20);
 
-var bullet = bulletPool.Spawn();   // SetActive(true)
-bulletPool.Unspawn(bullet);        // SetActive(false) + 挂回 parent
+var bullet = bulletPool.Spawn();
+bulletPool.Unspawn(bullet);
 ```
 
-## Event 模块使用示例
-
-Event 模块支持 struct（零 GC 栈分配）和 class（引用传递）两种消息类型，提供同步发布和线程安全异步发布双模式。
+### Event
 
 ```csharp
 // 定义消息（struct = 零 GC）
-public struct PlayerDeadEventArgs
-{
-    public int playerId;
-    public Vector3 position;
-}
+public struct PlayerDeadEventArgs { public int playerId; }
 
 // 订阅
 GameEntry.Event.Subscribe<PlayerDeadEventArgs>(OnPlayerDead);
 
-// 同步发布（零 GC，栈分配，立即分发）
-GameEntry.Event.Fire(new PlayerDeadEventArgs { playerId = 1, position = pos });
+// 同步发布（零 GC）
+GameEntry.Event.Fire(new PlayerDeadEventArgs { playerId = 1 });
 
-// 异步发布（线程安全，下一帧分发）
-GameEntry.Event.FireAsync(complexEventArgs);
-
-// 取消订阅
-GameEntry.Event.Unsubscribe<PlayerDeadEventArgs>(OnPlayerDead);
-
-// EventGroup 管理订阅生命周期——Dispose() 一键取消组内所有订阅，杜绝遗漏
+// EventGroup 批量管理订阅生命周期
 private EventGroup eventGroup;
+private void OnEnable() => eventGroup = GameEntry.Event.CreateGroup()
+    .Subscribe<PlayerDeadEventArgs>(OnPlayerDead);
+private void OnDisable() => eventGroup.Dispose();
+```
 
-private void OnEnable()
-{
-    eventGroup = GameEntry.Event.CreateGroup();
-    eventGroup.Subscribe<PlayerDeadEventArgs>(OnPlayerDead);
-    eventGroup.Subscribe<DamageEventArgs>(OnDamage);
-}
+### Network — 多服务器
 
-private void OnDisable()
-{
-    eventGroup.Dispose();  // 自动取消所有订阅
-}
+```csharp
+var login = GameEntry.Network.CreateChannel("Login");
+login.RegisterHandler(1001, OnLoginResponse);
+await login.ConnectAsync("127.0.0.1", 9001);
+
+var chat = GameEntry.Network.CreateChannel("Chat");
+await chat.ConnectAsync("127.0.0.1", 9002);
+chat.Send(2001, messageBytes);
+
+// 事件带通道名
+GameEntry.Event.Subscribe<NetworkConnectedEvent>(e =>
+    Debug.Log($"通道 [{e.ChannelName}] 已连接"));
+```
+
+### Config — JSON 模式
+
+```csharp
+string json = "[{\"Id\":1,\"Name\":\"Sword\"},{\"Id\":2,\"Name\":\"Shield\"}]";
+GameEntry.Config.LoadConfigFromString<ItemConfig>(json);
+var item = GameEntry.Config.GetConfig<ItemConfig>(1);
 ```
 
 ## 与 GameFramework 的核心差异
 
 | 维度 | GameFramework | UnityRFramework |
 |------|---------------|-----------------|
-| 数据结构 | 自定义 `GameFrameworkLinkedList` 等包装类 | C# 标准 `LinkedList<T>` |
-| 对象池包装 | `ObjectBase` 强制继承 | 委托注入，零包装 |
-| Component 厚度 | 含业务逻辑（UIComponent 200+ 行） | ≤50 行，纯配置+转发 |
-| Module 入口 | Component-first | Module-first，Component 做装饰层 |
+| 数据结构 | 自定义 `GameFrameworkLinkedList` 等 | C# 标准 `LinkedList<T>` |
+| 对象池 | `ObjectBase` 强制继承 | 委托注入，零包装 |
+| Component | 含业务逻辑（UIComponent 200+ 行） | 纯配置+转发，≤100 行 |
+| Helper 惯例 | Default 占位抛出异常 | 提供可用的默认实现（如 `Resources.Load`） |
+| 网络 | 单连接 | 多通道（登录/聊天/游戏服并存） |
+| 配置 | 仅 Luban | JSON + Luban 双模式 |
 
-## 目录结构
+## 技术栈
 
-```
-Assets/UnityRFramework/
-├── Library/RFramework/RFramework/  ← 纯 C# 模块，不依赖 UnityEngine
-│   ├── Base/                        ← RFrameworkModule、RFrameworkModuleEntry
-│   ├── Log/                         ← RFrameworkLog、RFrameworkLogLevel
-│   ├── Pool/                        ← IPoolModule、PoolModule、ObjectPool<T>
-│   ├── Event/                       ← IEventModule、EventModule、EventGroup
-│   ├── Timer/                       ← ITimerModule、TimerModule
-│   ├── Resource/                    ← IResourceModule、ResourceModule、IResourceHelper
-│   └── Config/                      ← IConfigModule、ConfigModule、IConfigHelper
-├── Scripts/Runtime/                 ← Unity 运行时
-│   ├── Base/                        ← UnityRFrameworkComponent、ComponentEntry
-│   ├── GameEntry.cs                 ← 框架入口 MonoBehaviour
-│   ├── Utility/                     ← DefaultLogHelper
-│   ├── Pool/                        ← PoolComponent
-│   ├── Event/                       ← EventComponent
-│   ├── Timer/                       ← TimerComponent
-│   ├── Resource/                    ← ResourceComponent、DefaultResourceHelper（占位）
-│   └── Config/                      ← ConfigComponent、ConfigHelperBase（抽象基类）
-├── Scripts/Editor/                  ← 编辑器工具
-└── Prefabs/                         ← UnityRFramework.prefab
-```
+以下为 Runtime 层默认实现，通过 Helper 桥接可自由替换。Library 层不依赖任何第三方库。
+
+| 领域 | 默认实现 | 可替换方案 |
+|------|---------|-----------|
+| 资源管理 | YooAsset | Addressables |
+| 配置表 | Luban | JSON/CSV（默认 `DefaultConfigHelper`） |
+| 代码热更 | HybridCLR | ILRuntime |
+| 异步 | Task（Library）/ UniTask（Runtime） | Awaitable、Coroutine |
+| 序列化 | MemoryPack | Protobuf |
+| UI | UGUI | UI Toolkit、FairyGUI |
+| 动画 | DOTween | Animator |
 
 ## 参考项目
 
-- [GameFramework](https://github.com/EllanJiang/GameFramework) — 架构参考，取其结构去其重量
-- [StarForce](https://github.com/EllanJiang/StarForce) — GF 官方示例，参考 GameEntry + 扩展方法模式
-- [UniFramework](https://github.com/gmhevinci/UniFramework) — 轻量级工具集，已集成 UniLog（日志文件写入）
-
+- [GameFramework](https://github.com/EllanJiang/GameFramework) — 架构蓝本
+- [StarForce](https://github.com/EllanJiang/StarForce) — GameEntry + 扩展方法模式
+- [UniFramework](https://github.com/gmhevinci/UniFramework) — 轻量工具集参考
+- [ET](https://github.com/egametang/ET) — Entity 数据/逻辑分离思想
+- [TEngine](https://github.com/Alex-Rachel/TEngine) — YooAsset + HybridCLR 集成参考

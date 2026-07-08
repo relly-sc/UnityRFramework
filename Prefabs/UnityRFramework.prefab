@@ -475,6 +475,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   localizationHelperTypeName: UnityRFramework.Runtime.DefaultLocalizationHelper
+  defaultLanguage: zh-CN
 --- !u!1 &7740000000000000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -519,7 +520,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cccccccccccccccccccccccccccccccc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  networkHelperTypeName: UnityRFramework.Runtime.DefaultNetworkHelper
+  networkHelperTypeName: UnityRFramework.Runtime.TcpNetworkHelper
   heartbeatInterval: 5
   autoReconnect: 1
   reconnectInterval: 3

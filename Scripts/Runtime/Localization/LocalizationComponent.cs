@@ -22,6 +22,13 @@ namespace UnityRFramework.Runtime
         private string localizationHelperTypeName = "UnityRFramework.Runtime.DefaultLocalizationHelper";
 
         /// <summary>
+        /// 默认语言代码（如 zh-CN）。Awake 时自动加载并切换到该语言。
+        /// </summary>
+        [SerializeField]
+        [Tooltip("默认语言代码（如 zh-CN）。Awake 时自动加载并切换到该语言。")]
+        private string defaultLanguage = "zh-CN";
+
+        /// <summary>
         /// 本地化模块引用。
         /// </summary>
         private ILocalizationModule localizationModule;
@@ -61,6 +68,12 @@ namespace UnityRFramework.Runtime
                 Log.Error(
                     "LocalizationComponent: Helper type '{0}' is null. Configure in Inspector or call SetHelper().",
                     localizationHelperTypeName);
+            }
+
+            // 自动加载默认语言
+            if (!string.IsNullOrEmpty(defaultLanguage))
+            {
+                _ = LoadDefaultLanguageAsync(defaultLanguage);
             }
         }
 
@@ -111,6 +124,22 @@ namespace UnityRFramework.Runtime
         public bool HasString(string key)
         {
             return localizationModule.HasString(key);
+        }
+
+        /// <summary>
+        /// 异步加载默认语言（fire-and-forget，不阻塞 Awake）。
+        /// </summary>
+        /// <param name="language">语言代码。</param>
+        private async System.Threading.Tasks.Task LoadDefaultLanguageAsync(string language)
+        {
+            try
+            {
+                await SwitchLanguageAsync(language);
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error("LocalizationComponent: Failed to load default language '{0}'. {1}", language, ex.Message);
+            }
         }
     }
 }
