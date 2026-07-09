@@ -93,6 +93,7 @@ namespace UnityRFramework.Runtime
         private List<IDebuggerInfo> moduleInfos = new List<IDebuggerInfo>();
 
         // ---- 样式 ----
+        private static Texture2D windowBgTex;
         private GUIStyle badgeBoxStyle;
         private GUIStyle badgeLabelStyle;
         private GUIStyle windowBoxStyle;
@@ -106,6 +107,7 @@ namespace UnityRFramework.Runtime
         private GUIStyle stackStyle;
         private GUIStyle buttonStyle;
         private bool stylesInited;
+        private float lastStylesScale;
 
         // ---- 图标 ----
         private static Texture2D iconError;
@@ -127,6 +129,7 @@ namespace UnityRFramework.Runtime
 
         private void Awake()
         {
+            if (windowBgTex == null) windowBgTex = MakeTex(1, 1, new Color(0.13f, 0.13f, 0.15f, 0.94f));
             RefreshModuleInfos();
         }
 
@@ -202,7 +205,12 @@ namespace UnityRFramework.Runtime
         private void OnGUI()
         {
             if (!ActiveWindow || debuggerComponent == null) return;
-            if (!stylesInited) InitStyles();
+            float s = EffectiveScale;
+            if (!stylesInited || Mathf.Abs(lastStylesScale - s) > 0.01f)
+            {
+                InitStyles();
+                lastStylesScale = s;
+            }
             EnsureIcons();
 
             if (!showFullWindow)
@@ -441,7 +449,7 @@ namespace UnityRFramework.Runtime
         {
             float s = EffectiveScale;
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Clear", GUILayout.Width(70f * s), GUILayout.Height(24f * s)))
+            if (GUILayout.Button("Clear", buttonStyle, GUILayout.Width(70f * s), GUILayout.Height(24f * s)))
             {
                 ClearLogCache();
                 selectedLogIndex = -1;
@@ -758,7 +766,8 @@ namespace UnityRFramework.Runtime
 
             windowBoxStyle = new GUIStyle(GUI.skin.box)
             {
-                normal = { background = MakeTex(1, 1, new Color(0.13f, 0.13f, 0.15f, 0.94f)) },
+                normal = { background = windowBgTex },
+                border = new RectOffset(0, 0, 0, 0),
                 padding = new RectOffset(0, 0, 0, 0)
             };
 

@@ -132,7 +132,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8f69d159fe67f4332bcbf27bce5f2a56, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  editorResourceMode: 1
   textHelperTypeName: UnityRFramework.Runtime.DefaultTextHelper
   logHelperTypeName: UnityRFramework.Runtime.DefaultLogHelper
   jsonHelperTypeName: UnityRFramework.Runtime.DefaultJsonHelper
@@ -659,7 +658,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   activeWindowType: 1
   toggleKey: 286
-  windowScale: 2
+  windowScale: 1
   autoDpiScale: 1
   maxLogEntries: 200
   switchTabKey: 9
