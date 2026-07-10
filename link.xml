@@ -1,9 +1,13 @@
 <linker>
-  <!-- 保留 UnityRFramework.Runtime 程序集中所有类型及其序列化字段 -->
-  <assembly fullname="Assembly-CSharp" preserve="all">
+  <!-- 保留框架 Runtime 程序集（UnityRFramework.Runtime）所有类型，防止 IL2CPP 裁剪掉反射创建的 Helper -->
+  <assembly fullname="UnityRFramework.Runtime" preserve="all">
   </assembly>
 
-  <!-- 保留 RFramework Library 程序集 -->
-  <assembly fullname="RFramework" preserve="all">
+  <!-- 保留框架核心 Library 程序集（RFramework.Library） -->
+  <assembly fullname="RFramework.Library" preserve="all">
+  </assembly>
+
+  <!-- 开发期 Samples/Demo 默认编译于 Assembly-CSharp，发布改名 Samples~ 前一并保留以防裁剪 -->
+  <assembly fullname="Assembly-CSharp" preserve="all">
   </assembly>
 </linker>

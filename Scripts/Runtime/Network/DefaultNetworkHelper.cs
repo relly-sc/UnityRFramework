@@ -21,7 +21,7 @@ namespace UnityRFramework.Runtime
         }
 
         /// <inheritdoc/>
-        public override void Send(byte[] data)
+        public override void Send(int msgId, byte[] body)
         {
             Log.Error("DefaultNetworkHelper: Send is not implemented.");
         }

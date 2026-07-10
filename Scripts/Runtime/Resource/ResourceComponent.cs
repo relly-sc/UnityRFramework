@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using RFramework;
@@ -119,11 +120,12 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 异步加载场景
         /// </summary>
-        public Task LoadSceneAsync(string location, LoadSceneMode sceneMode = LoadSceneMode.Single,
-            bool activateOnLoad = true, uint priority = 0)
+        /// <param name="sceneMode">场景加载模式：0=Single 替换当前场景，1=Additive 叠加到当前场景（与 UnityEngine.SceneManagement.LoadSceneMode 值一致）</param>
+        /// <param name="onProgress">进度回调（0~1），可为 null</param>
+        public Task LoadSceneAsync(string location, int sceneMode = 0,
+            bool activateOnLoad = true, uint priority = 0, IProgress<float> onProgress = null)
         {
-            SceneLoadMode mode = sceneMode == LoadSceneMode.Additive ? SceneLoadMode.Additive : SceneLoadMode.Single;
-            return resourceModule.LoadSceneAsync(location, mode, activateOnLoad, priority);
+            return resourceModule.LoadSceneAsync(location, sceneMode, activateOnLoad, priority, onProgress);
         }
 
         /// <summary>

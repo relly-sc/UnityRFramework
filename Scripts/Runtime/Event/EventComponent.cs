@@ -63,7 +63,15 @@ namespace UnityRFramework.Runtime
         /// <inheritdoc cref="IEventModule.Fire{T}"/>
         public void Fire<T>(T args)
         {
-            eventModule.Fire(args);
+            try
+            {
+                eventModule.Fire(args);
+            }
+            catch (RFrameworkException e)
+            {
+                // Library 层以 RFrameworkException 上报派发异常，Runtime 层在此转日志
+                Log.Error(e.ToString());
+            }
         }
 
         /// <inheritdoc cref="IEventModule.FireAsync{T}"/>

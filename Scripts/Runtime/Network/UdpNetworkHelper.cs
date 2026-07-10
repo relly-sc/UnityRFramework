@@ -119,16 +119,25 @@ namespace UnityRFramework.Runtime
         }
 
         /// <inheritdoc/>
-        public override void Send(byte[] data)
+        public override void Send(int msgId, byte[] body)
         {
-            if (!isConnected || udpClient == null || data == null)
+            if (!isConnected || udpClient == null)
             {
                 return;
             }
 
             try
             {
-                udpClient.Send(data, data.Length);
+                // 帧协议：[4B msgId][body]
+                int bodyLen = body == null ? 0 : body.Length;
+                byte[] frame = new byte[MsgIdSize + bodyLen];
+                BitConverter.GetBytes(msgId).CopyTo(frame, 0);
+                if (bodyLen > 0)
+                {
+                    body.CopyTo(frame, MsgIdSize);
+                }
+
+                udpClient.Send(frame, frame.Length);
             }
             catch (Exception ex)
             {

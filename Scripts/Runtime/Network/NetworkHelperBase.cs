@@ -16,7 +16,7 @@ namespace UnityRFramework.Runtime
         public abstract void Disconnect();
 
         /// <inheritdoc/>
-        public abstract void Send(byte[] data);
+        public abstract void Send(int msgId, byte[] body);
 
         /// <inheritdoc/>
         public abstract void Update();

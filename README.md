@@ -166,7 +166,7 @@ timer.Cancel();
 var prefab = await GameEntry.Resource.LoadAssetAsync<GameObject>("Assets/Prefabs/Player.prefab");
 
 // 场景异步加载
-await GameEntry.Resource.LoadSceneAsync("Assets/Scenes/Battle.unity", LoadSceneMode.Additive);
+await GameEntry.Resource.LoadSceneAsync("Assets/Scenes/Battle.unity", 1); // sceneMode: 1=Additive 叠加
 
 // 卸载
 GameEntry.Resource.UnloadAsset(prefab);
@@ -182,9 +182,9 @@ GameEntry.Resource.UnloadUnusedAssets();
 // GET 请求
 var response = await GameEntry.WebRequest.GetAsync("https://api.example.com/data");
 
-// POST JSON
-var result = await GameEntry.WebRequest.PostJsonAsync("https://api.example.com/login",
-    new { username = "player1", password = "123456" });
+// POST JSON（需自行序列化为 JSON 字符串，框架不自动序列化对象）
+string json = "{\"username\":\"player1\",\"password\":\"123456\"}";
+var result = await GameEntry.WebRequest.PostAsync("https://api.example.com/login", json);
 
 // 带超时和取消
 var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -214,33 +214,33 @@ if (GameEntry.Config.HasConfigRow<ItemConfig>(1001)) { ... }
 ### Fsm
 
 ```csharp
-// 创建状态机
-var fsm = GameEntry.Fsm.CreateFsm("AI", owner,
+// 创建状态机（首参为拥有者对象，非名称；返回 IFsm 实例）
+var fsm = GameEntry.Fsm.CreateFsm(owner,
     new IdleState(), new PatrolState(), new CombatState());
 
 // 切换状态
 fsm.ChangeState<CombatState>();
 
-// 销毁
-GameEntry.Fsm.DestroyFsm("AI");
+// 销毁（传入 IFsm 实例）
+GameEntry.Fsm.DestroyFsm(fsm);
 ```
 
 ### Procedure
 
 ```csharp
-// Procedure 的每个状态是一个 ProcedureBase 子类
-public class LoginProcedure : ProcedureBase
+// Procedure 的每个状态是一个 ProcedureStateBase 子类
+public class LoginProcedure : ProcedureStateBase
 {
-    protected override async void OnEnter(ProcedureOwner owner)
+    protected override void OnEnter()
     {
-        // 从 Blackboard 读取数据
-        var serverIP = owner.GetData<string>("ServerIP");
+        // 从 Blackboard 读取数据（键值对，跨状态共享）
+        var serverIP = GameEntry.Procedure.Blackboard.Get<string>("ServerIP");
 
         // 连接服务器
         await GameEntry.Network.ConnectAsync(serverIP, 9000);
 
         // 跳转到下一个流程
-        owner.ChangeProcedure<HallProcedure>();
+        GameEntry.Procedure.ChangeProcedure<HallProcedure>();
     }
 }
 
@@ -251,18 +251,17 @@ GameEntry.Procedure.StartProcedure<LoginProcedure>();
 ### Entity
 
 ```csharp
-// 加载并显示实体
-var player = await GameEntry.Entity.ShowEntityAsync<PlayerEntity>(1001, "Assets/Prefabs/Player.prefab");
+// 加载并显示实体（需指定实体组名称）
+long playerId = 1001;
+var player = await GameEntry.Entity.ShowEntityAsync(playerId, "Assets/Prefabs/Player.prefab", "DefaultGroup");
 
-// 挂载子实体
-var weapon = await GameEntry.Entity.AttachEntityAsync(player.Id, "Assets/Prefabs/Sword.prefab", "WeaponSlot");
+// 先加载子实体，再按实体编号挂载（父子附加，非按资源路径）
+long weaponId = 2001;
+await GameEntry.Entity.ShowEntityAsync(weaponId, "Assets/Prefabs/Sword.prefab", "DefaultGroup");
+GameEntry.Entity.AttachEntity(weaponId, playerId);
 
-// 隐藏/显示
-GameEntry.Entity.HideEntity(player.Id);
-GameEntry.Entity.ShowEntity(player.Id);
-
-// 回收
-GameEntry.Entity.HideEntity(player.Id);
+// 隐藏（进入对象池等待复用或销毁）
+GameEntry.Entity.HideEntity(playerId);
 ```
 
 ### Scene
@@ -275,40 +274,36 @@ var scene = await GameEntry.Scene.LoadSceneAsync("Assets/Scenes/Battle.unity");
 await GameEntry.Scene.UnloadSceneAsync("Assets/Scenes/Battle.unity");
 
 // 判断是否已加载
-if (GameEntry.Scene.SceneIsLoaded("Assets/Scenes/Battle.unity")) { ... }
+if (GameEntry.Scene.IsLoaded("Assets/Scenes/Battle.unity")) { ... }
 ```
 
 ### UI
 
 ```csharp
-// 打开窗口
-var ui = await GameEntry.UI.OpenUIFormAsync("Assets/UI/Dialog.prefab", "Dialog");
+// 打开窗口（windowLayer 数值越大越靠前；fullScreen 覆盖时自动隐藏下层 UI）
+var ui = await GameEntry.UI.OpenUIFormAsync("Assets/UI/Dialog.prefab", windowLayer: 10, fullScreen: true);
 
-// 关闭
-GameEntry.UI.CloseUIForm(ui);
-
-// 暂停/恢复
-GameEntry.UI.PauseUIForm(ui);
-GameEntry.UI.ResumeUIForm(ui);
+// 关闭（按资源路径）
+GameEntry.UI.CloseUIForm("Assets/UI/Dialog.prefab");
 ```
 
 ### Audio
 
 ```csharp
 // BGM
-GameEntry.Audio.PlayBGM("Assets/Audio/bgm_main.mp3");
-GameEntry.Audio.PauseBGM();
-GameEntry.Audio.StopBGM();
+GameEntry.Audio.PlayBgm("Assets/Audio/bgm_main.mp3");
+GameEntry.Audio.PauseBgm();
+GameEntry.Audio.StopBgm();
 
 // 音效
-GameEntry.Audio.PlaySFX("Assets/Audio/sfx_click.mp3");
+GameEntry.Audio.PlaySfx("Assets/Audio/sfx_click.mp3");
 
 // UI 音效
-GameEntry.Audio.PlayUISFX("Assets/Audio/ui_confirm.mp3");
+GameEntry.Audio.PlayUI("Assets/Audio/ui_confirm.mp3");
 
 // 音量控制
-GameEntry.Audio.BGMVolume = 0.8f;
-GameEntry.Audio.SFXVolume = 1f;
+GameEntry.Audio.BgmVolume = 0.8f;
+GameEntry.Audio.SfxVolume = 1f;
 
 // AudioSource 池自动管理，无需手动创建/销毁
 ```

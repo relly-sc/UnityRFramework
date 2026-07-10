@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -6,7 +7,6 @@ using RFramework.Event;
 using RFramework.Resource;
 using RFramework.Scene;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace UnityRFramework.Runtime
 {
@@ -67,11 +67,11 @@ namespace UnityRFramework.Runtime
         }
 
         /// <inheritdoc cref="ISceneModule.LoadSceneAsync"/>
-        public Task LoadSceneAsync(string assetName, LoadSceneMode sceneMode = LoadSceneMode.Single,
-            bool activateOnLoad = true, uint priority = 0, object userData = null,
-            CancellationToken ct = default)
+        public Task LoadSceneAsync(string assetName, int sceneMode = 0,
+            bool activateOnLoad = true, uint priority = 0, IProgress<float> onProgress = null,
+            object userData = null, CancellationToken ct = default)
         {
-            return sceneModule.LoadSceneAsync(assetName, (SceneLoadMode)sceneMode, activateOnLoad, priority,
+            return sceneModule.LoadSceneAsync(assetName, sceneMode, activateOnLoad, priority, onProgress,
                 userData, ct);
         }
 

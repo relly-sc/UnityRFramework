@@ -6,7 +6,8 @@ namespace UnityRFramework.Runtime
 {
     /// <summary>
     /// 日志工具集（Runtime 层专用，内部委托给 RFrameworkLog）。
-    /// Library 层代码直接使用 RFrameworkLog，Runtime 层代码使用本类。
+    /// 分层约定：Library 层业务代码不直接调用 RFrameworkLog，而是以 RFrameworkException 上报错误；
+    /// Runtime 层在捕获 RFrameworkException 后调用本类输出日志。
     /// 需要在 BaseComponent.Awake() 中调用 RFrameworkLog.SetLogHelper() 初始化后才可用。
     /// </summary>
     public static class Log

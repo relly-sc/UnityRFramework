@@ -5,6 +5,23 @@
 /// <remarks>弱相关工具集：置于全局命名空间，免 using 直接可用。</remarks>
 public static class StringExtension
 {
+
+
+    /// <summary>
+    /// 去掉文件扩展名，Resources.Load 不识别扩展名。
+    /// 如 "Prefabs/Player.prefab" → "Prefabs/Player"。
+    /// </summary>
+    public static string StripExtension(this string path)
+    {
+        int dot = path.LastIndexOf('.');
+        if (dot > 0 && dot > path.LastIndexOf('/'))
+        {
+            return path.Substring(0, dot);
+        }
+
+        return path;
+    }
+
     /// <summary>
     /// 从指定字符串中的指定位置处开始读取一行。
     /// </summary>

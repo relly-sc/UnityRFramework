@@ -126,20 +126,27 @@ namespace UnityRFramework.Runtime
         }
 
         /// <inheritdoc/>
-        public override void Send(byte[] data)
+        public override void Send(int msgId, byte[] body)
         {
-            if (!isConnected || stream == null || data == null)
+            if (!isConnected || stream == null)
             {
                 return;
             }
 
             try
             {
-                // 构造消息：[4B 包长度] [4B msgId]
-                // 此处 data 应为 msgId(4B) + body 的组合，由上层 NetworkChannel.Send 发来
-                // 但 INetworkHelper.Send 接收的是原始字节，帧协议由 Helper 负责
-                // 这里我们按简单的长度前缀：发送方自行组装帧
-                stream.Write(data, 0, data.Length);
+                // 帧协议：[4B 包长（含自身）][4B msgId][body]
+                int bodyLen = body == null ? 0 : body.Length;
+                int totalLen = PacketLengthSize + MsgIdSize + bodyLen;
+                byte[] frame = new byte[totalLen];
+                BitConverter.GetBytes(totalLen).CopyTo(frame, 0);
+                BitConverter.GetBytes(msgId).CopyTo(frame, PacketLengthSize);
+                if (bodyLen > 0)
+                {
+                    body.CopyTo(frame, PacketLengthSize + MsgIdSize);
+                }
+
+                stream.Write(frame, 0, frame.Length);
                 stream.Flush();
             }
             catch (Exception ex)

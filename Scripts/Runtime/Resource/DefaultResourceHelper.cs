@@ -40,7 +40,9 @@ namespace UnityRFramework.Runtime
         {
             foreach (var kv in loadedAssets)
             {
-                if (kv.Value != null)
+                // 仅个体资源（贴图/材质/音频/字体等）可被 Resources.UnloadAsset 卸载；
+                // 预制体(GameObject/Component) 不支持该 API，需交由 Resources.UnloadUnusedAssets 回收。
+                if (kv.Value != null && !(kv.Value is GameObject) && !(kv.Value is Component))
                 {
                     Resources.UnloadAsset(kv.Value);
                 }
@@ -65,7 +67,9 @@ namespace UnityRFramework.Runtime
             }
 
             // 去扩展名，Resources.Load 不接受扩展名
-            string path = StripExtension(location);
+            string path = location.StripExtension();
+
+
 
             // 检查缓存
             if (loadedAssets.TryGetValue(path, out Object cached) && cached != null)
@@ -92,28 +96,37 @@ namespace UnityRFramework.Runtime
                 return;
             }
 
-            string path = StripExtension(location);
+            string path = location.StripExtension();
             if (loadedAssets.TryGetValue(path, out Object asset))
             {
                 loadedAssets.Remove(path);
+
+                // 预制体(GameObject/Component) 不能用 Resources.UnloadAsset 卸载，
+                // 否则引擎报错 "UnloadAsset may only be used on individual assets..." 且不会真正释放，
+                // 交由 Resources.UnloadUnusedAssets 统一回收即可。
+                if (asset is GameObject || asset is Component)
+                {
+                    return;
+                }
+
                 Resources.UnloadAsset(asset);
             }
         }
 
         /// <inheritdoc/>
-        public override async Task LoadSceneAsync(string location, SceneLoadMode sceneMode,
-            bool activateOnLoad, uint priority)
+        public override async Task LoadSceneAsync(string location, int sceneMode,
+            bool activateOnLoad, uint priority, IProgress<float> onProgress = null)
         {
             if (string.IsNullOrEmpty(location))
             {
                 throw new ArgumentException("DefaultResourceHelper: scene location is null or empty.");
             }
 
-            string sceneName = StripExtension(location);
+            string sceneName = location.StripExtension();
 
-            LoadSceneMode unityMode = sceneMode == SceneLoadMode.Additive
-                ? LoadSceneMode.Additive
-                : LoadSceneMode.Single;
+
+
+            LoadSceneMode unityMode = (LoadSceneMode)sceneMode;
 
             AsyncOperation op = SceneManager.LoadSceneAsync(sceneName, unityMode);
             if (op == null)
@@ -127,8 +140,12 @@ namespace UnityRFramework.Runtime
 
             while (!op.isDone)
             {
+                onProgress?.Report(op.progress);
                 await Task.Yield();
             }
+
+            // 报告最终进度（isDone 时 progress 通常为 1，但 Unity 有时停在 0.9，强制补 1）
+            onProgress?.Report(1f);
 
             loadedScenes.Add(sceneName);
         }
@@ -141,7 +158,7 @@ namespace UnityRFramework.Runtime
                 return;
             }
 
-            string sceneName = StripExtension(location);
+            string sceneName = location.StripExtension();
             if (!loadedScenes.Contains(sceneName))
             {
                 return;
@@ -167,7 +184,7 @@ namespace UnityRFramework.Runtime
                 return false;
             }
 
-            string path = StripExtension(location);
+            string path = location.StripExtension();
             return Resources.Load(path, typeof(Object)) != null;
         }
 
@@ -178,19 +195,6 @@ namespace UnityRFramework.Runtime
             return 0;
         }
 
-        /// <summary>
-        /// 去掉文件扩展名，Resources.Load 不识别扩展名。
-        /// 如 "Prefabs/Player.prefab" → "Prefabs/Player"。
-        /// </summary>
-        private static string StripExtension(string path)
-        {
-            int dot = path.LastIndexOf('.');
-            if (dot > 0 && dot > path.LastIndexOf('/'))
-            {
-                return path.Substring(0, dot);
-            }
 
-            return path;
-        }
     }
 }

@@ -111,17 +111,26 @@ namespace UnityRFramework.Runtime
         }
 
         /// <inheritdoc/>
-        public override async void Send(byte[] data)
+        public override async void Send(int msgId, byte[] body)
         {
-            if (!IsConnected || webSocket == null || data == null)
+            if (!IsConnected || webSocket == null)
             {
                 return;
             }
 
             try
             {
+                // 帧协议：[4B msgId][body]（WebSocket 原生分帧承载整条消息）
+                int bodyLen = body == null ? 0 : body.Length;
+                byte[] frame = new byte[MsgIdSize + bodyLen];
+                BitConverter.GetBytes(msgId).CopyTo(frame, 0);
+                if (bodyLen > 0)
+                {
+                    body.CopyTo(frame, MsgIdSize);
+                }
+
                 await webSocket.SendAsync(
-                    new ArraySegment<byte>(data),
+                    new ArraySegment<byte>(frame),
                     WebSocketMessageType.Binary,
                     true,
                     CancellationToken.None);

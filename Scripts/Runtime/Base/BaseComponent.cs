@@ -186,7 +186,15 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private void Update()
         {
-            RFrameworkModuleEntry.Update(Time.deltaTime, Time.unscaledDeltaTime);
+            try
+            {
+                RFrameworkModuleEntry.Update(Time.deltaTime, Time.unscaledDeltaTime);
+            }
+            catch (RFrameworkException e)
+            {
+                // 模块轮询（含异步事件派发）抛出的框架异常在此转日志，避免整帧崩溃
+                Log.Error(e.ToString());
+            }
         }
 
         /// <summary>

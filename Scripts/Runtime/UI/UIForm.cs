@@ -19,8 +19,10 @@ namespace UnityRFramework.Runtime
 
         /// <summary>
         /// UI 实例对象。
+        /// 注意：框架关闭（模块 Shutdown / 场景卸载）时，Unity 可能已先行销毁本组件所在 GameObject。
+        /// 此时访问 gameObject 会抛 MissingReferenceException，故显式判空短路。
         /// </summary>
-        public object Handle => gameObject;
+        public object Handle => this != null ? gameObject : null;
 
         /// <summary>
         /// 窗口层级。
@@ -57,6 +59,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         void IUIForm.OnInit(object userData)
         {
+            if (this == null)
+            {
+                return;
+            }
+
             uiFormLogic = GetComponent<UIFormLogic>();
             if (uiFormLogic == null)
             {
@@ -71,6 +78,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         void IUIForm.OnOpen(object userData)
         {
+            if (this == null)
+            {
+                return;
+            }
+
             IsOpened = true;
             gameObject.SetActive(true);
 
@@ -85,6 +97,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         void IUIForm.OnPause()
         {
+            if (this == null)
+            {
+                return;
+            }
+
             if (uiFormLogic != null)
             {
                 uiFormLogic.OnPause();
@@ -96,6 +113,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         void IUIForm.OnResume()
         {
+            if (this == null)
+            {
+                return;
+            }
+
             if (uiFormLogic != null)
             {
                 uiFormLogic.OnResume();
@@ -107,6 +129,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         void IUIForm.OnClose(object userData)
         {
+            if (this == null)
+            {
+                return;
+            }
+
             IsOpened = false;
 
             if (uiFormLogic != null)
@@ -122,6 +149,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         void IUIForm.OnUpdate(float elapseSeconds, float realElapseSeconds)
         {
+            if (this == null)
+            {
+                return;
+            }
+
             if (uiFormLogic != null && IsOpened)
             {
                 uiFormLogic.OnUpdate(elapseSeconds, realElapseSeconds);
