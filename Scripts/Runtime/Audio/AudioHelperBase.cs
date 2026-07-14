@@ -5,16 +5,10 @@ using UnityEngine;
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// 音频辅助器基类。子类需实现音频加载/释放/播放全部引擎特定操作。
+    /// 音频辅助器基类。子类实现播放与回调等引擎特定操作。
     /// </summary>
     public abstract class AudioHelperBase : MonoBehaviour, IAudioHelper
     {
-        /// <inheritdoc cref="IAudioHelper.LoadAudioAsset"/>
-        public abstract object LoadAudioAsset(string assetName);
-
-        /// <inheritdoc cref="IAudioHelper.ReleaseAudioAsset"/>
-        public abstract void ReleaseAudioAsset(object audioAsset);
-
         /// <inheritdoc cref="IAudioHelper.PlayBgm"/>
         public abstract void PlayBgm(object audioAsset, float volume, bool loop,
             float fadeInSeconds, float completeDelaySeconds, Action onComplete);

@@ -190,6 +190,13 @@ namespace UnityRFramework.Runtime
                 throw new ArgumentException("DefaultResourceHelper: scene location is null or empty.");
             }
 
+            if (!activateOnLoad)
+            {
+                throw new NotSupportedException(
+                    "DefaultResourceHelper does not support deferred scene activation. " +
+                    "LoadSceneAsync must be called with activateOnLoad set to true.");
+            }
+
             string sceneName = location.StripExtension();
 
 
@@ -203,7 +210,7 @@ namespace UnityRFramework.Runtime
                     $"DefaultResourceHelper: load scene '{sceneName}' failed, scene may not be in Build Settings.");
             }
 
-            op.allowSceneActivation = activateOnLoad;
+            op.allowSceneActivation = true;
             op.priority = (int)priority;
 
             while (!op.isDone)

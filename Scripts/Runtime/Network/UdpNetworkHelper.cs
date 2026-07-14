@@ -56,6 +56,10 @@ namespace UnityRFramework.Runtime
         /// 收到的完整消息队列（接收线程写入，主线程读取）。
         /// </summary>
         private readonly ConcurrentQueue<PendingMessage> pendingMessages = new ConcurrentQueue<PendingMessage>();
+        private const int MaxPendingMessages = 1024;
+        private const int MaxMessagesPerUpdate = 256;
+        private int pendingMessageCount;
+        private int overflowReported;
 
         /// <inheritdoc/>
         public override bool IsConnected
@@ -150,9 +154,17 @@ namespace UnityRFramework.Runtime
         public override void Update()
         {
             // 处理接收队列中的消息（主线程）
-            while (pendingMessages.TryDequeue(out PendingMessage msg))
+            int processed = 0;
+            while (processed < MaxMessagesPerUpdate && pendingMessages.TryDequeue(out PendingMessage msg))
             {
+                Interlocked.Decrement(ref pendingMessageCount);
                 OnReceive?.Invoke(msg.MsgId, msg.Body);
+                processed++;
+            }
+
+            if (Volatile.Read(ref pendingMessageCount) < MaxPendingMessages)
+            {
+                Interlocked.Exchange(ref overflowReported, 0);
             }
         }
 
@@ -189,7 +201,7 @@ namespace UnityRFramework.Runtime
                         Array.Copy(data, MsgIdSize, body, 0, bodyLength);
                     }
 
-                    pendingMessages.Enqueue(new PendingMessage(msgId, body));
+                    EnqueuePendingMessage(new PendingMessage(msgId, body));
                 }
                 catch (ObjectDisposedException)
                 {
@@ -211,6 +223,22 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 待处理的完整消息。
         /// </summary>
+        private void EnqueuePendingMessage(PendingMessage message)
+        {
+            if (Interlocked.Increment(ref pendingMessageCount) > MaxPendingMessages)
+            {
+                Interlocked.Decrement(ref pendingMessageCount);
+                if (Interlocked.Exchange(ref overflowReported, 1) == 0)
+                {
+                    OnError?.Invoke($"Receive queue overflow. Dropping messages after {MaxPendingMessages} pending packets.");
+                }
+
+                return;
+            }
+
+            pendingMessages.Enqueue(message);
+        }
+
         private readonly struct PendingMessage
         {
             /// <summary>

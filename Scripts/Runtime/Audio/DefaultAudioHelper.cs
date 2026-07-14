@@ -96,35 +96,6 @@ namespace UnityRFramework.Runtime
             uiSource.playOnAwake = false;
         }
 
-        // ====== 资源加载 ======
-
-        /// <inheritdoc cref="IAudioHelper.LoadAudioAsset"/>
-        public override object LoadAudioAsset(string assetName)
-        {
-            if (string.IsNullOrEmpty(assetName))
-            {
-                return null;
-            }
-
-            AudioClip clip = Resources.Load<AudioClip>(assetName);
-            if (clip == null)
-            {
-                Log.Warning("Audio clip '{0}' not found.", assetName);
-            }
-
-            return clip;
-        }
-
-        /// <inheritdoc cref="IAudioHelper.ReleaseAudioAsset"/>
-        public override void ReleaseAudioAsset(object audioAsset)
-        {
-            AudioClip clip = audioAsset as AudioClip;
-            if (clip != null)
-            {
-                Resources.UnloadAsset(clip);
-            }
-        }
-
         // ====== BGM ======
 
         /// <inheritdoc cref="IAudioHelper.PlayBgm"/>
