@@ -213,7 +213,15 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private void OnDestroy()
         {
-            RFrameworkModuleEntry.Shutdown();
+            try
+            {
+                RFrameworkModuleEntry.Shutdown();
+            }
+            catch (RFrameworkException ex)
+            {
+                // Shutdown 可能聚合抛出模块关闭异常；经 Log 输出，避免成为 Unity OnDestroy 未处理异常
+                Log.Error(ex.ToString());
+            }
         }
 
         /// <summary>

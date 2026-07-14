@@ -165,26 +165,66 @@ namespace UnityRFramework.Runtime
         /// <param name="ct">取消令牌。</param>
         private async Task ReceiveLoopAsync(CancellationToken ct)
         {
+            // 单条消息最大长度（8MB），防御恶意/异常的大消息导致内存暴涨
+            const int MaxMessageSize = 8 * 1024 * 1024;
             byte[] buffer = new byte[8192];
 
             try
             {
                 while (!ct.IsCancellationRequested && webSocket != null && webSocket.State == WebSocketState.Open)
                 {
-                    WebSocketReceiveResult result;
-                    int totalBytes = 0;
+                    WebSocketReceiveResult result = await webSocket.ReceiveAsync(
+                        new ArraySegment<byte>(buffer), ct);
+
+                    // Close 帧优先处理：不按业务消息解析，触发断开回调后退出循环
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        isConnected = false;
+                        OnDisconnected?.Invoke();
+                        break;
+                    }
 
                     // 读取一条完整消息（可能跨多个帧）
                     using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
                     {
-                        do
+                        // 先写入首个分片（外层已接收）。
+                        // 若首个分片即为消息结尾（单帧消息），则不会进入续收循环，
+                        // 避免无谓地多等一条消息、进而吞掉后续消息或令单帧消息永久阻塞。
+                        ms.Write(buffer, 0, result.Count);
+
+                        if (ms.Length > MaxMessageSize)
+                        {
+                            throw new InvalidOperationException(
+                                "WebSocket message exceeds max allowed size.");
+                        }
+
+                        while (!result.EndOfMessage && result.MessageType != WebSocketMessageType.Close)
                         {
                             result = await webSocket.ReceiveAsync(
                                 new ArraySegment<byte>(buffer), ct);
+
+                            // 续收阶段出现 Close 帧：放弃本条消息，按断开处理
+                            if (result.MessageType == WebSocketMessageType.Close)
+                            {
+                                isConnected = false;
+                                OnDisconnected?.Invoke();
+                                break;
+                            }
+
                             ms.Write(buffer, 0, result.Count);
-                            totalBytes += result.Count;
+
+                            if (ms.Length > MaxMessageSize)
+                            {
+                                throw new InvalidOperationException(
+                                    "WebSocket message exceeds max allowed size.");
+                            }
                         }
-                        while (!result.EndOfMessage);
+
+                        // 续收阶段收到 Close 帧：已触发断开回调，直接退出外层循环
+                        if (result.MessageType == WebSocketMessageType.Close)
+                        {
+                            break;
+                        }
 
                         byte[] data = ms.ToArray();
 
@@ -204,11 +244,6 @@ namespace UnityRFramework.Runtime
                         }
 
                         pendingMessages.Enqueue(new PendingMessage(msgId, body));
-                    }
-
-                    if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        break;
                     }
                 }
             }

@@ -31,6 +31,11 @@ namespace UnityRFramework.Runtime
         private const int MsgIdSize = 4;
 
         /// <summary>
+        /// 单条数据包最大长度（16MB），防御恶意/异常的大包长度字段触发巨大内存分配。
+        /// </summary>
+        private const int MaxPacketLength = 16 * 1024 * 1024;
+
+        /// <summary>
         /// TCP 客户端实例。
         /// </summary>
         private TcpClient tcpClient;
@@ -191,10 +196,14 @@ namespace UnityRFramework.Runtime
                     }
 
                     int packetLength = BitConverter.ToInt32(lengthBuffer, 0);
-                    if (packetLength < PacketLengthSize + MsgIdSize)
+                    if (packetLength < PacketLengthSize + MsgIdSize || packetLength > MaxPacketLength)
                     {
-                        Log.Warning("TcpNetworkHelper: Invalid packet length: {0}", packetLength);
-                        continue;
+                        // 非法长度字段无法可靠定位载荷边界，若仅 continue 会把载荷字节
+                        // 误读为下一条包长从而导致协议流永久失步，因此直接断开连接。
+                        Log.Warning("TcpNetworkHelper: Invalid packet length: {0}, disconnect.", packetLength);
+                        isConnected = false;
+                        Disconnect();
+                        break;
                     }
 
                     int remaining = packetLength - PacketLengthSize;

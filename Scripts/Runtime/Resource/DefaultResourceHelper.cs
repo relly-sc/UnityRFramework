@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using RFramework.Resource;
 using UnityEngine;
@@ -53,8 +54,16 @@ namespace UnityRFramework.Runtime
         }
 
         /// <inheritdoc/>
-        public override Task<object> LoadAssetAsync(string location, Type assetType, uint priority)
+        public override Task<object> LoadAssetAsync(string location, Type assetType, uint priority,
+            CancellationToken ct = default)
         {
+            // 同步路径无法真正中断 Resources.Load，但需在调用方已取消时尽早返回取消，
+            // 由上层 ResourceModule 统一处理"首调用者取消"语义（不再发起无意义同步加载）。
+            if (ct.IsCancellationRequested)
+            {
+                return Task.FromCanceled<object>(ct);
+            }
+
             return Task.FromResult(LoadAssetSync(location, assetType));
         }
 
