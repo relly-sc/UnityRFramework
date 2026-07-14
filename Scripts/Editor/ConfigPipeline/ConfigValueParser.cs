@@ -23,7 +23,7 @@ namespace UnityRFramework.Editor
         {
             try
             {
-                Parse(field, value);
+                ParseValue(field, value);
             }
             catch (Exception ex) when (!(ex is RFrameworkException))
             {
@@ -47,7 +47,7 @@ namespace UnityRFramework.Editor
             object parsed;
             try
             {
-                parsed = Parse(field, value);
+                parsed = ParseValue(field, value);
             }
             catch (Exception ex)
             {
@@ -78,7 +78,10 @@ namespace UnityRFramework.Editor
             }
         }
 
-        private static object Parse(ConfigFieldSchema field, string value)
+        /// <summary>
+        /// 将一个已经过 Schema 校验的 CSV 字段转换为对应的 CLR 值。
+        /// </summary>
+        public static object ParseValue(ConfigFieldSchema field, string value)
         {
             string trimmed = value?.Trim() ?? string.Empty;
             switch (field.Kind)

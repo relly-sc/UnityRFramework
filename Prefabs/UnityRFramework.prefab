@@ -473,7 +473,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  localizationHelperTypeName: UnityRFramework.Runtime.DefaultLocalizationHelper
+  localizationHelperTypeName: UnityRFramework.Runtime.JsonLocalizationHelper
   defaultLanguage: zh-CN
 --- !u!1 &7740000000000000001
 GameObject:
@@ -798,4 +798,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2d6ac15918cc48ceb278a7a37aa2bbce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  configHelperTypeName: UnityRFramework.Runtime.DefaultConfigHelper
+  configHelperTypeName: UnityRFramework.Runtime.JsonConfigHelper

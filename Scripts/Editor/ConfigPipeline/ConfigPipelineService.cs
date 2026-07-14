@@ -10,12 +10,15 @@ using UnityEngine;
 namespace UnityRFramework.Editor
 {
     /// <summary>
-    /// Config/Localization CSV 校验、代码生成和二进制导出的统一 Editor 入口。
+    /// Config/Localization CSV 校验、代码生成、JSON 和二进制导出的统一 Editor 入口。
     /// </summary>
     public static class ConfigPipelineService
     {
         private const string ConfigCodeManifestName = "UnityRFramework.ConfigCode.manifest";
+        private const string ConfigJsonManifestName = "UnityRFramework.ConfigJson.manifest";
         private const string ConfigBinaryManifestName = "UnityRFramework.ConfigBinary.manifest";
+        private const string LocalizationJsonManifestName =
+            "UnityRFramework.LocalizationJson.manifest";
         private const string LocalizationBinaryManifestName =
             "UnityRFramework.LocalizationBinary.manifest";
 
@@ -59,7 +62,7 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 校验并导出全部 Config 代码和二进制文件。
+        /// 校验并导出全部 Config 代码、JSON 和二进制文件。
         /// </summary>
         /// <param name="options">转换工具配置。</param>
         /// <returns>导出报告。</returns>
@@ -80,7 +83,7 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 校验并导出全部 Localization 二进制文件。
+        /// 校验并导出全部 Localization JSON 和二进制文件。
         /// </summary>
         /// <param name="options">转换工具配置。</param>
         /// <returns>导出报告。</returns>
@@ -177,8 +180,9 @@ namespace UnityRFramework.Editor
             ConfigPipelineReport report)
         {
             string codeRoot = ResolveDirectory(options.GeneratedCodeDirectory, false);
-            string binaryRoot = ResolveDirectory(options.ConfigBinaryDirectory, false);
+            string outputRoot = ResolveDirectory(options.ConfigOutputDirectory, false);
             HashSet<string> codeFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> jsonFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             HashSet<string> binaryFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool changed = false;
 
@@ -186,8 +190,10 @@ namespace UnityRFramework.Editor
             {
                 ConfigTableSchema schema = configs[i];
                 string codeFile = schema.RowTypeName + ".g.cs";
+                string jsonFile = schema.TableName + ".json";
                 string binaryFile = schema.TableName + ".bytes";
                 codeFiles.Add(codeFile);
+                jsonFiles.Add(jsonFile);
                 binaryFiles.Add(binaryFile);
 
                 string codePath = Path.Combine(codeRoot, codeFile);
@@ -198,7 +204,15 @@ namespace UnityRFramework.Editor
                     report.FileWritten(ToProjectPath(codePath));
                 }
 
-                string binaryPath = Path.Combine(binaryRoot, binaryFile);
+                string jsonPath = Path.Combine(outputRoot, jsonFile);
+                if (JsonExportUtility.WriteTextIfChanged(
+                    jsonPath, ConfigJsonExporter.Build(schema)))
+                {
+                    changed = true;
+                    report.FileWritten(ToProjectPath(jsonPath));
+                }
+
+                string binaryPath = Path.Combine(outputRoot, binaryFile);
                 if (ConfigBinaryExporter.WriteBytesIfChanged(
                     binaryPath, ConfigBinaryExporter.BuildV2(schema)))
                 {
@@ -210,7 +224,9 @@ namespace UnityRFramework.Editor
             changed |= SynchronizeManifest(
                 codeRoot, ConfigCodeManifestName, codeFiles, report);
             changed |= SynchronizeManifest(
-                binaryRoot, ConfigBinaryManifestName, binaryFiles, report);
+                outputRoot, ConfigJsonManifestName, jsonFiles, report);
+            changed |= SynchronizeManifest(
+                outputRoot, ConfigBinaryManifestName, binaryFiles, report);
             return changed;
         }
 
@@ -219,15 +235,26 @@ namespace UnityRFramework.Editor
             IReadOnlyList<LocalizationTable> localizations,
             ConfigPipelineReport report)
         {
-            string outputRoot = ResolveDirectory(options.LocalizationBinaryDirectory, false);
-            HashSet<string> outputFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string outputRoot = ResolveDirectory(options.LocalizationOutputDirectory, false);
+            HashSet<string> jsonFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> binaryFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool changed = false;
             for (int i = 0; i < localizations.Count; i++)
             {
                 LocalizationTable localization = localizations[i];
-                string fileName = localization.Language + ".bytes";
-                outputFiles.Add(fileName);
-                string outputPath = Path.Combine(outputRoot, fileName);
+                string jsonFile = localization.Language + ".json";
+                jsonFiles.Add(jsonFile);
+                string jsonPath = Path.Combine(outputRoot, jsonFile);
+                if (JsonExportUtility.WriteTextIfChanged(
+                    jsonPath, LocalizationJsonExporter.Build(localization)))
+                {
+                    changed = true;
+                    report.FileWritten(ToProjectPath(jsonPath));
+                }
+
+                string binaryFile = localization.Language + ".bytes";
+                binaryFiles.Add(binaryFile);
+                string outputPath = Path.Combine(outputRoot, binaryFile);
                 if (ConfigBinaryExporter.WriteBytesIfChanged(
                     outputPath, LocalizationBinaryExporter.BuildV2(localization)))
                 {
@@ -237,7 +264,9 @@ namespace UnityRFramework.Editor
             }
 
             changed |= SynchronizeManifest(
-                outputRoot, LocalizationBinaryManifestName, outputFiles, report);
+                outputRoot, LocalizationJsonManifestName, jsonFiles, report);
+            changed |= SynchronizeManifest(
+                outputRoot, LocalizationBinaryManifestName, binaryFiles, report);
             return changed;
         }
 
@@ -309,14 +338,14 @@ namespace UnityRFramework.Editor
             ResolveDirectory(options.ConfigSourceDirectory, requireConfigSource);
             ResolveDirectory(options.LocalizationSourceDirectory, requireLocalizationSource);
             ResolveDirectory(options.GeneratedCodeDirectory, false);
-            string configBinaryRoot = ResolveDirectory(options.ConfigBinaryDirectory, false);
-            string localizationBinaryRoot = ResolveDirectory(
-                options.LocalizationBinaryDirectory, false);
+            string configOutputRoot = ResolveDirectory(options.ConfigOutputDirectory, false);
+            string localizationOutputRoot = ResolveDirectory(
+                options.LocalizationOutputDirectory, false);
             if (string.Equals(
-                configBinaryRoot, localizationBinaryRoot, StringComparison.OrdinalIgnoreCase))
+                configOutputRoot, localizationOutputRoot, StringComparison.OrdinalIgnoreCase))
             {
                 throw new RFrameworkException(
-                    "Config and Localization binary output directories must be different.");
+                    "Config and Localization output directories must be different.");
             }
         }
 

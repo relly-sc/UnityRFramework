@@ -91,7 +91,7 @@ namespace UnityRFramework.Editor
                 "语言文件根路径。DefaultResourceHelper 下对应 Resources 内的相对路径。"));
             EditorGUILayout.PropertyField(languageFileExtension, new GUIContent(
                 "Language File Extension",
-                "DefaultLocalizationHelper 使用 .json；BinaryLocalizationHelper 使用 .bytes。"));
+                "JsonLocalizationHelper 使用 .json；BinaryLocalizationHelper 使用 .bytes。"));
 
             serializedObject.ApplyModifiedProperties();
         }

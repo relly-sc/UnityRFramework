@@ -10,21 +10,25 @@ namespace UnityRFramework.Runtime
     /// 配置模块 Unity 组件。
     /// 负责编排配置加载流程（ResourceModule 加载字节 → ConfigModule 解析缓存），
     /// 并通过 <see cref="Helper.CreateHelper{T}(string, T)"/> 或 SetHelper 方法注入 IConfigHelper 实现。
-    /// 默认 HelperTypeName 指向 DefaultConfigHelper（UTF-8 JSON 字节 + JSON 字符串），
+    /// 默认 HelperTypeName 指向 JsonConfigHelper（UTF-8 JSON 字节 + JSON 字符串），
     /// 也可在 Inspector 中配置其他 Helper，或在启动流程中调用 SetHelper() 注入实现。
     /// </summary>
     [AddComponentMenu("UnityRFramework/Config Component")]
     public sealed class ConfigComponent : UnityRFrameworkComponent
     {
+        private const string JsonHelperTypeName = "UnityRFramework.Runtime.JsonConfigHelper";
+        private const string LegacyJsonHelperTypeName =
+            "UnityRFramework.Runtime.DefaultConfigHelper";
+
         /// <summary>
         /// 配置辅助器类型全名。
         /// 必须是继承自 <see cref="ConfigHelperBase"/> 的 MonoBehaviour 类型。
-        /// 默认为 DefaultConfigHelper（UTF-8 JSON 字节 + JSON 字符串），
+        /// 默认为 JsonConfigHelper（UTF-8 JSON 字节 + JSON 字符串），
         /// 可在启动流程中通过 SetHelper 方法运行时替换。
         /// </summary>
         [SerializeField]
         [Tooltip("配置辅助器类型全名。必须是继承自 ConfigHelperBase 的 MonoBehaviour。")]
-        private string configHelperTypeName = "UnityRFramework.Runtime.DefaultConfigHelper";
+        private string configHelperTypeName = JsonHelperTypeName;
 
         /// <summary>
         /// 配置模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
@@ -38,9 +42,12 @@ namespace UnityRFramework.Runtime
 
             // IL2CPP 构建时 [SerializeField] private 字段可能因 stripping 被损毁，
             // 防御性检查：值异常时回退到代码默认值
-            if (string.IsNullOrEmpty(configHelperTypeName) || configHelperTypeName.StartsWith("System."))
+            if (string.IsNullOrEmpty(configHelperTypeName)
+                || configHelperTypeName.StartsWith("System.")
+                || string.Equals(configHelperTypeName, LegacyJsonHelperTypeName,
+                    System.StringComparison.Ordinal))
             {
-                configHelperTypeName = "UnityRFramework.Runtime.DefaultConfigHelper";
+                configHelperTypeName = JsonHelperTypeName;
             }
 
             // 通过统一 Helper 创建器反射创建 MonoBehaviour 辅助器
@@ -78,7 +85,7 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 异步加载配置表。
         /// 通过 ResourceComponent 加载 TextAsset 字节数据，再调用 ConfigModule 解析并缓存。
-        /// DefaultConfigHelper 按 UTF-8 JSON 解析，BinaryConfigHelper 按 URFC v1/v2 解析；
+        /// JsonConfigHelper 按 UTF-8 JSON 解析，BinaryConfigHelper 按 URFC v1/v2 解析；
         /// 自定义 Helper 可定义自己的字节格式。
         /// </summary>
         /// <typeparam name="T">配置行类型（如 ItemConfig）。</typeparam>

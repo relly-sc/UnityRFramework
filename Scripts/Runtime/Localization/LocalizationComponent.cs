@@ -16,10 +16,14 @@ namespace UnityRFramework.Runtime
     public sealed class LocalizationComponent : UnityRFrameworkComponent
     {
         private const string FallbackLanguage = "zh-CN";
+        private const string JsonHelperTypeName =
+            "UnityRFramework.Runtime.JsonLocalizationHelper";
+        private const string LegacyJsonHelperTypeName =
+            "UnityRFramework.Runtime.DefaultLocalizationHelper";
 
         [SerializeField]
         [Tooltip("本地化解析辅助器类型。默认按 UTF-8 JSON 解析。")]
-        private string localizationHelperTypeName = "UnityRFramework.Runtime.DefaultLocalizationHelper";
+        private string localizationHelperTypeName = JsonHelperTypeName;
 
         [SerializeField]
         [Tooltip("默认语言代码。未指定时使用 zh-CN。")]
@@ -56,6 +60,13 @@ namespace UnityRFramework.Runtime
             {
                 Log.Error("Can not find module '{0}'.", nameof(ILocalizationModule));
                 return;
+            }
+
+            if (string.IsNullOrEmpty(localizationHelperTypeName)
+                || string.Equals(localizationHelperTypeName, LegacyJsonHelperTypeName,
+                    StringComparison.Ordinal))
+            {
+                localizationHelperTypeName = JsonHelperTypeName;
             }
 
             LocalizationHelperBase helper = Helper.CreateHelper<LocalizationHelperBase>(

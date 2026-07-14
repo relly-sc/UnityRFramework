@@ -7,7 +7,7 @@ using UnityEngine;
 namespace UnityRFramework.Editor
 {
     /// <summary>
-    /// Config 与 Localization CSV 校验和导出窗口。
+    /// Config 与 Localization CSV 校验、JSON 和二进制导出窗口。
     /// </summary>
     public sealed class ConfigPipelineWindow : EditorWindow
     {
@@ -56,15 +56,17 @@ namespace UnityRFramework.Editor
             EditorGUILayout.LabelField("Config", EditorStyles.boldLabel);
             DrawFolderField("CSV 目录", ref options.ConfigSourceDirectory);
             DrawFolderField("生成代码目录", ref options.GeneratedCodeDirectory);
-            DrawFolderField("二进制目录", ref options.ConfigBinaryDirectory);
+            DrawFolderField("输出目录", ref options.ConfigOutputDirectory);
             options.GeneratedNamespace = EditorGUILayout.TextField(
-                new GUIContent("生成命名空间", "配置行类型与 Codec 的 C# 命名空间。"),
+                new GUIContent(
+                    "生成命名空间",
+                    "配置行类型与 Codec 的 C# 命名空间。留空时生成到全局命名空间。"),
                 options.GeneratedNamespace);
 
             EditorGUILayout.Space(10f);
             EditorGUILayout.LabelField("Localization", EditorStyles.boldLabel);
             DrawFolderField("CSV 目录", ref options.LocalizationSourceDirectory);
-            DrawFolderField("二进制目录", ref options.LocalizationBinaryDirectory);
+            DrawFolderField("输出目录", ref options.LocalizationOutputDirectory);
 
             EditorGUILayout.Space(12f);
             using (new EditorGUILayout.HorizontalScope())

@@ -65,6 +65,64 @@ namespace UnityRFramework.Editor.Tests
             Assert.Throws<RFrameworkException>(() => LocalizationCsvParser.Parse(document));
         }
 
+        /// <summary>验证 Config JSON 导出结果可由 JsonConfigHelper 回读。</summary>
+        [Test]
+        public void ConfigJsonRoundTripsThroughJsonHelper()
+        {
+            Utility.Json.SetJsonHelper(new DefaultJsonHelper());
+            string json = ConfigJsonExporter.Build(CreateSchema());
+            GameObject owner = new GameObject("JsonConfigHelper Tests");
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                object table = helper.ParseConfig(typeof(TestConfigRow), Encoding.UTF8.GetBytes(json));
+                TestConfigRow first = helper.GetConfig<TestConfigRow>(table, 1);
+                TestConfigRow second = helper.GetConfig<TestConfigRow>(table, 2);
+
+                Assert.AreEqual("Sword", first.Name);
+                Assert.AreEqual(12.5f, first.Price);
+                Assert.AreEqual("Shield", second.Name);
+                Assert.AreEqual(20f, second.Price);
+            }
+            finally
+            {
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证 Localization JSON 导出、转义和 JsonLocalizationHelper 回读。</summary>
+        [Test]
+        public void LocalizationJsonRoundTripsThroughJsonHelper()
+        {
+            Utility.Json.SetJsonHelper(new DefaultJsonHelper());
+            LocalizationTable source = new LocalizationTable
+            {
+                Language = "en",
+                SourcePath = "memory.csv",
+                Entries = new List<KeyValuePair<string, string>>
+                {
+                    new KeyValuePair<string, string>("ui_login", "Log \"in\""),
+                    new KeyValuePair<string, string>("ui_tip", "Line 1\nLine 2")
+                }
+            };
+
+            string json = LocalizationJsonExporter.Build(source);
+            GameObject owner = new GameObject("JsonLocalizationHelper Tests");
+            try
+            {
+                JsonLocalizationHelper helper = owner.AddComponent<JsonLocalizationHelper>();
+                Dictionary<string, string> parsed = helper.ParseLanguage(
+                    "en", Encoding.UTF8.GetBytes(json));
+
+                Assert.AreEqual("Log \"in\"", parsed["ui_login"]);
+                Assert.AreEqual("Line 1\nLine 2", parsed["ui_tip"]);
+            }
+            finally
+            {
+                Object.DestroyImmediate(owner);
+            }
+        }
+
         /// <summary>验证 URFL v2 导出结果可由 Runtime Helper 回读。</summary>
         [Test]
         public void LocalizationV2RoundTrips()
@@ -198,6 +256,21 @@ namespace UnityRFramework.Editor.Tests
             {
                 Assert.LessOrEqual(lines[i].Length, 120, $"Generated line {i + 1} is too long.");
             }
+        }
+
+        /// <summary>验证生成命名空间留空时输出全局命名空间脚本。</summary>
+        [Test]
+        public void CodeGeneratorOmitsNamespaceWhenOptionIsBlank()
+        {
+            const string csv = "Id,Name\nint,string\n编号,名称\n1,Sword";
+            ConfigTableSchema schema = ConfigSchemaParser.ParseConfig(
+                CsvDocumentReader.Parse("Item.csv", csv), string.Empty);
+
+            string code = ConfigCodeGenerator.Generate(schema);
+
+            Assert.IsEmpty(schema.Namespace);
+            StringAssert.DoesNotContain("namespace ", code);
+            StringAssert.Contains("public sealed class ItemConfig", code);
         }
 
         private static ConfigTableSchema CreateSchema()
