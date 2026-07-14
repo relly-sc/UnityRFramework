@@ -55,29 +55,49 @@ namespace UnityRFramework.Runtime
         }
 
         /// <inheritdoc/>
-        public override async void Connect(string ip, int port)
+        public override void Connect(string ip, int port)
         {
             if (isConnected)
             {
                 return;
             }
 
+            _ = ConnectAsync(ip, port);
+        }
+
+        private async Task ConnectAsync(string ip, int port)
+        {
+            ClientWebSocket socket = new ClientWebSocket();
+            CancellationTokenSource cts = new CancellationTokenSource();
             try
             {
                 string uri = string.Format("ws://{0}:{1}/", ip, port);
-                webSocket = new ClientWebSocket();
-                receiveCts = new CancellationTokenSource();
+                webSocket = socket;
+                receiveCts = cts;
 
-                await webSocket.ConnectAsync(new Uri(uri), CancellationToken.None);
+                await socket.ConnectAsync(new Uri(uri), cts.Token);
+                if (!ReferenceEquals(webSocket, socket))
+                {
+                    return;
+                }
+
                 isConnected = true;
 
                 OnConnected?.Invoke();
 
-                // 启动异步接收循环（fire-and-forget）
-                _ = ReceiveLoopAsync(receiveCts.Token);
+                _ = ReceiveLoopAsync(socket, cts.Token);
             }
             catch (Exception ex)
             {
+                if (!ReferenceEquals(webSocket, socket))
+                {
+                    return;
+                }
+
+                webSocket = null;
+                receiveCts = null;
+                cts.Dispose();
+                socket.Dispose();
                 Log.Error("WebSocketNetworkHelper: Connect failed to {0}:{1}. {2}", ip, port, ex.Message);
                 OnError?.Invoke(ex.Message);
             }
@@ -86,38 +106,35 @@ namespace UnityRFramework.Runtime
         /// <inheritdoc/>
         public override void Disconnect()
         {
+            ClientWebSocket socket = webSocket;
+            CancellationTokenSource cts = receiveCts;
+            bool wasConnected = isConnected;
             isConnected = false;
-            receiveCts?.Cancel();
-
-            try
-            {
-                if (webSocket != null && webSocket.State == WebSocketState.Open)
-                {
-                    webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disconnect", CancellationToken.None)
-                        .GetAwaiter().GetResult();
-                }
-            }
-            catch
-            {
-                // 忽略关闭时的异常
-            }
-
-            webSocket?.Dispose();
             webSocket = null;
-            receiveCts?.Dispose();
             receiveCts = null;
+            cts?.Cancel();
+            _ = CloseAndDisposeAsync(socket, cts);
 
-            OnDisconnected?.Invoke();
+            if (wasConnected)
+            {
+                OnDisconnected?.Invoke();
+            }
         }
 
         /// <inheritdoc/>
-        public override async void Send(int msgId, byte[] body)
+        public override void Send(int msgId, byte[] body)
         {
-            if (!IsConnected || webSocket == null)
+            ClientWebSocket socket = webSocket;
+            if (!IsConnected || socket == null)
             {
                 return;
             }
 
+            _ = SendAsync(socket, msgId, body);
+        }
+
+        private async Task SendAsync(ClientWebSocket socket, int msgId, byte[] body)
+        {
             try
             {
                 // 帧协议：[4B msgId][body]（WebSocket 原生分帧承载整条消息）
@@ -129,7 +146,7 @@ namespace UnityRFramework.Runtime
                     body.CopyTo(frame, MsgIdSize);
                 }
 
-                await webSocket.SendAsync(
+                await socket.SendAsync(
                     new ArraySegment<byte>(frame),
                     WebSocketMessageType.Binary,
                     true,
@@ -137,6 +154,11 @@ namespace UnityRFramework.Runtime
             }
             catch (Exception ex)
             {
+                if (!ReferenceEquals(webSocket, socket))
+                {
+                    return;
+                }
+
                 Log.Error("WebSocketNetworkHelper: Send failed. {0}", ex.Message);
                 isConnected = false;
                 OnError?.Invoke(ex.Message);
@@ -163,7 +185,7 @@ namespace UnityRFramework.Runtime
         /// 异步接收循环。持续读取 WebSocket 消息直到连接关闭。
         /// </summary>
         /// <param name="ct">取消令牌。</param>
-        private async Task ReceiveLoopAsync(CancellationToken ct)
+        private async Task ReceiveLoopAsync(ClientWebSocket socket, CancellationToken ct)
         {
             // 单条消息最大长度（8MB），防御恶意/异常的大消息导致内存暴涨
             const int MaxMessageSize = 8 * 1024 * 1024;
@@ -171,9 +193,9 @@ namespace UnityRFramework.Runtime
 
             try
             {
-                while (!ct.IsCancellationRequested && webSocket != null && webSocket.State == WebSocketState.Open)
+                while (!ct.IsCancellationRequested && socket.State == WebSocketState.Open)
                 {
-                    WebSocketReceiveResult result = await webSocket.ReceiveAsync(
+                    WebSocketReceiveResult result = await socket.ReceiveAsync(
                         new ArraySegment<byte>(buffer), ct);
 
                     // Close 帧优先处理：不按业务消息解析，触发断开回调后退出循环
@@ -200,7 +222,7 @@ namespace UnityRFramework.Runtime
 
                         while (!result.EndOfMessage && result.MessageType != WebSocketMessageType.Close)
                         {
-                            result = await webSocket.ReceiveAsync(
+                            result = await socket.ReceiveAsync(
                                 new ArraySegment<byte>(buffer), ct);
 
                             // 续收阶段出现 Close 帧：放弃本条消息，按断开处理
@@ -259,6 +281,26 @@ namespace UnityRFramework.Runtime
                     OnError?.Invoke("WebSocket receive error");
                     OnDisconnected?.Invoke();
                 }
+            }
+        }
+
+        private static async Task CloseAndDisposeAsync(ClientWebSocket socket, CancellationTokenSource cts)
+        {
+            try
+            {
+                if (socket != null && socket.State == WebSocketState.Open)
+                {
+                    await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disconnect", CancellationToken.None);
+                }
+            }
+            catch
+            {
+                // Closing a socket that is already aborted is expected.
+            }
+            finally
+            {
+                socket?.Dispose();
+                cts?.Dispose();
             }
         }
 

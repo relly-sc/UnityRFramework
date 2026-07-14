@@ -145,6 +145,14 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>
+        /// 按资源路径和类型精确归还一次加载引用。
+        /// </summary>
+        public void UnloadAsset<T>(string location) where T : class
+        {
+            resourceModule.UnloadAsset<T>(location);
+        }
+
+        /// <summary>
         /// 释放未使用的资源
         /// </summary>
         public void UnloadUnusedAssets()

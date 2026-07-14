@@ -55,7 +55,8 @@ namespace UnityRFramework.Runtime
         /// 释放指定位置的资源句柄。
         /// </summary>
         /// <param name="location">资源路径。</param>
-        public abstract void ReleaseAsset(string location);
+        /// <param name="assetType">加载该资源时使用的资源类型。</param>
+        public abstract void ReleaseAsset(string location, Type assetType);
 
         /// <summary>
         /// 异步加载场景。

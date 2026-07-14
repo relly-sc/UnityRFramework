@@ -19,12 +19,50 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 已加载资源路径 → 对象引用映射，用于 ReleaseAsset 释放。
         /// </summary>
-        private readonly Dictionary<string, Object> loadedAssets = new Dictionary<string, Object>();
+        private readonly Dictionary<AssetHandleKey, Object> loadedAssets =
+            new Dictionary<AssetHandleKey, Object>();
+
+        /// <summary>
+        /// 同一 Unity 对象可能以不同类型请求加载。仅当所有类型视图均释放后，才可调用
+        /// Resources.UnloadAsset，避免提前卸载仍被另一条 ResourceModule 缓存使用的对象。
+        /// </summary>
+        private readonly Dictionary<Object, int> assetReferenceCounts = new Dictionary<Object, int>();
 
         /// <summary>
         /// 已加载场景路径集合，用于 UnloadSceneAsync 卸载。
         /// </summary>
         private readonly HashSet<string> loadedScenes = new HashSet<string>();
+
+        private readonly struct AssetHandleKey : IEquatable<AssetHandleKey>
+        {
+            public readonly string Location;
+            public readonly Type AssetType;
+
+            public AssetHandleKey(string location, Type assetType)
+            {
+                Location = location;
+                AssetType = assetType;
+            }
+
+            public bool Equals(AssetHandleKey other)
+            {
+                return string.Equals(Location, other.Location) && AssetType == other.AssetType;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is AssetHandleKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return ((Location != null ? Location.GetHashCode() : 0) * 397) ^
+                           (AssetType != null ? AssetType.GetHashCode() : 0);
+                }
+            }
+        }
 
         /// <inheritdoc/>
         public override Task InitializeAsync(string packageName, ResourcePlayMode playMode,
@@ -32,6 +70,7 @@ namespace UnityRFramework.Runtime
         {
             // Resources 模式无需初始化
             loadedAssets.Clear();
+            assetReferenceCounts.Clear();
             loadedScenes.Clear();
             return Task.CompletedTask;
         }
@@ -39,17 +78,18 @@ namespace UnityRFramework.Runtime
         /// <inheritdoc/>
         public override void Destroy()
         {
-            foreach (var kv in loadedAssets)
+            foreach (var kv in assetReferenceCounts)
             {
                 // 仅个体资源（贴图/材质/音频/字体等）可被 Resources.UnloadAsset 卸载；
                 // 预制体(GameObject/Component) 不支持该 API，需交由 Resources.UnloadUnusedAssets 回收。
-                if (kv.Value != null && !(kv.Value is GameObject) && !(kv.Value is Component))
+                if (kv.Key != null && !(kv.Key is GameObject) && !(kv.Key is Component))
                 {
-                    Resources.UnloadAsset(kv.Value);
+                    Resources.UnloadAsset(kv.Key);
                 }
             }
 
             loadedAssets.Clear();
+            assetReferenceCounts.Clear();
             loadedScenes.Clear();
         }
 
@@ -77,11 +117,10 @@ namespace UnityRFramework.Runtime
 
             // 去扩展名，Resources.Load 不接受扩展名
             string path = location.StripExtension();
-
-
+            AssetHandleKey key = new AssetHandleKey(path, assetType ?? typeof(Object));
 
             // 检查缓存
-            if (loadedAssets.TryGetValue(path, out Object cached) && cached != null)
+            if (loadedAssets.TryGetValue(key, out Object cached) && cached != null)
             {
                 return cached;
             }
@@ -93,12 +132,20 @@ namespace UnityRFramework.Runtime
                 return null;
             }
 
-            loadedAssets[path] = asset;
+            loadedAssets[key] = asset;
+            if (assetReferenceCounts.TryGetValue(asset, out int referenceCount))
+            {
+                assetReferenceCounts[asset] = referenceCount + 1;
+            }
+            else
+            {
+                assetReferenceCounts.Add(asset, 1);
+            }
             return asset;
         }
 
         /// <inheritdoc/>
-        public override void ReleaseAsset(string location)
+        public override void ReleaseAsset(string location, Type assetType)
         {
             if (string.IsNullOrEmpty(location))
             {
@@ -106,9 +153,21 @@ namespace UnityRFramework.Runtime
             }
 
             string path = location.StripExtension();
-            if (loadedAssets.TryGetValue(path, out Object asset))
+            AssetHandleKey key = new AssetHandleKey(path, assetType ?? typeof(Object));
+            if (loadedAssets.TryGetValue(key, out Object asset))
             {
-                loadedAssets.Remove(path);
+                loadedAssets.Remove(key);
+
+                if (assetReferenceCounts.TryGetValue(asset, out int referenceCount))
+                {
+                    if (referenceCount > 1)
+                    {
+                        assetReferenceCounts[asset] = referenceCount - 1;
+                        return;
+                    }
+
+                    assetReferenceCounts.Remove(asset);
+                }
 
                 // 预制体(GameObject/Component) 不能用 Resources.UnloadAsset 卸载，
                 // 否则引擎报错 "UnloadAsset may only be used on individual assets..." 且不会真正释放，

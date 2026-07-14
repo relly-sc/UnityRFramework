@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using RFramework.Network;
 using UnityEngine;
 
@@ -79,15 +80,29 @@ namespace UnityRFramework.Runtime
                 return;
             }
 
+            _ = ConnectAsync(ip, port);
+        }
+
+        private async Task ConnectAsync(string ip, int port)
+        {
+            TcpClient client = new TcpClient();
             try
             {
-                tcpClient = new TcpClient();
-                tcpClient.NoDelay = true;
-                tcpClient.ReceiveTimeout = 3000;
-                tcpClient.SendTimeout = 3000;
-                tcpClient.Connect(ip, port);
+                client.NoDelay = true;
+                client.ReceiveTimeout = 3000;
+                client.SendTimeout = 3000;
+                tcpClient = client;
+                await client.ConnectAsync(ip, port);
 
-                stream = tcpClient.GetStream();
+                // Disconnect can dispose and detach the client while the
+                // operating-system connect attempt is still completing.
+                if (!ReferenceEquals(tcpClient, client))
+                {
+                    client.Close();
+                    return;
+                }
+
+                stream = client.GetStream();
                 isConnected = true;
                 stopReceive = false;
 
@@ -103,6 +118,14 @@ namespace UnityRFramework.Runtime
             }
             catch (Exception ex)
             {
+                if (!ReferenceEquals(tcpClient, client))
+                {
+                    client.Close();
+                    return;
+                }
+
+                tcpClient = null;
+                client.Close();
                 Log.Error("TcpNetworkHelper: Connect failed to {0}:{1}. {2}", ip, port, ex.Message);
                 OnError?.Invoke(ex.Message);
             }
