@@ -14,6 +14,8 @@ namespace UnityRFramework.Runtime
     [DisallowMultipleComponent]
     public sealed class LocalizationComponent : UnityRFrameworkComponent
     {
+        private const string FallbackLanguage = "zh-CN";
+
         /// <summary>
         /// 本地化辅助器类型全名。
         /// </summary>
@@ -22,10 +24,10 @@ namespace UnityRFramework.Runtime
         private string localizationHelperTypeName = "UnityRFramework.Runtime.DefaultLocalizationHelper";
 
         /// <summary>
-        /// 默认语言代码（如 zh-CN）。Awake 时自动加载并切换到该语言。
+        /// 默认语言代码（如 zh-CN）。未指定时回退到简体中文。
         /// </summary>
         [SerializeField]
-        [Tooltip("默认语言代码（如 zh-CN）。Awake 时自动加载并切换到该语言。")]
+        [Tooltip("默认语言代码（如 zh-CN）。未指定时回退到简体中文。")]
         private string defaultLanguage = "zh-CN";
 
         /// <summary>
@@ -70,11 +72,9 @@ namespace UnityRFramework.Runtime
                     localizationHelperTypeName);
             }
 
-            // 自动加载默认语言
-            if (!string.IsNullOrEmpty(defaultLanguage))
-            {
-                _ = LoadDefaultLanguageAsync(defaultLanguage);
-            }
+            // 自动加载默认语言；未指定时使用简体中文。
+            string language = string.IsNullOrEmpty(defaultLanguage) ? FallbackLanguage : defaultLanguage;
+            _ = LoadDefaultLanguageAsync(language);
         }
 
         /// <summary>
