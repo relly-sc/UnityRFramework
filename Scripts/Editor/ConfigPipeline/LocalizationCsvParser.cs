@@ -18,23 +18,44 @@ namespace UnityRFramework.Editor
         /// <returns>经过校验的本地化键值表。</returns>
         public static LocalizationTable Parse(CsvDocument document)
         {
-            if (document == null || document.Rows.Count == 0)
+            if (document == null || document.Rows.Count < 3)
             {
-                throw new RFrameworkException("Localization CSV is empty.");
+                throw new RFrameworkException(
+                    "Localization CSV requires field, type and comment header rows.");
             }
 
-            CsvRow header = document.Rows[0];
-            if (header.Values.Count != 2
-                || !string.Equals(header.Values[0].Trim(), "Key", StringComparison.OrdinalIgnoreCase)
-                || !string.Equals(header.Values[1].Trim(), "Value", StringComparison.OrdinalIgnoreCase))
+            CsvRow fieldRow = document.Rows[0];
+            if (fieldRow.Values.Count != 2
+                || !string.Equals(
+                    fieldRow.Values[0].Trim(), "Key", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(
+                    fieldRow.Values[1].Trim(), "Value", StringComparison.OrdinalIgnoreCase))
             {
-                throw Error(document.SourcePath, header.LineNumber,
-                    "Localization header must be exactly 'Key,Value'.");
+                throw Error(document.SourcePath, fieldRow.LineNumber,
+                    "Localization field row must be exactly 'Key,Value'.");
+            }
+
+            CsvRow typeRow = document.Rows[1];
+            if (typeRow.Values.Count != 2
+                || !string.Equals(
+                    typeRow.Values[0].Trim(), "string", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(
+                    typeRow.Values[1].Trim(), "string", StringComparison.OrdinalIgnoreCase))
+            {
+                throw Error(document.SourcePath, typeRow.LineNumber,
+                    "Localization type row must be exactly 'string,string'.");
+            }
+
+            CsvRow commentRow = document.Rows[2];
+            if (commentRow.Values.Count != 2)
+            {
+                throw Error(document.SourcePath, commentRow.LineNumber,
+                    "Localization comment row must contain exactly 2 columns.");
             }
 
             List<KeyValuePair<string, string>> entries = new List<KeyValuePair<string, string>>();
             HashSet<string> keys = new HashSet<string>(StringComparer.Ordinal);
-            for (int i = 1; i < document.Rows.Count; i++)
+            for (int i = 3; i < document.Rows.Count; i++)
             {
                 CsvRow row = document.Rows[i];
                 if (row.Values.All(string.IsNullOrWhiteSpace))

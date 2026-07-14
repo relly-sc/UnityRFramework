@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Text;
 using RFramework;
@@ -18,8 +17,11 @@ namespace UnityRFramework.Runtime
         /// <summary>URFC 生成代码协议版本。</summary>
         public const ushort ConfigGeneratedVersion = 2;
 
-        /// <summary>URFL 协议版本。</summary>
-        public const ushort LocalizationVersion = 1;
+        /// <summary>URFL 无校验兼容协议版本。</summary>
+        public const ushort LocalizationLegacyVersion = 1;
+
+        /// <summary>URFL CRC32 校验协议版本。</summary>
+        public const ushort LocalizationVersion = 2;
 
         /// <summary>协议允许的最大集合元素数量。</summary>
         public const int MaxCollectionCount = 1_000_000;
@@ -31,9 +33,6 @@ namespace UnityRFramework.Runtime
         private const uint Fnv32Prime = 16777619;
         private const ulong Fnv64Offset = 14695981039346656037;
         private const ulong Fnv64Prime = 1099511628211;
-        private const uint Crc32Polynomial = 0xedb88320;
-
-        private static readonly uint[] Crc32Table = BuildCrc32Table();
 
         /// <summary>
         /// 读取 Int32 长度前缀的 UTF-8 字符串。
@@ -115,13 +114,7 @@ namespace UnityRFramework.Runtime
                 throw new RFrameworkException("CRC32 source bytes are invalid.");
             }
 
-            uint crc = 0xffffffff;
-            for (int i = 0; i < bytes.Length; i++)
-            {
-                crc = (crc >> 8) ^ Crc32Table[(crc ^ bytes[i]) & 0xff];
-            }
-
-            return ~crc;
+            return unchecked((uint)Utility.Verifier.GetCrc32(bytes));
         }
 
         /// <summary>
@@ -191,23 +184,5 @@ namespace UnityRFramework.Runtime
             }
         }
 
-        private static uint[] BuildCrc32Table()
-        {
-            uint[] table = new uint[256];
-            for (uint i = 0; i < table.Length; i++)
-            {
-                uint value = i;
-                for (int bit = 0; bit < 8; bit++)
-                {
-                    value = (value & 1) != 0
-                        ? (value >> 1) ^ Crc32Polynomial
-                        : value >> 1;
-                }
-
-                table[i] = value;
-            }
-
-            return table;
-        }
     }
 }

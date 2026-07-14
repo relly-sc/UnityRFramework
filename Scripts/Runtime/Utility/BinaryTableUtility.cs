@@ -11,7 +11,7 @@ namespace UnityRFramework.Runtime
     /// UnityRFramework 单表二进制协议读取器。
     /// 所有整数均为 little-endian，字符串为 Int32 字节长度 + UTF-8 数据。
     /// Config 支持 URFC v1 反射映射和 URFC v2 生成 Codec 两种格式。
-    /// Localization 使用 URFL v1 Key/Value 格式。
+    /// Localization 使用 URFL v2 Key/Value + CRC32 格式，并兼容读取 v1。
     /// </summary>
     internal static class BinaryTableUtility
     {
@@ -247,10 +247,10 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>
-        /// 读取 URFL v1 本地化键值表。
+        /// 读取 URFL v1/v2 本地化键值表。
         /// </summary>
         /// <param name="language">语言代码。</param>
-        /// <param name="bytes">URFL v1 文件字节。</param>
+        /// <param name="bytes">URFL 文件字节。</param>
         /// <returns>本地化键值字典。</returns>
         public static Dictionary<string, string> ReadLocalization(string language, byte[] bytes)
         {
@@ -270,32 +270,58 @@ namespace UnityRFramework.Runtime
                 using (MemoryStream stream = new MemoryStream(bytes, false))
                 using (BinaryReader reader = new BinaryReader(stream, Encoding.UTF8, false))
                 {
-                    ReadAndValidateHeader(
-                        reader, LocalizationMagic, BinaryFormatUtility.LocalizationVersion, "localization");
+                    ReadAndValidateMagic(reader, LocalizationMagic, "localization");
+                    ushort version = reader.ReadUInt16();
                     int entryCount = ReadBoundedCount(reader, MaxRows, "localization entry");
-                    Dictionary<string, string> result = new Dictionary<string, string>(entryCount);
-
-                    for (int i = 0; i < entryCount; i++)
+                    if (version == BinaryFormatUtility.LocalizationLegacyVersion)
                     {
-                        string key = ReadUtf8String(reader, false);
-                        string value = ReadUtf8String(reader, false);
-                        if (string.IsNullOrEmpty(key))
-                        {
-                            throw new RFrameworkException(
-                                $"Binary localization '{language}' contains an empty key at index {i}.");
-                        }
-
-                        if (result.ContainsKey(key))
-                        {
-                            throw new RFrameworkException(
-                                $"Binary localization '{language}' contains duplicate key '{key}'.");
-                        }
-
-                        result.Add(key, value);
+                        Dictionary<string, string> legacy = ReadLocalizationEntries(
+                            language, reader, entryCount);
+                        EnsureFullyConsumed(stream, "localization");
+                        return legacy;
                     }
 
-                    EnsureFullyConsumed(stream, "localization");
-                    return result;
+                    if (version != BinaryFormatUtility.LocalizationVersion)
+                    {
+                        throw new RFrameworkException(
+                            $"Binary localization version '{version}' is not supported. "
+                            + $"Expected '{BinaryFormatUtility.LocalizationLegacyVersion}' or "
+                            + $"'{BinaryFormatUtility.LocalizationVersion}'.");
+                    }
+
+                    int bodyLength = reader.ReadInt32();
+                    uint expectedChecksum = reader.ReadUInt32();
+                    long remaining = stream.Length - stream.Position;
+                    if (bodyLength < 0 || bodyLength != remaining)
+                    {
+                        throw new RFrameworkException(
+                            $"Binary localization body length '{bodyLength}' does not match "
+                            + $"remaining bytes '{remaining}'.");
+                    }
+
+                    byte[] body = reader.ReadBytes(bodyLength);
+                    if (body.Length != bodyLength)
+                    {
+                        throw new EndOfStreamException();
+                    }
+
+                    uint actualChecksum = BinaryFormatUtility.ComputeCrc32(body);
+                    if (actualChecksum != expectedChecksum)
+                    {
+                        throw new RFrameworkException(
+                            "Binary localization checksum mismatch. "
+                            + $"Expected '{expectedChecksum:X8}', actual '{actualChecksum:X8}'.");
+                    }
+
+                    using (MemoryStream bodyStream = new MemoryStream(body, false))
+                    using (BinaryReader bodyReader = new BinaryReader(
+                        bodyStream, Encoding.UTF8, false))
+                    {
+                        Dictionary<string, string> result = ReadLocalizationEntries(
+                            language, bodyReader, entryCount);
+                        EnsureFullyConsumed(bodyStream, "localization body");
+                        return result;
+                    }
                 }
             }
             catch (RFrameworkException)
@@ -310,6 +336,32 @@ namespace UnityRFramework.Runtime
                 throw new RFrameworkException(
                     $"Binary localization '{language}' is truncated or malformed.", ex);
             }
+        }
+
+        private static Dictionary<string, string> ReadLocalizationEntries(
+            string language, BinaryReader reader, int entryCount)
+        {
+            Dictionary<string, string> result = new Dictionary<string, string>(entryCount);
+            for (int i = 0; i < entryCount; i++)
+            {
+                string key = ReadUtf8String(reader, false);
+                string value = ReadUtf8String(reader, false);
+                if (string.IsNullOrEmpty(key))
+                {
+                    throw new RFrameworkException(
+                        $"Binary localization '{language}' contains an empty key at index {i}.");
+                }
+
+                if (result.ContainsKey(key))
+                {
+                    throw new RFrameworkException(
+                        $"Binary localization '{language}' contains duplicate key '{key}'.");
+                }
+
+                result.Add(key, value);
+            }
+
+            return result;
         }
 
         private static void ReadAndValidateHeader(

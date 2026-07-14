@@ -229,7 +229,7 @@ namespace UnityRFramework.Editor
                 outputFiles.Add(fileName);
                 string outputPath = Path.Combine(outputRoot, fileName);
                 if (ConfigBinaryExporter.WriteBytesIfChanged(
-                    outputPath, LocalizationBinaryExporter.BuildV1(localization)))
+                    outputPath, LocalizationBinaryExporter.BuildV2(localization)))
                 {
                     changed = true;
                     report.FileWritten(ToProjectPath(outputPath));

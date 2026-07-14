@@ -39,9 +39,35 @@ namespace UnityRFramework.Editor.Tests
                 ConfigSchemaParser.ParseConfig(document, "Game.Config"));
         }
 
-        /// <summary>验证 URFL v1 导出结果可由 Runtime Helper 回读。</summary>
+        /// <summary>Verifies that Localization uses the shared three-row header format.</summary>
         [Test]
-        public void LocalizationV1RoundTrips()
+        public void LocalizationCsvUsesThreeHeaderRows()
+        {
+            const string csv =
+                "Key,Value\nstring,string\nLocalization key,Localized text\nui_login,Login";
+            CsvDocument document = CsvDocumentReader.Parse("en-US.csv", csv);
+
+            LocalizationTable table = LocalizationCsvParser.Parse(document);
+
+            Assert.AreEqual("en-US", table.Language);
+            Assert.AreEqual(1, table.Entries.Count);
+            Assert.AreEqual("ui_login", table.Entries[0].Key);
+            Assert.AreEqual("Login", table.Entries[0].Value);
+        }
+
+        /// <summary>Verifies that the legacy two-row Localization format is rejected.</summary>
+        [Test]
+        public void LocalizationCsvRejectsMissingTypeAndCommentRows()
+        {
+            const string csv = "Key,Value\nui_login,Login";
+            CsvDocument document = CsvDocumentReader.Parse("en-US.csv", csv);
+
+            Assert.Throws<RFrameworkException>(() => LocalizationCsvParser.Parse(document));
+        }
+
+        /// <summary>验证 URFL v2 导出结果可由 Runtime Helper 回读。</summary>
+        [Test]
+        public void LocalizationV2RoundTrips()
         {
             LocalizationTable source = new LocalizationTable
             {
@@ -54,7 +80,7 @@ namespace UnityRFramework.Editor.Tests
                 }
             };
 
-            byte[] bytes = LocalizationBinaryExporter.BuildV1(source);
+            byte[] bytes = LocalizationBinaryExporter.BuildV2(source);
             GameObject owner = new GameObject("BinaryLocalizationHelper Tests");
             try
             {
@@ -62,6 +88,37 @@ namespace UnityRFramework.Editor.Tests
                 Dictionary<string, string> parsed = helper.ParseLanguage("zh-CN", bytes);
                 Assert.AreEqual("登录", parsed["ui_login"]);
                 Assert.AreEqual("退出", parsed["ui_exit"]);
+            }
+            finally
+            {
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证 URFL v2 会拒绝内容损坏，并保留 URFL v1 读取兼容。</summary>
+        [Test]
+        public void LocalizationV2RejectsCorruptBodyAndReadsV1()
+        {
+            LocalizationTable source = new LocalizationTable
+            {
+                Language = "en",
+                SourcePath = "memory.csv",
+                Entries = new List<KeyValuePair<string, string>>
+                {
+                    new KeyValuePair<string, string>("ui_login", "Login")
+                }
+            };
+
+            byte[] v2 = LocalizationBinaryExporter.BuildV2(source);
+            byte[] v1 = LocalizationBinaryExporter.BuildV1(source);
+            GameObject owner = new GameObject("BinaryLocalizationHelper CRC Tests");
+            try
+            {
+                BinaryLocalizationHelper helper = owner.AddComponent<BinaryLocalizationHelper>();
+                Assert.AreEqual("Login", helper.ParseLanguage("en", v1)["ui_login"]);
+
+                v2[v2.Length - 1] ^= 0x7f;
+                Assert.Throws<RFrameworkException>(() => helper.ParseLanguage("en", v2));
             }
             finally
             {
