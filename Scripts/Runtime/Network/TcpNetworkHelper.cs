@@ -134,6 +134,7 @@ namespace UnityRFramework.Runtime
         /// <inheritdoc/>
         public override void Disconnect()
         {
+            bool wasConnected = isConnected;
             stopReceive = true;
             isConnected = false;
 
@@ -150,7 +151,10 @@ namespace UnityRFramework.Runtime
             stream = null;
             tcpClient = null;
 
-            OnDisconnected?.Invoke();
+            if (wasConnected)
+            {
+                OnDisconnected?.Invoke();
+            }
         }
 
         /// <inheritdoc/>
@@ -180,8 +184,8 @@ namespace UnityRFramework.Runtime
             catch (Exception ex)
             {
                 Log.Error("TcpNetworkHelper: Send failed. {0}", ex.Message);
-                isConnected = false;
                 OnError?.Invoke(ex.Message);
+                Disconnect();
             }
         }
 
@@ -215,6 +219,7 @@ namespace UnityRFramework.Runtime
                     // 读取包长度（4 字节）
                     if (!ReadExactly(lengthBuffer, 0, PacketLengthSize))
                     {
+                        Disconnect();
                         break;
                     }
 
@@ -224,7 +229,6 @@ namespace UnityRFramework.Runtime
                         // 非法长度字段无法可靠定位载荷边界，若仅 continue 会把载荷字节
                         // 误读为下一条包长从而导致协议流永久失步，因此直接断开连接。
                         Log.Warning("TcpNetworkHelper: Invalid packet length: {0}, disconnect.", packetLength);
-                        isConnected = false;
                         Disconnect();
                         break;
                     }
@@ -234,6 +238,7 @@ namespace UnityRFramework.Runtime
 
                     if (!ReadExactly(packetBuffer, 0, remaining))
                     {
+                        Disconnect();
                         break;
                     }
 
@@ -251,19 +256,28 @@ namespace UnityRFramework.Runtime
                 }
                 catch (ObjectDisposedException)
                 {
+                    if (!stopReceive)
+                    {
+                        Disconnect();
+                    }
+
                     break;
                 }
                 catch (InvalidOperationException)
                 {
+                    if (!stopReceive)
+                    {
+                        Disconnect();
+                    }
+
                     break;
                 }
                 catch (Exception)
                 {
                     if (!stopReceive)
                     {
-                        isConnected = false;
                         OnError?.Invoke("Receive error");
-                        OnDisconnected?.Invoke();
+                        Disconnect();
                     }
                     break;
                 }

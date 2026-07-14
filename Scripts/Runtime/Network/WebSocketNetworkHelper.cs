@@ -201,8 +201,7 @@ namespace UnityRFramework.Runtime
                     // Close 帧优先处理：不按业务消息解析，触发断开回调后退出循环
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        isConnected = false;
-                        OnDisconnected?.Invoke();
+                        EndConnection(socket);
                         break;
                     }
 
@@ -228,8 +227,7 @@ namespace UnityRFramework.Runtime
                             // 续收阶段出现 Close 帧：放弃本条消息，按断开处理
                             if (result.MessageType == WebSocketMessageType.Close)
                             {
-                                isConnected = false;
-                                OnDisconnected?.Invoke();
+                                EndConnection(socket);
                                 break;
                             }
 
@@ -277,10 +275,30 @@ namespace UnityRFramework.Runtime
             {
                 if (!ct.IsCancellationRequested)
                 {
-                    isConnected = false;
                     OnError?.Invoke("WebSocket receive error");
-                    OnDisconnected?.Invoke();
+                    EndConnection(socket);
                 }
+            }
+        }
+
+        private void EndConnection(ClientWebSocket socket)
+        {
+            if (!ReferenceEquals(webSocket, socket))
+            {
+                return;
+            }
+
+            bool wasConnected = isConnected;
+            CancellationTokenSource cts = receiveCts;
+            isConnected = false;
+            webSocket = null;
+            receiveCts = null;
+            cts?.Cancel();
+            _ = CloseAndDisposeAsync(socket, cts);
+
+            if (wasConnected)
+            {
+                OnDisconnected?.Invoke();
             }
         }
 

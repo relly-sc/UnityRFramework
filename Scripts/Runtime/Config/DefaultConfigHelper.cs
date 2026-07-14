@@ -186,7 +186,7 @@ namespace UnityRFramework.Runtime
         [Serializable]
         private class ConfigArrayWrapper<T>
         {
-            public T[] Items;
+            public T[] Items = Array.Empty<T>();
         }
     }
 }

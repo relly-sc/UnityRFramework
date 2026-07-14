@@ -219,8 +219,10 @@ namespace UnityRFramework.Runtime
             }
             catch (RFrameworkException ex)
             {
-                // Shutdown 可能聚合抛出模块关闭异常；经 Log 输出，避免成为 Unity OnDestroy 未处理异常
-                Log.Error(ex.ToString());
+                // The framework logger is cleared in Shutdown even when a
+                // module fails. Use Unity's direct logger for this final
+                // teardown diagnostic.
+                Debug.LogException(ex);
             }
         }
 
