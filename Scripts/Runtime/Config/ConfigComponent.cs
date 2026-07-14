@@ -78,7 +78,7 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 异步加载配置表。
         /// 通过 ResourceComponent 加载 TextAsset 字节数据，再调用 ConfigModule 解析并缓存。
-        /// DefaultConfigHelper 按 UTF-8 JSON 解析，BinaryConfigHelper 按 URFC v1 解析；
+        /// DefaultConfigHelper 按 UTF-8 JSON 解析，BinaryConfigHelper 按 URFC v1/v2 解析；
         /// 自定义 Helper 可定义自己的字节格式。
         /// </summary>
         /// <typeparam name="T">配置行类型（如 ItemConfig）。</typeparam>

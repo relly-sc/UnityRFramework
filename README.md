@@ -238,7 +238,7 @@ if (GameEntry.Config.HasConfigRow<ItemConfig>(1001)) { ... }
 
 `ParseConfig(Type, byte[])` 的字节格式由当前 `IConfigHelper` 决定。框架默认 JSON；`BinaryConfigHelper` 兼容反射映射的 URFC v1，并使用生成 Codec 读取带 TableId、SchemaHash 和 CRC32 的 URFC v2。项目私有格式可直接继承 `ConfigHelperBase`。
 
-框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具生成配置行、静态 Codec、URFC v2 和带 CRC32 的 URFL v2，并仅在内容变化时写入。Config 与 Localization 的二进制输出目录必须分开，避免同名文件相互覆盖；Runtime 仍兼容读取无 CRC 的 URFL v1。
+框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具生成配置行、静态 Codec、URFC v2 和带 CRC32 的 URFL v2，并仅在内容变化时写入。Config 与 Localization 的二进制输出目录必须分开，避免同名文件相互覆盖；Runtime 仍兼容读取无 CRC 的 URFL v1。独立验收场景位于 `Assets/ConfigPipelineAcceptance`，可通过 `UnityRFramework/Tests` 下的菜单重建场景、运行 Play Mode 验收或构建专用 Player；当前实现已通过非 Editor Codec 自动注册与完整加载/关闭链路验证，定为 `ConfigPipeline v1`。
 
 ### Fsm
 
