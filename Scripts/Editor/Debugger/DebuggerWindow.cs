@@ -616,18 +616,18 @@ namespace UnityRFramework.Editor
                     RFramework.RFrameworkLog.IsInitialized ? "Initialized" : "Not initialized", null));
 
                 // Event
-                var eventM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Event.IEventModule>();
+                var eventM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IEventModule>();
                 if (eventM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Event", "Active", null));
 
                 // Fsm
-                var fsmM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Fsm.IFsmModule>();
+                var fsmM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IFsmModule>();
                 if (fsmM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Fsm",
                         string.Format("FSMs: {0}", fsmM.FsmCount), null));
 
                 // Procedure
-                var procM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Procedure.IProcedureModule>();
+                var procM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IProcedureModule>();
                 if (procM != null)
                 {
                     var current = procM.CurrentProcedure;
@@ -640,7 +640,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Pool
-                var poolM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Pool.IPoolModule>();
+                var poolM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IPoolModule>();
                 if (poolM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -652,7 +652,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Timer
-                var timerM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Timer.ITimerModule>();
+                var timerM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ITimerModule>();
                 if (timerM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -664,7 +664,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Resource
-                var resM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Resource.IResourceModule>();
+                var resM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IResourceModule>();
                 if (resM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -677,7 +677,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Config
-                var cfgM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Config.IConfigModule>();
+                var cfgM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IConfigModule>();
                 if (cfgM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -689,7 +689,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Scene
-                var sceneM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Scene.ISceneModule>();
+                var sceneM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ISceneModule>();
                 if (sceneM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -707,7 +707,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // UI
-                var uiM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.UI.IUIModule>();
+                var uiM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IUIModule>();
                 if (uiM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -719,7 +719,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Entity
-                var entM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Entity.IEntityModule>();
+                var entM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IEntityModule>();
                 if (entM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -732,7 +732,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Audio
-                var audioM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Audio.IAudioModule>();
+                var audioM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IAudioModule>();
                 if (audioM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -747,7 +747,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Network
-                var netM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Network.INetworkModule>();
+                var netM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.INetworkModule>();
                 if (netM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -760,7 +760,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Localization
-                var locM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Localization.ILocalizationModule>();
+                var locM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ILocalizationModule>();
                 if (locM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -772,7 +772,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // WebRequest
-                var webM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.WebRequest.IWebRequestModule>();
+                var webM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IWebRequestModule>();
                 if (webM != null)
                 {
                     var details = new Dictionary<string, string>

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using RFramework.Config;
+using RFramework;
 using UnityEngine;
 
 namespace UnityRFramework.Runtime
@@ -22,6 +22,7 @@ namespace UnityRFramework.Runtime
 
         /// <summary>
         /// 解析配置原始字节为强类型配置表对象。
+        /// 字节格式由实现方决定，与 JSON 字符串入口相互独立。
         /// </summary>
         /// <param name="tableType">表类型（由 GetTableType 返回）。</param>
         /// <param name="bytes">原始字节数据。</param>
@@ -30,11 +31,17 @@ namespace UnityRFramework.Runtime
 
         /// <summary>
         /// 从 JSON 字符串解析为强类型配置表对象。
+        /// 实现方可独立提供 JSON 支持，不要求字节入口也使用 JSON。
+        /// 默认实现明确报告不支持；只处理二进制/自定义格式的 Helper 无需实现此入口。
         /// </summary>
         /// <param name="tableType">表类型（由 GetTableType 返回）。</param>
         /// <param name="json">JSON 字符串。</param>
         /// <returns>解析后的配置表对象。</returns>
-        public abstract object ParseConfigFromString(Type tableType, string json);
+        public virtual object ParseConfigFromString(Type tableType, string json)
+        {
+            throw new RFrameworkException(
+                $"Config helper '{GetType().Name}' does not support JSON string parsing.");
+        }
 
         /// <summary>
         /// 从已解析的配置表中获取指定 ID 的单条配置行。

@@ -1,7 +1,6 @@
 using UnityEngine;
 
 using RFramework;
-using RFramework.Timer;
 
 namespace UnityRFramework.Runtime
 {

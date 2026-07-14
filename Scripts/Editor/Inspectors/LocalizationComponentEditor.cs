@@ -62,12 +62,16 @@ namespace UnityRFramework.Editor
 
         private SerializedProperty localizationHelperTypeName;
         private SerializedProperty defaultLanguage;
+        private SerializedProperty languageAssetRoot;
+        private SerializedProperty languageFileExtension;
         private bool useCustomLanguage;
 
         private void OnEnable()
         {
             localizationHelperTypeName = serializedObject.FindProperty("localizationHelperTypeName");
             defaultLanguage = serializedObject.FindProperty("defaultLanguage");
+            languageAssetRoot = serializedObject.FindProperty("languageAssetRoot");
+            languageFileExtension = serializedObject.FindProperty("languageFileExtension");
             useCustomLanguage = FindLanguageIndex(defaultLanguage.stringValue) < 0;
         }
 
@@ -82,6 +86,12 @@ namespace UnityRFramework.Editor
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
             DrawDefaultLanguage();
+            EditorGUILayout.PropertyField(languageAssetRoot, new GUIContent(
+                "Language Asset Root",
+                "语言文件根路径。DefaultResourceHelper 下对应 Resources 内的相对路径。"));
+            EditorGUILayout.PropertyField(languageFileExtension, new GUIContent(
+                "Language File Extension",
+                "DefaultLocalizationHelper 使用 .json；BinaryLocalizationHelper 使用 .bytes。"));
 
             serializedObject.ApplyModifiedProperties();
         }
@@ -94,7 +104,7 @@ namespace UnityRFramework.Editor
 
             GUIContent label = new GUIContent(
                 "Default Language",
-                "Awake 时自动加载并切换到该语言。Unspecified 会回退到简体中文 zh-CN。");
+                "Start 时通过 ResourceComponent 自动加载并切换。Unspecified 会回退到简体中文 zh-CN。");
             int newIndex = EditorGUILayout.Popup(label, selectedIndex, LanguageDisplayNames);
 
             if (newIndex == customIndex)

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using RFramework;
-using RFramework.Config;
 using UnityEngine;
 
 namespace UnityRFramework.Runtime
@@ -10,8 +10,8 @@ namespace UnityRFramework.Runtime
     /// 配置模块 Unity 组件。
     /// 负责编排配置加载流程（ResourceModule 加载字节 → ConfigModule 解析缓存），
     /// 并通过 <see cref="Helper.CreateHelper{T}(string, T)"/> 或 SetHelper 方法注入 IConfigHelper 实现。
-    /// 默认 HelperTypeName 指向 DefaultConfigHelper（不包含任何实现），
-    /// 请在 Inspector 中配置 ConfigHelperTypeName 或在启动流程中调用 SetHelper() 注入真实实现。
+    /// 默认 HelperTypeName 指向 DefaultConfigHelper（UTF-8 JSON 字节 + JSON 字符串），
+    /// 也可在 Inspector 中配置其他 Helper，或在启动流程中调用 SetHelper() 注入实现。
     /// </summary>
     [AddComponentMenu("UnityRFramework/Config Component")]
     public sealed class ConfigComponent : UnityRFrameworkComponent
@@ -19,8 +19,8 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 配置辅助器类型全名。
         /// 必须是继承自 <see cref="ConfigHelperBase"/> 的 MonoBehaviour 类型。
-        /// 默认为 DefaultConfigHelper（不含实现），请配置为真实 Helper 类型全名，
-        /// 或在启动流程中通过 SetHelper 方法运行时替换。
+        /// 默认为 DefaultConfigHelper（UTF-8 JSON 字节 + JSON 字符串），
+        /// 可在启动流程中通过 SetHelper 方法运行时替换。
         /// </summary>
         [SerializeField]
         [Tooltip("配置辅助器类型全名。必须是继承自 ConfigHelperBase 的 MonoBehaviour。")]
@@ -78,10 +78,13 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 异步加载配置表。
         /// 通过 ResourceComponent 加载 TextAsset 字节数据，再调用 ConfigModule 解析并缓存。
+        /// DefaultConfigHelper 按 UTF-8 JSON 解析，BinaryConfigHelper 按 URFC v1 解析；
+        /// 自定义 Helper 可定义自己的字节格式。
         /// </summary>
-        /// <typeparam name="T">Luban 生成的配置行类型（如 ItemConfig）。</typeparam>
-        /// <param name="assetPath">配置资源路径（如 "Assets/Config/item.bytes"）。</param>
-        public async Task LoadConfigAsync<T>(string assetPath) where T : class
+        /// <typeparam name="T">配置行类型（如 ItemConfig）。</typeparam>
+        /// <param name="assetPath">配置资源路径（如 .json 或 .bytes）。</param>
+        /// <param name="ct">取消令牌。</param>
+        public async Task LoadConfigAsync<T>(string assetPath, CancellationToken ct = default) where T : class
         {
             if (string.IsNullOrEmpty(assetPath))
             {
@@ -96,14 +99,30 @@ namespace UnityRFramework.Runtime
                     "ConfigComponent: ResourceComponent not found. Ensure Resource module is initialized first.");
             }
 
-            TextAsset textAsset = await resource.LoadAssetAsync<TextAsset>(assetPath);
+            await resource.InitializeAsync();
+            TextAsset textAsset = await resource.LoadAssetAsync<TextAsset>(assetPath, 0, ct);
             if (textAsset == null)
             {
                 throw new RFrameworkException(
                     $"ConfigComponent: Failed to load config asset '{assetPath}'.");
             }
 
-            configModule.LoadConfig<T>(textAsset.bytes);
+            try
+            {
+                configModule.LoadConfig<T>(textAsset.bytes);
+            }
+            finally
+            {
+                resource.UnloadAsset<TextAsset>(assetPath);
+            }
+        }
+
+        /// <summary>
+        /// 从已加载的原始字节解析配置表。格式由当前 IConfigHelper 决定。
+        /// </summary>
+        public void LoadConfig<T>(byte[] bytes) where T : class
+        {
+            configModule.LoadConfig<T>(bytes);
         }
 
         /// <summary>

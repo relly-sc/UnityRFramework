@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using RFramework.Audio;
+using RFramework;
 using UnityEngine;
 
 namespace UnityRFramework.Runtime

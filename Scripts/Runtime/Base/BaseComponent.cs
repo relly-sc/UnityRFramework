@@ -215,14 +215,25 @@ namespace UnityRFramework.Runtime
         {
             try
             {
-                RFrameworkModuleEntry.Shutdown();
+                RFrameworkModuleEntry.Shutdown(false);
             }
             catch (RFrameworkException ex)
             {
-                // The framework logger is cleared in Shutdown even when a
-                // module fails. Use Unity's direct logger for this final
-                // teardown diagnostic.
-                Debug.LogException(ex);
+                if (RFrameworkLog.IsInitialized)
+                {
+                    try
+                    {
+                        Log.Error(ex.ToString());
+                    }
+                    catch
+                    {
+                        // 关闭阶段已无可用日志后端时，优先保证框架完成清理。
+                    }
+                }
+            }
+            finally
+            {
+                RFrameworkLog.SetLogHelper(null);
             }
         }
 

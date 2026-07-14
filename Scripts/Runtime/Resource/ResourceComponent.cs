@@ -2,7 +2,6 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using RFramework;
-using RFramework.Resource;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 // 消除 System.Object 与 UnityEngine.Object 的歧义
@@ -13,8 +12,8 @@ namespace UnityRFramework.Runtime
     /// <summary>
     /// 资源模块 Unity 组件。
     /// 负责 Inspector 配置注入（PlayMode、Server URL）并转发调用到 ResourceModule。
-    /// 默认 HelperTypeName 指向 DefaultResourceHelper（不包含任何实现），
-    /// 请在 Inspector 中配置 ResourceHelperTypeName 或在启动流程中调用 SetHelper() 注入真实实现。
+    /// 默认使用基于 Unity Resources API 的 DefaultResourceHelper，
+    /// 可在 Inspector 或启动流程中替换为 YooAsset 等实现。
     /// </summary>
     [AddComponentMenu("UnityRFramework/Resource Component")]
     public sealed class ResourceComponent : UnityRFrameworkComponent
@@ -22,8 +21,8 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 资源辅助器类型全名。
         /// 必须是继承自 <see cref="ResourceHelperBase"/> 的 MonoBehaviour 类型。
-        /// 默认为 DefaultResourceHelper（不含实现），请配置为真实 Helper 类型全名，
-        /// 或在启动流程中通过 SetHelper 方法运行时替换。
+        /// 默认为基于 Resources.Load 的 DefaultResourceHelper，
+        /// 也可在启动流程中通过 SetHelper 方法运行时替换。
         /// </summary>
         [SerializeField]
         [Tooltip("资源辅助器类型全名。必须是继承自 ResourceHelperBase 的 MonoBehaviour。")]

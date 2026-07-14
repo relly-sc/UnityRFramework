@@ -1,0 +1,23 @@
+{
+    "name": "UnityRFramework.Editor.Tests",
+    "rootNamespace": "UnityRFramework.Editor.Tests",
+    "references": [
+        "UnityRFramework.Editor",
+        "UnityRFramework.Runtime",
+        "RFramework.Library"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

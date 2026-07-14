@@ -3,7 +3,7 @@ using System.Collections;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using RFramework.WebRequest;
+using RFramework;
 using UnityEngine.Networking;
 
 namespace UnityRFramework.Runtime

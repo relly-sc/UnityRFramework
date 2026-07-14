@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using RFramework.Entity;
+using RFramework;
 using UnityEngine;
 
 namespace UnityRFramework.Runtime

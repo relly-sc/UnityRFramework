@@ -1,4 +1,4 @@
-using RFramework.Entity;
+using RFramework;
 using UnityEngine;
 using Object = UnityEngine.Object;
 

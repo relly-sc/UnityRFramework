@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using RFramework.Resource;
+using RFramework;
 using UnityEngine;
 
 namespace UnityRFramework.Runtime

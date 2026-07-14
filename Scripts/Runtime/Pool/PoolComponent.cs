@@ -1,8 +1,6 @@
 using System;
 
 using RFramework;
-using RFramework.Pool;
-
 using UnityEngine;
 using Object = UnityEngine.Object;
 

@@ -543,18 +543,18 @@ namespace UnityRFramework.Runtime
                     RFramework.RFrameworkLog.IsInitialized ? "Initialized" : "Not initialized", null));
 
                 // Event
-                var eventM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Event.IEventModule>();
+                var eventM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IEventModule>();
                 if (eventM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Event", "Active", null));
 
                 // Fsm
-                var fsmM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Fsm.IFsmModule>();
+                var fsmM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IFsmModule>();
                 if (fsmM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Fsm",
                         string.Format("FSMs: {0}", fsmM.FsmCount), null));
 
                 // Procedure
-                var procM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Procedure.IProcedureModule>();
+                var procM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IProcedureModule>();
                 if (procM != null)
                 {
                     var current = procM.CurrentProcedure;
@@ -570,31 +570,31 @@ namespace UnityRFramework.Runtime
                 }
 
                 // Pool
-                var poolM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Pool.IPoolModule>();
+                var poolM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IPoolModule>();
                 if (poolM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Pool",
                         string.Format("Objects: {0}", poolM.PoolCount), null));
 
                 // Timer
-                var timerM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Timer.ITimerModule>();
+                var timerM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ITimerModule>();
                 if (timerM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Timer",
                         string.Format("Timers: {0}", timerM.TimerCount), null));
 
                 // Resource
-                var resM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Resource.IResourceModule>();
+                var resM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IResourceModule>();
                 if (resM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Resource",
                         string.Format("Loaded: {0}  Loading: {1}", resM.LoadedAssetCount, resM.LoadingAssetCount), null));
 
                 // Config
-                var cfgM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Config.IConfigModule>();
+                var cfgM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IConfigModule>();
                 if (cfgM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Config",
                         string.Format("Tables: {0}", cfgM.ConfigCount), null));
 
                 // Scene
-                var sceneM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Scene.ISceneModule>();
+                var sceneM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ISceneModule>();
                 if (sceneM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -612,19 +612,19 @@ namespace UnityRFramework.Runtime
                 }
 
                 // UI
-                var uiM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.UI.IUIModule>();
+                var uiM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IUIModule>();
                 if (uiM != null)
                     moduleInfos.Add(new ModuleDebugInfo("UI",
                         string.Format("Forms: {0}", uiM.UIFormCount), null));
 
                 // Entity
-                var entM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Entity.IEntityModule>();
+                var entM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IEntityModule>();
                 if (entM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Entity",
                         string.Format("Entities: {0}  Groups: {1}", entM.EntityCount, entM.EntityGroupCount), null));
 
                 // Audio
-                var audioM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Audio.IAudioModule>();
+                var audioM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IAudioModule>();
                 if (audioM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Audio",
                         audioM.Muted ? "Muted" : "Playing",
@@ -637,7 +637,7 @@ namespace UnityRFramework.Runtime
                         }));
 
                 // Network
-                var netM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Network.INetworkModule>();
+                var netM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.INetworkModule>();
                 if (netM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Network",
                         netM.IsConnected ? "Connected" : "Disconnected",
@@ -648,7 +648,7 @@ namespace UnityRFramework.Runtime
                         }));
 
                 // Localization
-                var locM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.Localization.ILocalizationModule>();
+                var locM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ILocalizationModule>();
                 if (locM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Localization",
                         locM.CurrentLanguage ?? "(none)",
@@ -658,14 +658,14 @@ namespace UnityRFramework.Runtime
                         }));
 
                 // WebRequest
-                var webM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.WebRequest.IWebRequestModule>();
+                var webM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IWebRequestModule>();
                 if (webM != null)
                     moduleInfos.Add(new ModuleDebugInfo("WebRequest",
                         string.Format("Active: {0}  Queued: {1}", webM.ActiveRequestCount, webM.QueuedRequestCount), null));
             }
             catch (Exception e)
             {
-                Debug.LogWarning(string.Format("DebuggerOverlay.RefreshModuleInfos: {0}", e.Message));
+                Log.Warning("DebuggerOverlay.RefreshModuleInfos: {0}", e.Message);
             }
         }
 

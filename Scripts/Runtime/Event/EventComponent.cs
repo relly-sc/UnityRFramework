@@ -1,6 +1,5 @@
 using UnityEngine;
 using RFramework;
-using RFramework.Event;
 
 namespace UnityRFramework.Runtime
 {
@@ -40,6 +39,20 @@ namespace UnityRFramework.Runtime
         {
             base.Awake();
             eventModule = RFrameworkModuleEntry.GetModule<IEventModule>();
+            eventModule.OnError += OnModuleError;
+        }
+
+        private void OnDestroy()
+        {
+            if (eventModule != null)
+            {
+                eventModule.OnError -= OnModuleError;
+            }
+        }
+
+        private void OnModuleError(RFrameworkException error)
+        {
+            Log.Error(error.ToString());
         }
 
         /// <inheritdoc cref="IEventModule.Count{T}"/>
