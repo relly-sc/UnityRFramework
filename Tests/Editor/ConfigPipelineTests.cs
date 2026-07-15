@@ -289,6 +289,70 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        /// <summary>验证历史 URFC Schema 只有显式注册迁移器后才能读取。</summary>
+        [Test]
+        public void ConfigV2MigratesRegisteredLegacySchema()
+        {
+            ConfigTableSchema currentSchema = CreateSchema();
+            ConfigTableSchema legacySchema = CreateLegacySchema();
+            byte[] legacyBytes = ConfigBinaryExporter.BuildV2(legacySchema);
+            BinaryConfigCodecRegistry.Register(
+                new TestConfigRowCodec(currentSchema.TableId, currentSchema.SchemaHash));
+
+            GameObject owner = new GameObject("Binary Config Migration Tests");
+            try
+            {
+                BinaryConfigHelper helper = owner.AddComponent<BinaryConfigHelper>();
+                Assert.Throws<RFrameworkException>(() =>
+                    helper.ParseConfig(typeof(TestConfigRow), legacyBytes));
+
+                BinaryConfigMigrationRegistry.Register(new TestLegacyConfigMigration(
+                    legacySchema.SchemaHash, currentSchema.SchemaHash, 99f));
+                object table = helper.ParseConfig(typeof(TestConfigRow), legacyBytes);
+                TestConfigRow first = helper.GetConfig<TestConfigRow>(table, 1);
+                TestConfigRow second = helper.GetConfig<TestConfigRow>(table, 2);
+
+                Assert.AreEqual("Sword", first.Name);
+                Assert.AreEqual(99f, first.Price);
+                Assert.AreEqual("Shield", second.Name);
+                Assert.AreEqual(99f, second.Price);
+            }
+            finally
+            {
+                BinaryConfigMigrationRegistry.Unregister(
+                    typeof(TestConfigRow), legacySchema.SchemaHash);
+                BinaryConfigCodecRegistry.Unregister(typeof(TestConfigRow));
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证迁移器目标必须与当前 Codec Schema 完全一致。</summary>
+        [Test]
+        public void ConfigV2RejectsMigrationForAnotherTargetSchema()
+        {
+            ConfigTableSchema currentSchema = CreateSchema();
+            ConfigTableSchema legacySchema = CreateLegacySchema();
+            BinaryConfigCodecRegistry.Register(
+                new TestConfigRowCodec(currentSchema.TableId, currentSchema.SchemaHash));
+            BinaryConfigMigrationRegistry.Register(new TestLegacyConfigMigration(
+                legacySchema.SchemaHash, currentSchema.SchemaHash + 1, 0f));
+
+            GameObject owner = new GameObject("Binary Config Migration Target Tests");
+            try
+            {
+                BinaryConfigHelper helper = owner.AddComponent<BinaryConfigHelper>();
+                Assert.Throws<RFrameworkException>(() => helper.ParseConfig(
+                    typeof(TestConfigRow), ConfigBinaryExporter.BuildV2(legacySchema)));
+            }
+            finally
+            {
+                BinaryConfigMigrationRegistry.Unregister(
+                    typeof(TestConfigRow), legacySchema.SchemaHash);
+                BinaryConfigCodecRegistry.Unregister(typeof(TestConfigRow));
+                Object.DestroyImmediate(owner);
+            }
+        }
+
         /// <summary>验证枚举、数组、List 和字符串换行的 Schema 与 JSON 闭环。</summary>
         [Test]
         public void ComplexFieldsRoundTripThroughJsonHelper()
@@ -548,6 +612,40 @@ namespace UnityRFramework.Editor.Tests
                 {
                     new CsvRow(4, new[] { "1", "Sword", "12.5" }),
                     new CsvRow(5, new[] { "2", "Shield", "20" })
+                },
+                TableId = BinaryFormatUtility.ComputeFnv1A32(fullTypeName),
+                SchemaHash = BinaryFormatUtility.ComputeFnv1A64(identity)
+            };
+        }
+
+        private static ConfigTableSchema CreateLegacySchema()
+        {
+            ConfigFieldSchema[] fields =
+            {
+                new ConfigFieldSchema
+                {
+                    Name = "Id", TypeKeyword = "int", CSharpTypeName = "int",
+                    Kind = ConfigFieldKind.Int32
+                },
+                new ConfigFieldSchema
+                {
+                    Name = "Name", TypeKeyword = "string", CSharpTypeName = "string",
+                    Kind = ConfigFieldKind.String
+                }
+            };
+            const string fullTypeName = "UnityRFramework.Editor.Tests.TestConfigRow";
+            string identity = fullTypeName + "|Id:int;Name:string";
+            return new ConfigTableSchema
+            {
+                SourcePath = "legacy-memory.csv",
+                TableName = "TestConfigRow",
+                Namespace = "UnityRFramework.Editor.Tests",
+                RowTypeName = nameof(TestConfigRow),
+                Fields = fields,
+                Rows = new[]
+                {
+                    new CsvRow(4, new[] { "1", "Sword" }),
+                    new CsvRow(5, new[] { "2", "Shield" })
                 },
                 TableId = BinaryFormatUtility.ComputeFnv1A32(fullTypeName),
                 SchemaHash = BinaryFormatUtility.ComputeFnv1A64(identity)

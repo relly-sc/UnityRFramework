@@ -1,0 +1,16 @@
+{
+  "Tables": {
+    "Acceptance_Action": [
+      {
+        "Id": 1,
+        "NameKey": "acceptance_attack",
+        "Power": 1
+      },
+      {
+        "Id": 2,
+        "NameKey": "acceptance_skill",
+        "Power": 1.5
+      }
+    ]
+  }
+}

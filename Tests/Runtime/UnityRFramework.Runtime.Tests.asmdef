@@ -1,15 +1,11 @@
 {
-    "name": "UnityRFramework.Editor.Tests",
-    "rootNamespace": "UnityRFramework.Editor.Tests",
+    "name": "UnityRFramework.Runtime.Tests",
+    "rootNamespace": "UnityRFramework.Tests",
     "references": [
-        "UnityRFramework.Editor",
         "UnityRFramework.Runtime",
-        "UnityRFramework.Runtime.Tests",
         "RFramework.Library"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

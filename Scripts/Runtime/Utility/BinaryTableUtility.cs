@@ -108,17 +108,20 @@ namespace UnityRFramework.Runtime
                             + $"File '{tableId:X8}', codec '{codec.TableId:X8}'.");
                     }
 
-                    if (codec.SchemaHash != schemaHash)
-                    {
-                        throw new RFrameworkException(
-                            $"Binary config schema mismatch for '{rowType.Name}'. "
-                            + $"File '{schemaHash:X16}', codec '{codec.SchemaHash:X16}'.");
-                    }
-
                     using (MemoryStream bodyStream = new MemoryStream(body, false))
                     using (BinaryReader bodyReader = new BinaryReader(bodyStream, Encoding.UTF8, false))
                     {
-                        object table = codec.ReadTable(bodyReader, rowCount);
+                        object table;
+                        if (codec.SchemaHash == schemaHash)
+                        {
+                            table = codec.ReadTable(bodyReader, rowCount);
+                        }
+                        else
+                        {
+                            table = ReadAndMigrateTable(
+                                rowType, schemaHash, codec, bodyReader, rowCount);
+                        }
+
                         if (table == null)
                         {
                             throw new RFrameworkException(
@@ -142,6 +145,33 @@ namespace UnityRFramework.Runtime
                 throw new RFrameworkException(
                     $"Generated binary config '{rowType.Name}' is truncated or malformed.", ex);
             }
+        }
+
+        private static object ReadAndMigrateTable(
+            Type rowType,
+            ulong sourceSchemaHash,
+            IBinaryConfigCodec currentCodec,
+            BinaryReader reader,
+            int rowCount)
+        {
+            if (!BinaryConfigMigrationRegistry.TryGet(
+                rowType, sourceSchemaHash, out IBinaryConfigMigration migration))
+            {
+                throw new RFrameworkException(
+                    $"Binary config schema mismatch for '{rowType.Name}'. "
+                    + $"File '{sourceSchemaHash:X16}', codec "
+                    + $"'{currentCodec.SchemaHash:X16}', and no migration is registered.");
+            }
+
+            if (migration.TargetSchemaHash != currentCodec.SchemaHash)
+            {
+                throw new RFrameworkException(
+                    $"Binary config migration target mismatch for '{rowType.Name}'. "
+                    + $"Migration '{migration.TargetSchemaHash:X16}', codec "
+                    + $"'{currentCodec.SchemaHash:X16}'.");
+            }
+
+            return migration.ReadAndMigrate(reader, rowCount);
         }
 
         /// <summary>
