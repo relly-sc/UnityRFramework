@@ -28,6 +28,10 @@ namespace UnityRFramework.Tests
             "ConfigPipelineAcceptance/Config/Json/AcceptanceBundle.json";
         private const string EnglishPath =
             "ConfigPipelineAcceptance/Localization/Binary/en.bytes";
+        private const string BinaryLanguageBundlePath =
+            "ConfigPipelineAcceptance/Localization/Binary/AcceptanceLanguages.bytes";
+        private const string JsonLanguageBundlePath =
+            "ConfigPipelineAcceptance/Localization/Json/AcceptanceLanguages.json";
 
         private async void Start()
         {
@@ -73,6 +77,7 @@ namespace UnityRFramework.Tests
             await VerifyJsonConfigAsync(resource);
             await VerifyConfigBundlesAsync(config, resource);
             await VerifyLocalizationAsync(localization, resource);
+            await VerifyLocalizationBundlesAsync(localization, resource);
         }
 
         private static async Task VerifyConfigAsync(
@@ -151,6 +156,48 @@ namespace UnityRFramework.Tests
             Require(
                 localization.GetString("acceptance_title") == "Config Pipeline Acceptance",
                 "Language reload failed.");
+        }
+
+        private static async Task VerifyLocalizationBundlesAsync(
+            LocalizationComponent localization, ResourceComponent resource)
+        {
+            byte[] binaryBytes = await LoadBytesAsync(resource, BinaryLanguageBundlePath);
+            localization.LoadLanguageBundle(binaryBytes);
+            Require(localization.LoadedLanguageCount == 2,
+                "Language bundle count mismatch.");
+            localization.SwitchLanguage("zh-CN");
+            Require(localization.GetString("acceptance_title") == "配置管线验收",
+                "Binary language bundle Chinese query mismatch.");
+            localization.SwitchLanguage("en");
+            Require(localization.GetString("acceptance_title")
+                    == "Config Pipeline Acceptance",
+                "Binary language bundle English query mismatch.");
+
+            byte[] badBundle = CloneAndFlip(binaryBytes, binaryBytes.Length - 1);
+            ExpectFailure(
+                () => localization.LoadLanguageBundle(badBundle),
+                "Localization bundle CRC");
+            Require(localization.GetString("acceptance_title")
+                    == "Config Pipeline Acceptance",
+                "Rejected language bundle replaced the valid cache.");
+
+            byte[] jsonBytes = await LoadBytesAsync(resource, JsonLanguageBundlePath);
+            GameObject owner = new GameObject("JSON Language Bundle Acceptance Helper");
+            try
+            {
+                JsonLocalizationHelper helper = owner.AddComponent<JsonLocalizationHelper>();
+                IReadOnlyDictionary<string, Dictionary<string, string>> languages =
+                    helper.ParseLanguageBundle(jsonBytes);
+                Require(languages["zh-CN"]["acceptance_title"] == "配置管线验收",
+                    "JSON language bundle Chinese query mismatch.");
+                Require(languages["en"]["acceptance_title"]
+                        == "Config Pipeline Acceptance",
+                    "JSON language bundle English query mismatch.");
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(owner);
+            }
         }
 
         private static async Task VerifyJsonConfigAsync(ResourceComponent resource)

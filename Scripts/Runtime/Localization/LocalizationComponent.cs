@@ -193,6 +193,48 @@ namespace UnityRFramework.Runtime
             localizationModule.LoadLanguageFromString(language, json);
         }
 
+        /// <summary>从资源路径加载多语言容器，不自动切换当前语言。</summary>
+        public async Task LoadLanguageBundleAsync(
+            string assetPath, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                throw new RFrameworkException(
+                    "LocalizationComponent: bundle asset path is invalid.");
+            }
+
+            ResourceComponent resource = GameEntry.Resource;
+            if (resource == null)
+            {
+                throw new RFrameworkException(
+                    "LocalizationComponent: ResourceComponent is required to load "
+                    + "a language bundle.");
+            }
+
+            await resource.InitializeAsync();
+            TextAsset textAsset = await resource.LoadAssetAsync<TextAsset>(assetPath, 0, ct);
+            if (textAsset == null)
+            {
+                throw new RFrameworkException(
+                    $"LocalizationComponent: Failed to load language bundle '{assetPath}'.");
+            }
+
+            try
+            {
+                localizationModule.LoadLanguageBundle(textAsset.bytes);
+            }
+            finally
+            {
+                resource.UnloadAsset<TextAsset>(assetPath);
+            }
+        }
+
+        /// <summary>从原始字节原子加载多语言容器。</summary>
+        public void LoadLanguageBundle(byte[] bytes)
+        {
+            localizationModule.LoadLanguageBundle(bytes);
+        }
+
         /// <summary>
         /// 确保目标语言已加载，然后串行切换当前语言。
         /// </summary>

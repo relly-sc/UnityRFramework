@@ -406,11 +406,50 @@ namespace UnityRFramework.Editor
                 }
             }
 
+            if (options.ExportLocalizationBundle)
+            {
+                string bundleName = ValidateOutputFileName(
+                    options.LocalizationBundleName, "Localization bundle");
+                string jsonFile = bundleName + ".json";
+                string binaryFile = bundleName + ".bytes";
+                jsonFiles.Add(jsonFile);
+                binaryFiles.Add(binaryFile);
+                string jsonPath = Path.Combine(jsonRoot, jsonFile);
+                if (JsonExportUtility.WriteTextIfChanged(
+                    jsonPath, LocalizationJsonExporter.BuildBundle(localizations)))
+                {
+                    changed = true;
+                    report.FileWritten(ToProjectPath(jsonPath));
+                }
+
+                string binaryPath = Path.Combine(binaryRoot, binaryFile);
+                if (ConfigBinaryExporter.WriteBytesIfChanged(
+                    binaryPath, LocalizationBinaryExporter.BuildBundle(localizations)))
+                {
+                    changed = true;
+                    report.FileWritten(ToProjectPath(binaryPath));
+                }
+            }
+
             changed |= SynchronizeManifest(
                 jsonRoot, LocalizationJsonManifestName, jsonFiles, report);
             changed |= SynchronizeManifest(
                 binaryRoot, LocalizationBinaryManifestName, binaryFiles, report);
             return changed;
+        }
+
+        private static string ValidateOutputFileName(string value, string displayName)
+        {
+            string name = value?.Trim();
+            if (string.IsNullOrEmpty(name)
+                || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+                || name.IndexOf('/') >= 0
+                || name.IndexOf('\\') >= 0)
+            {
+                throw new RFrameworkException($"{displayName} file name is invalid.");
+            }
+
+            return name;
         }
 
         private static void RemoveLegacyOutputs(

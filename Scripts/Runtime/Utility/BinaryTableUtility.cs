@@ -23,6 +23,7 @@ namespace UnityRFramework.Runtime
         private static readonly byte[] ConfigMagic = Encoding.ASCII.GetBytes("URFC");
         private static readonly byte[] ConfigBundleMagic = Encoding.ASCII.GetBytes("URFM");
         private static readonly byte[] LocalizationMagic = Encoding.ASCII.GetBytes("URFL");
+        private static readonly byte[] LocalizationBundleMagic = Encoding.ASCII.GetBytes("URLM");
 
         /// <summary>
         /// 读取并验证 URFC 文件头，返回协议版本。
@@ -517,6 +518,110 @@ namespace UnityRFramework.Runtime
             {
                 throw new RFrameworkException(
                     $"Binary localization '{language}' is truncated or malformed.", ex);
+            }
+        }
+
+        /// <summary>读取 URLM v1 多语言容器。</summary>
+        public static IReadOnlyDictionary<string, Dictionary<string, string>>
+            ReadLocalizationBundle(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                throw new RFrameworkException("Binary localization bundle data is empty.");
+            }
+
+            try
+            {
+                using (MemoryStream stream = new MemoryStream(bytes, false))
+                using (BinaryReader reader = new BinaryReader(stream, Encoding.UTF8, false))
+                {
+                    ReadAndValidateHeader(
+                        reader, LocalizationBundleMagic,
+                        BinaryFormatUtility.LocalizationBundleVersion,
+                        "localization bundle");
+                    int languageCount = ReadBoundedCount(
+                        reader, MaxRows, "localization language");
+                    if (languageCount == 0)
+                    {
+                        throw new RFrameworkException(
+                            "Binary localization bundle contains no languages.");
+                    }
+
+                    Dictionary<string, Dictionary<string, string>> result =
+                        new Dictionary<string, Dictionary<string, string>>(
+                            StringComparer.OrdinalIgnoreCase);
+                    for (int i = 0; i < languageCount; i++)
+                    {
+                        string language = ReadUtf8String(reader, false);
+                        if (string.IsNullOrWhiteSpace(language)
+                            || result.ContainsKey(language))
+                        {
+                            throw new RFrameworkException(
+                                $"Binary localization bundle contains an invalid or duplicate "
+                                + $"language '{language}'.");
+                        }
+
+                        int entryCount = ReadBoundedCount(
+                            reader, MaxRows, "localization entry");
+                        int bodyLength = reader.ReadInt32();
+                        uint checksum = reader.ReadUInt32();
+                        if (bodyLength < 0 || bodyLength > stream.Length - stream.Position)
+                        {
+                            throw new RFrameworkException(
+                                $"Binary localization bundle language '{language}' "
+                                + "body length is invalid.");
+                        }
+
+                        byte[] body = reader.ReadBytes(bodyLength);
+                        if (body.Length != bodyLength)
+                        {
+                            throw new EndOfStreamException();
+                        }
+
+                        if (BinaryFormatUtility.ComputeCrc32(body) != checksum)
+                        {
+                            throw new RFrameworkException(
+                                $"Binary localization bundle language '{language}' "
+                                + "checksum mismatch.");
+                        }
+
+                        result.Add(language, ReadLocalization(
+                            language,
+                            BuildLocalizationBytes(entryCount, checksum, body)));
+                    }
+
+                    EnsureFullyConsumed(stream, "localization bundle");
+                    return result;
+                }
+            }
+            catch (RFrameworkException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is EndOfStreamException
+                || ex is IOException
+                || ex is ArgumentException
+                || ex is OverflowException)
+            {
+                throw new RFrameworkException(
+                    "Binary localization bundle is truncated or malformed.", ex);
+            }
+        }
+
+        private static byte[] BuildLocalizationBytes(
+            int entryCount, uint checksum, byte[] body)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8, true))
+            {
+                writer.Write(LocalizationMagic);
+                writer.Write(BinaryFormatUtility.LocalizationVersion);
+                writer.Write(entryCount);
+                writer.Write(body.Length);
+                writer.Write(checksum);
+                writer.Write(body);
+                writer.Flush();
+                return stream.ToArray();
             }
         }
 

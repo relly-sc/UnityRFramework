@@ -309,6 +309,99 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        /// <summary>验证 JSON 与二进制多语言容器均可完整回读。</summary>
+        [Test]
+        public void LocalizationBundlesRoundTrip()
+        {
+            Utility.Json.SetJsonHelper(new DefaultJsonHelper());
+            LocalizationTable english = new LocalizationTable
+            {
+                Language = "en",
+                SourcePath = "en.csv",
+                Entries = new List<KeyValuePair<string, string>>
+                {
+                    new KeyValuePair<string, string>("title", "Title")
+                }
+            };
+            LocalizationTable chinese = new LocalizationTable
+            {
+                Language = "zh-CN",
+                SourcePath = "zh-CN.csv",
+                Entries = new List<KeyValuePair<string, string>>
+                {
+                    new KeyValuePair<string, string>("title", "标题")
+                }
+            };
+            GameObject owner = new GameObject("Localization Bundle Tests");
+            try
+            {
+                JsonLocalizationHelper jsonHelper = owner.AddComponent<JsonLocalizationHelper>();
+                IReadOnlyDictionary<string, Dictionary<string, string>> jsonLanguages =
+                    jsonHelper.ParseLanguageBundle(Encoding.UTF8.GetBytes(
+                        LocalizationJsonExporter.BuildBundle(new[] { english, chinese })));
+                Assert.AreEqual("Title", jsonLanguages["en"]["title"]);
+                Assert.AreEqual("标题", jsonLanguages["zh-CN"]["title"]);
+
+                BinaryLocalizationHelper binaryHelper =
+                    owner.AddComponent<BinaryLocalizationHelper>();
+                IReadOnlyDictionary<string, Dictionary<string, string>> binaryLanguages =
+                    binaryHelper.ParseLanguageBundle(
+                        LocalizationBinaryExporter.BuildBundle(new[] { english, chinese }));
+                Assert.AreEqual("Title", binaryLanguages["en"]["title"]);
+                Assert.AreEqual("标题", binaryLanguages["zh-CN"]["title"]);
+            }
+            finally
+            {
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证多语言容器拒绝重复语言和损坏的二进制分段。</summary>
+        [Test]
+        public void LocalizationBundlesRejectDuplicateLanguageAndBadCrc()
+        {
+            LocalizationTable first = new LocalizationTable
+            {
+                Language = "en",
+                SourcePath = "first.csv",
+                Entries = new List<KeyValuePair<string, string>>
+                {
+                    new KeyValuePair<string, string>("title", "First")
+                }
+            };
+            LocalizationTable duplicate = new LocalizationTable
+            {
+                Language = "en",
+                SourcePath = "duplicate.csv",
+                Entries = new List<KeyValuePair<string, string>>
+                {
+                    new KeyValuePair<string, string>("title", "Duplicate")
+                }
+            };
+            GameObject owner = new GameObject("Localization Bundle Invalid Tests");
+            try
+            {
+                JsonLocalizationHelper jsonHelper = owner.AddComponent<JsonLocalizationHelper>();
+                Assert.Throws<RFrameworkException>(() => jsonHelper.ParseLanguageBundle(
+                    Encoding.UTF8.GetBytes(
+                        LocalizationJsonExporter.BuildBundle(new[] { first, duplicate }))));
+
+                BinaryLocalizationHelper binaryHelper =
+                    owner.AddComponent<BinaryLocalizationHelper>();
+                Assert.Throws<RFrameworkException>(() => binaryHelper.ParseLanguageBundle(
+                    LocalizationBinaryExporter.BuildBundle(new[] { first, duplicate })));
+
+                byte[] badCrc = LocalizationBinaryExporter.BuildBundle(new[] { first });
+                badCrc[badCrc.Length - 1] ^= 0x7F;
+                Assert.Throws<RFrameworkException>(() =>
+                    binaryHelper.ParseLanguageBundle(badCrc));
+            }
+            finally
+            {
+                Object.DestroyImmediate(owner);
+            }
+        }
+
         /// <summary>验证 URFL v2 导出结果可由 Runtime Helper 回读。</summary>
         [Test]
         public void LocalizationV2RoundTrips()

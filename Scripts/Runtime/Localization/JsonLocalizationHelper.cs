@@ -8,7 +8,8 @@ namespace UnityRFramework.Runtime
     /// <summary>
     /// JSON 本地化解析器。每个文件只包含一种语言的 Key/Value 表。
     /// </summary>
-    public sealed class JsonLocalizationHelper : DictionaryLocalizationHelperBase
+    public sealed class JsonLocalizationHelper : DictionaryLocalizationHelperBase,
+        ILocalizationBundleHelper
     {
         /// <inheritdoc/>
         public override Dictionary<string, string> ParseLanguage(string language, byte[] bytes)
@@ -32,6 +33,19 @@ namespace UnityRFramework.Runtime
             }
 
             return ParseJsonLanguage(language, json);
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyDictionary<string, Dictionary<string, string>> ParseLanguageBundle(
+            byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                throw new RFrameworkException(
+                    "JsonLocalizationHelper: JSON bundle bytes are empty.");
+            }
+
+            return ParseJsonLanguageBundle(Encoding.UTF8.GetString(bytes));
         }
     }
 }

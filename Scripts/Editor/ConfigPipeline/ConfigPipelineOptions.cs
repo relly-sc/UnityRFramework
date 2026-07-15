@@ -32,6 +32,12 @@ namespace UnityRFramework.Editor
         [FormerlySerializedAs("LocalizationBinaryDirectory")]
         public string LocalizationOutputDirectory = "Assets/Resources/Localization";
 
+        /// <summary>是否额外导出包含全部语言的 JSON 与二进制容器。</summary>
+        public bool ExportLocalizationBundle = true;
+
+        /// <summary>多语言容器文件名，不含扩展名。</summary>
+        public string LocalizationBundleName = "LocalizationBundle";
+
         /// <summary>生成的 Config 行类型和 Codec 所使用的命名空间；留空时使用全局命名空间。</summary>
         public string GeneratedNamespace = "Game.Config";
     }

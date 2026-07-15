@@ -76,6 +76,15 @@ namespace UnityRFramework.Editor
             EditorGUILayout.LabelField("Localization", EditorStyles.boldLabel);
             DrawFolderField("CSV 目录", ref options.LocalizationSourceDirectory);
             DrawFolderField("输出目录", ref options.LocalizationOutputDirectory);
+            options.ExportLocalizationBundle = EditorGUILayout.Toggle(
+                new GUIContent("导出多语言容器", "同时导出 JSON 与二进制多语言容器。"),
+                options.ExportLocalizationBundle);
+            using (new EditorGUI.DisabledScope(!options.ExportLocalizationBundle))
+            {
+                options.LocalizationBundleName = EditorGUILayout.TextField(
+                    new GUIContent("容器文件名", "不含 .json 或 .bytes 扩展名。"),
+                    options.LocalizationBundleName);
+            }
 
             EditorGUILayout.Space(12f);
             using (new EditorGUILayout.HorizontalScope())

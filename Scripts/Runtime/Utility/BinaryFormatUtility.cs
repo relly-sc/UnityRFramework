@@ -26,6 +26,9 @@ namespace UnityRFramework.Runtime
         /// <summary>URFL CRC32 校验协议版本。</summary>
         public const ushort LocalizationVersion = 2;
 
+        /// <summary>URLM 多语言容器协议版本。</summary>
+        public const ushort LocalizationBundleVersion = 1;
+
         /// <summary>协议允许的最大集合元素数量。</summary>
         public const int MaxCollectionCount = 1_000_000;
 

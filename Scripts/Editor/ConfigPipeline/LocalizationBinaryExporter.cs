@@ -12,6 +12,7 @@ namespace UnityRFramework.Editor
     public static class LocalizationBinaryExporter
     {
         private static readonly byte[] LocalizationMagic = Encoding.ASCII.GetBytes("URFL");
+        private static readonly byte[] LocalizationBundleMagic = Encoding.ASCII.GetBytes("URLM");
 
         /// <summary>
         /// 构建一个 URFL v1 语言文件，仅用于兼容性测试和旧项目迁移。
@@ -55,6 +56,50 @@ namespace UnityRFramework.Editor
                 throw new RFrameworkException("Localization source is invalid.");
             }
 
+            byte[] body = BuildBody(localization);
+
+            using (MemoryStream stream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8, true))
+            {
+                writer.Write(LocalizationMagic);
+                writer.Write(BinaryFormatUtility.LocalizationVersion);
+                WritePayload(writer, localization, body);
+                writer.Flush();
+                return stream.ToArray();
+            }
+        }
+
+        /// <summary>构建 URLM v1 多语言容器。</summary>
+        public static byte[] BuildBundle(IReadOnlyList<LocalizationTable> localizations)
+        {
+            if (localizations == null || localizations.Count == 0)
+            {
+                throw new RFrameworkException("Localization bundle sources are empty.");
+            }
+
+            using (MemoryStream stream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8, true))
+            {
+                writer.Write(LocalizationBundleMagic);
+                writer.Write(BinaryFormatUtility.LocalizationBundleVersion);
+                writer.Write(localizations.Count);
+                for (int i = 0; i < localizations.Count; i++)
+                {
+                    LocalizationTable localization = localizations[i]
+                        ?? throw new RFrameworkException(
+                            "Localization bundle contains an invalid source.");
+                    BinaryFormatUtility.WriteUtf8String(
+                        writer, localization.Language, false);
+                    WritePayload(writer, localization, BuildBody(localization));
+                }
+
+                writer.Flush();
+                return stream.ToArray();
+            }
+        }
+
+        private static byte[] BuildBody(LocalizationTable localization)
+        {
             byte[] body;
             using (MemoryStream bodyStream = new MemoryStream())
             using (BinaryWriter bodyWriter = new BinaryWriter(bodyStream, Encoding.UTF8, true))
@@ -71,18 +116,16 @@ namespace UnityRFramework.Editor
                 body = bodyStream.ToArray();
             }
 
-            using (MemoryStream stream = new MemoryStream())
-            using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8, true))
-            {
-                writer.Write(LocalizationMagic);
-                writer.Write(BinaryFormatUtility.LocalizationVersion);
-                writer.Write(localization.Entries.Count);
-                writer.Write(body.Length);
-                writer.Write(BinaryFormatUtility.ComputeCrc32(body));
-                writer.Write(body);
-                writer.Flush();
-                return stream.ToArray();
-            }
+            return body;
+        }
+
+        private static void WritePayload(
+            BinaryWriter writer, LocalizationTable localization, byte[] body)
+        {
+            writer.Write(localization.Entries.Count);
+            writer.Write(body.Length);
+            writer.Write(BinaryFormatUtility.ComputeCrc32(body));
+            writer.Write(body);
         }
     }
 }

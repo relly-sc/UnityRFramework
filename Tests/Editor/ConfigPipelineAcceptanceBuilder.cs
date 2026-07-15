@@ -159,6 +159,8 @@ namespace UnityRFramework.Editor
                     + "Resources/ConfigPipelineAcceptance/Localization",
                 ExportConfigBundle = true,
                 ConfigBundleName = "AcceptanceBundle",
+                ExportLocalizationBundle = true,
+                LocalizationBundleName = "AcceptanceLanguages",
                 GeneratedNamespace = "UnityRFramework.Tests.Config"
             };
         }
