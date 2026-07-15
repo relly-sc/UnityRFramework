@@ -74,6 +74,40 @@ namespace UnityRFramework.Runtime
             return uiModule.OpenUIFormAsync(assetName, windowLayer, fullScreen, priority, userData, ct);
         }
 
+        /// <summary>
+        /// 将场景中已有的 UI 对象登记到 UI 模块。
+        /// 场景 UI 参与窗口栈和生命周期管理，但模块不会销毁对象或卸载资源。
+        /// </summary>
+        /// <param name="uiInstance">场景中的 UI 对象。</param>
+        /// <param name="formName">UI 表单唯一名称。</param>
+        /// <param name="windowLayer">窗口层级。</param>
+        /// <param name="fullScreen">是否为全屏窗口。</param>
+        /// <param name="userData">用户自定义数据。</param>
+        /// <returns>登记后的 UI 表单。</returns>
+        public IUIForm RegisterSceneUIForm(GameObject uiInstance, string formName, int windowLayer = 0,
+            bool fullScreen = false, object userData = null)
+        {
+            if (uiInstance == null)
+            {
+                throw new RFrameworkException("Scene UI instance is invalid.");
+            }
+
+            UIForm uiForm = uiInstance.GetOrAddComponent<UIForm>();
+            uiForm.Init(formName, windowLayer, fullScreen);
+            uiModule.RegisterUIForm(formName, uiForm, userData);
+            return uiForm;
+        }
+
+        /// <summary>
+        /// 从 UI 模块注销场景 UI，不销毁对象或卸载资源。
+        /// </summary>
+        /// <param name="formName">UI 表单唯一名称。</param>
+        /// <param name="userData">用户自定义数据。</param>
+        public void UnregisterSceneUIForm(string formName, object userData = null)
+        {
+            uiModule.UnregisterUIForm(formName, userData);
+        }
+
         /// <inheritdoc cref="IUIModule.CloseUIForm"/>
         public void CloseUIForm(string assetName, object userData = null)
         {

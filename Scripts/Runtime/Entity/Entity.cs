@@ -71,6 +71,7 @@ namespace UnityRFramework.Runtime
             }
 
             entityLogic.OnInit(this, isNewInstance, userData);
+            Status = EntityStatus.Inited;
         }
 
         void IEntity.OnRecycle()
@@ -95,6 +96,8 @@ namespace UnityRFramework.Runtime
             {
                 entityLogic.OnShow(userData);
             }
+
+            Status = EntityStatus.Showed;
         }
 
         void IEntity.OnHide(bool isShutdown, object userData)
@@ -105,6 +108,7 @@ namespace UnityRFramework.Runtime
             }
 
             gameObject.SetActive(false);
+            Status = EntityStatus.Hidden;
         }
 
         void IEntity.OnAttached(IEntity childEntity, object userData)

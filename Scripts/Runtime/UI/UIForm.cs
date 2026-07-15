@@ -106,6 +106,8 @@ namespace UnityRFramework.Runtime
             {
                 uiFormLogic.OnPause();
             }
+
+            gameObject.SetActive(false);
         }
 
         /// <summary>
@@ -117,6 +119,8 @@ namespace UnityRFramework.Runtime
             {
                 return;
             }
+
+            gameObject.SetActive(true);
 
             if (uiFormLogic != null)
             {

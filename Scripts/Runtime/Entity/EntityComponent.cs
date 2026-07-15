@@ -125,6 +125,59 @@ namespace UnityRFramework.Runtime
             return entityModule.ShowEntityAsync(entityId, assetName, groupName, priority, userData, ct);
         }
 
+        /// <summary>
+        /// 将场景中已有的对象登记到实体模块。
+        /// 场景实体参与实体组、查询、更新和父子附加，但模块不会回收或销毁对象。
+        /// </summary>
+        /// <param name="entityInstance">场景中的实体对象。</param>
+        /// <param name="entityId">实体编号，全局唯一且不能为零。</param>
+        /// <param name="entityName">实体逻辑名称。</param>
+        /// <param name="groupName">目标实体组名称。</param>
+        /// <param name="createGroupIfMissing">实体组不存在时是否创建无对象池配置的场景实体组。</param>
+        /// <param name="userData">用户自定义数据。</param>
+        /// <returns>登记后的实体。</returns>
+        public IEntity RegisterSceneEntity(GameObject entityInstance, long entityId, string entityName,
+            string groupName, bool createGroupIfMissing = false, object userData = null)
+        {
+            if (entityInstance == null)
+            {
+                throw new RFrameworkException("Scene entity instance is invalid.");
+            }
+
+            if (string.IsNullOrWhiteSpace(entityName))
+            {
+                throw new RFrameworkException("Scene entity name is invalid.");
+            }
+
+            if (string.IsNullOrWhiteSpace(groupName))
+            {
+                throw new RFrameworkException("Scene entity group name is invalid.");
+            }
+
+            if (!entityModule.HasEntityGroup(groupName))
+            {
+                if (!createGroupIfMissing)
+                {
+                    throw new RFrameworkException($"Entity group '{groupName}' is not exist.");
+                }
+
+                entityModule.CreateEntityGroup(groupName, 0f, 0, 0f, 0);
+            }
+
+            Entity entity = entityInstance.GetOrAddComponent<Entity>();
+            return entityModule.RegisterEntity(entityId, entityName, groupName, entity, userData);
+        }
+
+        /// <summary>
+        /// 从实体模块注销场景实体，不回收或销毁当前对象。
+        /// </summary>
+        /// <param name="entityId">实体编号。</param>
+        /// <param name="userData">用户自定义数据。</param>
+        public void UnregisterSceneEntity(long entityId, object userData = null)
+        {
+            entityModule.UnregisterEntity(entityId, userData);
+        }
+
         /// <inheritdoc cref="IEntityModule.HideEntity"/>
         public void HideEntity(long entityId, object userData = null)
         {

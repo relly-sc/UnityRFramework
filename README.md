@@ -348,6 +348,12 @@ GameEntry.Entity.AttachEntity(weaponId, playerId);
 
 // 隐藏（进入对象池等待复用或销毁）
 GameEntry.Entity.HideEntity(playerId);
+
+// 场景中预先放置的实体可挂 SceneEntityBinder，或通过代码登记。
+// 它参与实体组、查询、更新和父子附加，但不会进入对象池或被模块销毁。
+IEntity sceneNpc = GameEntry.Entity.RegisterSceneEntity(
+    sceneNpcObject, 10001, "SceneNpc", "Scene", createGroupIfMissing: true);
+GameEntry.Entity.UnregisterSceneEntity(10001);
 ```
 
 ### Scene
@@ -371,6 +377,12 @@ var ui = await GameEntry.UI.OpenUIFormAsync("Assets/UI/Dialog.prefab", windowLay
 
 // 关闭（按资源路径）
 GameEntry.UI.CloseUIForm("Assets/UI/Dialog.prefab");
+
+// 场景中预先放置的 UI 可挂 SceneUIFormBinder，或通过代码登记。
+// 它参与窗口栈、统一更新和全屏暂停，但对象仍由场景持有。
+IUIForm battleHud = GameEntry.UI.RegisterSceneUIForm(
+    battleHudObject, "BattleHUD", UILayer.HUD);
+GameEntry.UI.UnregisterSceneUIForm("BattleHUD");
 ```
 
 ### Audio
