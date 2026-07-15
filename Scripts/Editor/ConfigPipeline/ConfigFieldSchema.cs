@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace UnityRFramework.Editor
 {
     /// <summary>
@@ -19,5 +21,11 @@ namespace UnityRFramework.Editor
 
         /// <summary>获取或设置字段类型。</summary>
         public ConfigFieldKind Kind { get; set; }
+
+        /// <summary>获取或设置数组/List 的元素类型。</summary>
+        public ConfigFieldKind ElementKind { get; set; }
+
+        /// <summary>获取或设置枚举字段的成员定义。</summary>
+        public IReadOnlyList<ConfigEnumValueSchema> EnumValues { get; set; }
     }
 }

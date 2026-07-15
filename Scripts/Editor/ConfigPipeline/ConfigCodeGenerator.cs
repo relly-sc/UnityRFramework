@@ -58,8 +58,22 @@ namespace UnityRFramework.Editor
                 builder.AppendLine("{");
             }
 
+            for (int i = 0; i < schema.Fields.Count; i++)
+            {
+                ConfigFieldSchema field = schema.Fields[i];
+                if (field.Kind != ConfigFieldKind.Enum)
+                {
+                    continue;
+                }
+
+                AppendEnum(builder, indent, schema.TableName, field);
+                builder.AppendLine();
+            }
+
             AppendXmlSummary(builder, indent, schema.TableName + " 配置行。");
             builder.Append(indent).AppendLine("[Serializable]");
+            builder.Append(indent).Append("[ConfigTable(\"").Append(schema.TableName)
+                .AppendLine("\")]");
             builder.Append(indent).Append("public sealed class ").Append(schema.RowTypeName).AppendLine();
             builder.Append(indent).AppendLine("{");
             for (int i = 0; i < schema.Fields.Count; i++)
@@ -115,9 +129,8 @@ namespace UnityRFramework.Editor
             for (int i = 0; i < schema.Fields.Count; i++)
             {
                 ConfigFieldSchema field = schema.Fields[i];
-                builder.Append(indent).Append("                ").Append(field.Name).Append(" = ")
-                    .Append(GetReadExpression(field.Kind));
-                builder.AppendLine(i + 1 == schema.Fields.Count ? string.Empty : ",");
+                AppendReadAssignment(
+                    builder, indent, field, i + 1 == schema.Fields.Count);
             }
 
             builder.Append(indent).AppendLine("            };");
@@ -192,25 +205,102 @@ namespace UnityRFramework.Editor
             return true;
         }
 
-        private static string GetReadExpression(ConfigFieldKind kind)
+        private static void AppendEnum(
+            StringBuilder builder,
+            string indent,
+            string tableName,
+            ConfigFieldSchema field)
+        {
+            AppendXmlSummary(builder, indent, tableName + " 的 " + field.Name + " 枚举。");
+            builder.Append(indent).Append("public enum ").Append(field.CSharpTypeName).AppendLine();
+            builder.Append(indent).AppendLine("{");
+            for (int i = 0; i < field.EnumValues.Count; i++)
+            {
+                ConfigEnumValueSchema value = field.EnumValues[i];
+                builder.Append(indent).Append("    ").Append(value.Name).Append(" = ")
+                    .Append(value.Value);
+                builder.AppendLine(i + 1 == field.EnumValues.Count ? string.Empty : ",");
+            }
+
+            builder.Append(indent).AppendLine("}");
+        }
+
+        private static void AppendReadAssignment(
+            StringBuilder builder,
+            string indent,
+            ConfigFieldSchema field,
+            bool isLast)
+        {
+            string suffix = isLast ? string.Empty : ",";
+            if (field.Kind == ConfigFieldKind.Array || field.Kind == ConfigFieldKind.List)
+            {
+                string method = field.Kind == ConfigFieldKind.Array ? "ReadArray" : "ReadList";
+                string elementType = GetCSharpTypeName(field.ElementKind);
+                builder.Append(indent).Append("                ").Append(field.Name)
+                    .Append(" = BinaryConfigCollectionUtility.").Append(method).Append('<')
+                    .Append(elementType).AppendLine(">(");
+                builder.Append(indent).Append("                    reader, valueReader => ")
+                    .Append(GetScalarReadExpression(field.ElementKind, "valueReader"))
+                    .Append(')').AppendLine(suffix);
+                return;
+            }
+
+            builder.Append(indent).Append("                ").Append(field.Name).Append(" = ")
+                .Append(GetReadExpression(field)).AppendLine(suffix);
+        }
+
+        private static string GetReadExpression(ConfigFieldSchema field)
+        {
+            if (field.Kind == ConfigFieldKind.Enum)
+            {
+                return $"({field.CSharpTypeName})reader.ReadInt32()";
+            }
+
+            return GetScalarReadExpression(field.Kind, "reader");
+        }
+
+        private static string GetScalarReadExpression(ConfigFieldKind kind, string readerName)
         {
             switch (kind)
             {
-                case ConfigFieldKind.Boolean: return "reader.ReadBoolean()";
-                case ConfigFieldKind.Byte: return "reader.ReadByte()";
-                case ConfigFieldKind.SByte: return "reader.ReadSByte()";
-                case ConfigFieldKind.Int16: return "reader.ReadInt16()";
-                case ConfigFieldKind.UInt16: return "reader.ReadUInt16()";
-                case ConfigFieldKind.Int32: return "reader.ReadInt32()";
-                case ConfigFieldKind.UInt32: return "reader.ReadUInt32()";
-                case ConfigFieldKind.Int64: return "reader.ReadInt64()";
-                case ConfigFieldKind.UInt64: return "reader.ReadUInt64()";
-                case ConfigFieldKind.Single: return "reader.ReadSingle()";
-                case ConfigFieldKind.Double: return "reader.ReadDouble()";
-                case ConfigFieldKind.Decimal: return "reader.ReadDecimal()";
-                case ConfigFieldKind.Char: return "(char)reader.ReadUInt16()";
-                case ConfigFieldKind.String: return "BinaryFormatUtility.ReadUtf8String(reader, false)";
+                case ConfigFieldKind.Boolean: return readerName + ".ReadBoolean()";
+                case ConfigFieldKind.Byte: return readerName + ".ReadByte()";
+                case ConfigFieldKind.SByte: return readerName + ".ReadSByte()";
+                case ConfigFieldKind.Int16: return readerName + ".ReadInt16()";
+                case ConfigFieldKind.UInt16: return readerName + ".ReadUInt16()";
+                case ConfigFieldKind.Int32: return readerName + ".ReadInt32()";
+                case ConfigFieldKind.UInt32: return readerName + ".ReadUInt32()";
+                case ConfigFieldKind.Int64: return readerName + ".ReadInt64()";
+                case ConfigFieldKind.UInt64: return readerName + ".ReadUInt64()";
+                case ConfigFieldKind.Single: return readerName + ".ReadSingle()";
+                case ConfigFieldKind.Double: return readerName + ".ReadDouble()";
+                case ConfigFieldKind.Decimal: return readerName + ".ReadDecimal()";
+                case ConfigFieldKind.Char: return "(char)" + readerName + ".ReadUInt16()";
+                case ConfigFieldKind.String:
+                    return $"BinaryFormatUtility.ReadUtf8String({readerName}, false)";
                 default: throw new RFrameworkException($"Unsupported field kind '{kind}'.");
+            }
+        }
+
+        private static string GetCSharpTypeName(ConfigFieldKind kind)
+        {
+            switch (kind)
+            {
+                case ConfigFieldKind.Boolean: return "bool";
+                case ConfigFieldKind.Byte: return "byte";
+                case ConfigFieldKind.SByte: return "sbyte";
+                case ConfigFieldKind.Int16: return "short";
+                case ConfigFieldKind.UInt16: return "ushort";
+                case ConfigFieldKind.Int32: return "int";
+                case ConfigFieldKind.UInt32: return "uint";
+                case ConfigFieldKind.Int64: return "long";
+                case ConfigFieldKind.UInt64: return "ulong";
+                case ConfigFieldKind.Single: return "float";
+                case ConfigFieldKind.Double: return "double";
+                case ConfigFieldKind.Decimal: return "decimal";
+                case ConfigFieldKind.Char: return "char";
+                case ConfigFieldKind.String: return "string";
+                default: throw new RFrameworkException($"Unsupported element kind '{kind}'.");
             }
         }
 

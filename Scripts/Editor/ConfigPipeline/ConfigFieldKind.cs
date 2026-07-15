@@ -32,6 +32,12 @@ namespace UnityRFramework.Editor
         /// <summary>UTF-16 字符。</summary>
         Char,
         /// <summary>UTF-8 编码字符串。</summary>
-        String
+        String,
+        /// <summary>由当前配置表生成的 Int32 枚举。</summary>
+        Enum,
+        /// <summary>一维数组。</summary>
+        Array,
+        /// <summary>List 集合。</summary>
+        List
     }
 }

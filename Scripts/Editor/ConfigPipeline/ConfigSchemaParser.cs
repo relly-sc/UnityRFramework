@@ -82,6 +82,12 @@ namespace UnityRFramework.Editor
                     "Field and type rows must contain the same non-zero number of columns.");
             }
 
+            string tableName = Path.GetFileNameWithoutExtension(document.SourcePath);
+            ValidateIdentifier(tableName, "table", document.SourcePath, 1);
+            string rowTypeName = tableName.EndsWith("Config", StringComparison.Ordinal)
+                ? tableName
+                : tableName + "Config";
+
             List<ConfigFieldSchema> fields = new List<ConfigFieldSchema>(fieldCount);
             HashSet<string> fieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < fieldCount; i++)
@@ -94,23 +100,14 @@ namespace UnityRFramework.Editor
                         $"Duplicate field '{fieldName}'.");
                 }
 
-                string typeKeyword = typeRow.Values[i].Trim();
-                if (!Types.TryGetValue(
-                    typeKeyword,
-                    out (ConfigFieldKind Kind, string CSharpType) type))
-                {
-                    throw Error(document.SourcePath, typeRow.LineNumber,
-                        $"Unsupported field type '{typeKeyword}' for '{fieldName}'.");
-                }
-
-                fields.Add(new ConfigFieldSchema
-                {
-                    Name = fieldName,
-                    TypeKeyword = typeKeyword.ToLowerInvariant(),
-                    CSharpTypeName = type.CSharpType,
-                    Kind = type.Kind,
-                    Comment = i < commentRow.Values.Count ? commentRow.Values[i].Trim() : string.Empty
-                });
+                ConfigFieldSchema field = ParseFieldType(
+                    typeRow.Values[i].Trim(), rowTypeName, fieldName,
+                    document.SourcePath, typeRow.LineNumber);
+                field.Name = fieldName;
+                field.Comment = i < commentRow.Values.Count
+                    ? commentRow.Values[i].Trim()
+                    : string.Empty;
+                fields.Add(field);
             }
 
             ConfigFieldSchema idField = fields.FirstOrDefault(
@@ -153,11 +150,6 @@ namespace UnityRFramework.Editor
                 rows.Add(row);
             }
 
-            string tableName = Path.GetFileNameWithoutExtension(document.SourcePath);
-            ValidateIdentifier(tableName, "table", document.SourcePath, 1);
-            string rowTypeName = tableName.EndsWith("Config", StringComparison.Ordinal)
-                ? tableName
-                : tableName + "Config";
             string fullTypeName = string.IsNullOrEmpty(namespaceName)
                 ? rowTypeName
                 : namespaceName + "." + rowTypeName;
@@ -180,7 +172,139 @@ namespace UnityRFramework.Editor
             string fullTypeName, IReadOnlyList<ConfigFieldSchema> fields)
         {
             return fullTypeName + "|" + string.Join(";", fields.Select(
-                field => field.Name + ":" + field.CSharpTypeName));
+                field => field.Name + ":" + field.TypeKeyword));
+        }
+
+        private static ConfigFieldSchema ParseFieldType(
+            string typeKeyword,
+            string rowTypeName,
+            string fieldName,
+            string sourcePath,
+            int lineNumber)
+        {
+            if (Types.TryGetValue(
+                typeKeyword, out (ConfigFieldKind Kind, string CSharpType) primitive))
+            {
+                return new ConfigFieldSchema
+                {
+                    TypeKeyword = primitive.CSharpType,
+                    CSharpTypeName = primitive.CSharpType,
+                    Kind = primitive.Kind
+                };
+            }
+
+            if (typeKeyword.EndsWith("[]", StringComparison.Ordinal))
+            {
+                string elementKeyword = typeKeyword.Substring(0, typeKeyword.Length - 2).Trim();
+                return ParseCollectionType(
+                    elementKeyword, false, sourcePath, lineNumber, fieldName);
+            }
+
+            if (typeKeyword.StartsWith("List<", StringComparison.OrdinalIgnoreCase)
+                && typeKeyword.EndsWith(">", StringComparison.Ordinal))
+            {
+                string elementKeyword = typeKeyword.Substring(5, typeKeyword.Length - 6).Trim();
+                return ParseCollectionType(
+                    elementKeyword, true, sourcePath, lineNumber, fieldName);
+            }
+
+            if (typeKeyword.StartsWith("enum<", StringComparison.OrdinalIgnoreCase)
+                && typeKeyword.EndsWith(">", StringComparison.Ordinal))
+            {
+                string definition = typeKeyword.Substring(5, typeKeyword.Length - 6);
+                IReadOnlyList<ConfigEnumValueSchema> values = ParseEnumValues(
+                    definition, sourcePath, lineNumber, fieldName);
+                string enumTypeName = rowTypeName + fieldName + "Enum";
+                ValidateIdentifier(enumTypeName, "enum", sourcePath, lineNumber);
+                return new ConfigFieldSchema
+                {
+                    TypeKeyword = "enum<" + string.Join("|", values.Select(
+                        value => value.Name + "=" + value.Value.ToString(
+                            CultureInfo.InvariantCulture))) + ">",
+                    CSharpTypeName = enumTypeName,
+                    Kind = ConfigFieldKind.Enum,
+                    EnumValues = values
+                };
+            }
+
+            throw Error(sourcePath, lineNumber,
+                $"Unsupported field type '{typeKeyword}' for '{fieldName}'.");
+        }
+
+        private static ConfigFieldSchema ParseCollectionType(
+            string elementKeyword,
+            bool isList,
+            string sourcePath,
+            int lineNumber,
+            string fieldName)
+        {
+            if (!Types.TryGetValue(
+                elementKeyword, out (ConfigFieldKind Kind, string CSharpType) element))
+            {
+                throw Error(sourcePath, lineNumber,
+                    $"Collection field '{fieldName}' has unsupported element type "
+                    + $"'{elementKeyword}'.");
+            }
+
+            string csharpType = isList
+                ? $"List<{element.CSharpType}>"
+                : element.CSharpType + "[]";
+            return new ConfigFieldSchema
+            {
+                TypeKeyword = csharpType,
+                CSharpTypeName = csharpType,
+                Kind = isList ? ConfigFieldKind.List : ConfigFieldKind.Array,
+                ElementKind = element.Kind
+            };
+        }
+
+        private static IReadOnlyList<ConfigEnumValueSchema> ParseEnumValues(
+            string definition, string sourcePath, int lineNumber, string fieldName)
+        {
+            string[] entries = definition.Split('|');
+            List<ConfigEnumValueSchema> values = new List<ConfigEnumValueSchema>(entries.Length);
+            HashSet<string> names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            HashSet<int> numericValues = new HashSet<int>();
+            for (int i = 0; i < entries.Length; i++)
+            {
+                string[] pair = entries[i].Split('=');
+                if (pair.Length != 2)
+                {
+                    throw Error(sourcePath, lineNumber,
+                        $"Enum field '{fieldName}' member '{entries[i]}' must use Name=Value.");
+                }
+
+                string name = pair[0].Trim();
+                ValidateIdentifier(name, "enum member", sourcePath, lineNumber);
+                if (!names.Add(name))
+                {
+                    throw Error(sourcePath, lineNumber,
+                        $"Enum field '{fieldName}' contains duplicate member '{name}'.");
+                }
+
+                if (!int.TryParse(pair[1].Trim(), NumberStyles.Integer,
+                    CultureInfo.InvariantCulture, out int value))
+                {
+                    throw Error(sourcePath, lineNumber,
+                        $"Enum field '{fieldName}' member '{name}' has invalid Int32 value.");
+                }
+
+                if (!numericValues.Add(value))
+                {
+                    throw Error(sourcePath, lineNumber,
+                        $"Enum field '{fieldName}' contains duplicate value '{value}'.");
+                }
+
+                values.Add(new ConfigEnumValueSchema { Name = name, Value = value });
+            }
+
+            if (values.Count == 0)
+            {
+                throw Error(sourcePath, lineNumber,
+                    $"Enum field '{fieldName}' must declare at least one member.");
+            }
+
+            return values;
         }
 
         private static void ValidateNamespace(string namespaceName)

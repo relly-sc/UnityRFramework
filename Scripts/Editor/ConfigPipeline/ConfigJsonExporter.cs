@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using RFramework;
@@ -19,15 +20,18 @@ namespace UnityRFramework.Editor
 
             StringBuilder builder = new StringBuilder(4096);
             builder.AppendLine("{");
-            builder.AppendLine("  \"Items\": [");
+            builder.AppendLine("  \"Tables\": {");
+            builder.Append("    ");
+            JsonExportUtility.AppendString(builder, schema.TableName);
+            builder.AppendLine(": [");
             for (int rowIndex = 0; rowIndex < schema.Rows.Count; rowIndex++)
             {
                 CsvRow row = schema.Rows[rowIndex];
-                builder.AppendLine("    {");
+                builder.AppendLine("      {");
                 for (int fieldIndex = 0; fieldIndex < schema.Fields.Count; fieldIndex++)
                 {
                     ConfigFieldSchema field = schema.Fields[fieldIndex];
-                    builder.Append("      ");
+                    builder.Append("        ");
                     JsonExportUtility.AppendString(builder, field.Name);
                     builder.Append(": ");
                     AppendValue(builder, field, row.Values[fieldIndex], schema.SourcePath,
@@ -35,11 +39,12 @@ namespace UnityRFramework.Editor
                     builder.AppendLine(fieldIndex + 1 == schema.Fields.Count ? string.Empty : ",");
                 }
 
-                builder.Append("    }");
+                builder.Append("      }");
                 builder.AppendLine(rowIndex + 1 == schema.Rows.Count ? string.Empty : ",");
             }
 
-            builder.AppendLine("  ]");
+            builder.AppendLine("    ]");
+            builder.AppendLine("  }");
             builder.Append('}');
             return builder.ToString();
         }
@@ -63,7 +68,37 @@ namespace UnityRFramework.Editor
                     + "could not be written as JSON.", ex);
             }
 
-            switch (field.Kind)
+            if (field.Kind == ConfigFieldKind.Array || field.Kind == ConfigFieldKind.List)
+            {
+                IReadOnlyList<object> elements = (IReadOnlyList<object>)parsed;
+                builder.Append('[');
+                for (int i = 0; i < elements.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        builder.Append(", ");
+                    }
+
+                    AppendScalar(builder, field.ElementKind, elements[i]);
+                }
+
+                builder.Append(']');
+                return;
+            }
+
+            if (field.Kind == ConfigFieldKind.Enum)
+            {
+                builder.Append((int)parsed);
+                return;
+            }
+
+            AppendScalar(builder, field.Kind, parsed);
+        }
+
+        private static void AppendScalar(
+            StringBuilder builder, ConfigFieldKind kind, object parsed)
+        {
+            switch (kind)
             {
                 case ConfigFieldKind.Boolean:
                     builder.Append((bool)parsed ? "true" : "false");

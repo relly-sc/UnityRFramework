@@ -127,42 +127,20 @@ namespace UnityRFramework.Runtime
         /// </summary>
         protected static object ParseJsonToIndexedTable(Type rowType, string json)
         {
-            string normalizedJson = json.Trim().TrimStart('\uFEFF');
-            if (normalizedJson.StartsWith("[", StringComparison.Ordinal))
-            {
-                normalizedJson = "{\"Items\":" + normalizedJson + "}";
-            }
-
-            Type wrapperType = typeof(ConfigArrayWrapper<>).MakeGenericType(rowType);
-            object wrapper;
             try
             {
-                wrapper = Utility.Json.ToObject(wrapperType, normalizedJson);
+                return BuildIndexedTable(rowType, ConfigJsonReader.ParseRows(rowType, json));
             }
             catch (Exception ex)
             {
+                if (ex is RFrameworkException)
+                {
+                    throw;
+                }
+
                 throw new RFrameworkException(
                     $"JSON config for '{rowType.Name}' could not be parsed.", ex);
             }
-
-            if (wrapper == null)
-            {
-                throw new RFrameworkException(
-                    $"JSON parser returned null for config '{rowType.Name}'.");
-            }
-
-            FieldInfo itemsField = wrapperType.GetField(nameof(ConfigArrayWrapper<object>.Items));
-            Array items = itemsField?.GetValue(wrapper) as Array;
-            List<object> rows = new List<object>();
-            if (items != null)
-            {
-                foreach (object item in items)
-                {
-                    rows.Add(item);
-                }
-            }
-
-            return BuildIndexedTable(rowType, rows);
         }
 
         private static int GetRowId(Type rowType, object item)
@@ -201,10 +179,5 @@ namespace UnityRFramework.Runtime
             }
         }
 
-        [Serializable]
-        private sealed class ConfigArrayWrapper<T>
-        {
-            public T[] Items = Array.Empty<T>();
-        }
     }
 }

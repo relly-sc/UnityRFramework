@@ -18,11 +18,11 @@ namespace UnityRFramework.Editor
         /// <summary>Config 行类型和 Codec 代码输出目录。</summary>
         public string GeneratedCodeDirectory = "Assets/Generated/UnityRFramework/Config";
 
-        /// <summary>Config JSON 与 URFC 二进制的统一输出目录。</summary>
+        /// <summary>Config 统一输出根目录，内部自动分为 Json/Binary。</summary>
         [FormerlySerializedAs("ConfigBinaryDirectory")]
         public string ConfigOutputDirectory = "Assets/Resources/Config";
 
-        /// <summary>Localization JSON 与 URFL 二进制的统一输出目录。</summary>
+        /// <summary>Localization 统一输出根目录，内部自动分为 Json/Binary。</summary>
         [FormerlySerializedAs("LocalizationBinaryDirectory")]
         public string LocalizationOutputDirectory = "Assets/Resources/Localization";
 

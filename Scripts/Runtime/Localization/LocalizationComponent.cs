@@ -20,6 +20,11 @@ namespace UnityRFramework.Runtime
             "UnityRFramework.Runtime.JsonLocalizationHelper";
         private const string LegacyJsonHelperTypeName =
             "UnityRFramework.Runtime.DefaultLocalizationHelper";
+        private const string BinaryHelperTypeName =
+            "UnityRFramework.Runtime.BinaryLocalizationHelper";
+        private const string LegacyAssetRoot = "Localization";
+        private const string JsonAssetRoot = "Localization/Json";
+        private const string BinaryAssetRoot = "Localization/Binary";
 
         [SerializeField]
         [Tooltip("本地化解析辅助器类型。默认按 UTF-8 JSON 解析。")]
@@ -30,8 +35,8 @@ namespace UnityRFramework.Runtime
         private string defaultLanguage = "zh-CN";
 
         [SerializeField]
-        [Tooltip("语言文件根路径。默认对应 Resources/Localization。")]
-        private string languageAssetRoot = "Localization";
+        [Tooltip("语言文件根路径。JSON 默认对应 Resources/Localization/Json。")]
+        private string languageAssetRoot = "Localization/Json";
 
         [SerializeField]
         [Tooltip("语言文件扩展名。JSON 使用 .json，BinaryLocalizationHelper 使用 .bytes。")]
@@ -69,6 +74,8 @@ namespace UnityRFramework.Runtime
                 localizationHelperTypeName = JsonHelperTypeName;
             }
 
+            NormalizeBuiltInAssetSettings();
+
             LocalizationHelperBase helper = Helper.CreateHelper<LocalizationHelperBase>(
                 localizationHelperTypeName, null);
             if (helper != null)
@@ -82,6 +89,36 @@ namespace UnityRFramework.Runtime
                 Log.Error(
                     "LocalizationComponent: Helper type '{0}' is null. Configure it in Inspector or call SetHelper().",
                     localizationHelperTypeName);
+            }
+        }
+
+        private void NormalizeBuiltInAssetSettings()
+        {
+            bool usesBinary = string.Equals(
+                localizationHelperTypeName, BinaryHelperTypeName, StringComparison.Ordinal);
+            bool usesJson = string.Equals(
+                localizationHelperTypeName, JsonHelperTypeName, StringComparison.Ordinal);
+            if (!usesBinary && !usesJson)
+            {
+                return;
+            }
+
+            string normalizedRoot = (languageAssetRoot ?? string.Empty).Trim().Trim('/', '\\');
+            bool usesStandardRoot = string.IsNullOrEmpty(normalizedRoot)
+                || string.Equals(normalizedRoot, LegacyAssetRoot, StringComparison.Ordinal)
+                || string.Equals(normalizedRoot, JsonAssetRoot, StringComparison.Ordinal)
+                || string.Equals(normalizedRoot, BinaryAssetRoot, StringComparison.Ordinal);
+            if (usesStandardRoot)
+            {
+                languageAssetRoot = usesBinary ? BinaryAssetRoot : JsonAssetRoot;
+            }
+
+            string extension = (languageFileExtension ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(extension)
+                || string.Equals(extension, ".json", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(extension, ".bytes", StringComparison.OrdinalIgnoreCase))
+            {
+                languageFileExtension = usesBinary ? ".bytes" : ".json";
             }
         }
 

@@ -21,6 +21,8 @@ namespace UnityRFramework.Editor
             "UnityRFramework.LocalizationJson.manifest";
         private const string LocalizationBinaryManifestName =
             "UnityRFramework.LocalizationBinary.manifest";
+        private const string JsonOutputFolderName = "Json";
+        private const string BinaryOutputFolderName = "Binary";
 
         /// <summary>
         /// 校验全部 Config 与 Localization CSV，不写入输出文件。
@@ -116,16 +118,35 @@ namespace UnityRFramework.Editor
             }
 
             List<ConfigTableSchema> result = new List<ConfigTableSchema>(files.Length);
-            HashSet<string> typeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> generatedTypeNames =
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             Dictionary<uint, string> tableIds = new Dictionary<uint, string>();
             for (int i = 0; i < files.Length; i++)
             {
                 ConfigTableSchema schema = ConfigSchemaParser.ParseConfig(
                     CsvDocumentReader.ReadFile(files[i]), options.GeneratedNamespace?.Trim());
-                if (!typeNames.Add(schema.FullRowTypeName))
+                if (!generatedTypeNames.Add(schema.FullRowTypeName))
                 {
                     throw new RFrameworkException(
                         $"Duplicate generated config type '{schema.FullRowTypeName}'.");
+                }
+
+                for (int fieldIndex = 0; fieldIndex < schema.Fields.Count; fieldIndex++)
+                {
+                    ConfigFieldSchema field = schema.Fields[fieldIndex];
+                    if (field.Kind != ConfigFieldKind.Enum)
+                    {
+                        continue;
+                    }
+
+                    string enumTypeName = string.IsNullOrEmpty(schema.Namespace)
+                        ? field.CSharpTypeName
+                        : schema.Namespace + "." + field.CSharpTypeName;
+                    if (!generatedTypeNames.Add(enumTypeName))
+                    {
+                        throw new RFrameworkException(
+                            $"Duplicate generated enum type '{enumTypeName}'.");
+                    }
                 }
 
                 if (tableIds.TryGetValue(schema.TableId, out string other))
@@ -181,6 +202,12 @@ namespace UnityRFramework.Editor
         {
             string codeRoot = ResolveDirectory(options.GeneratedCodeDirectory, false);
             string outputRoot = ResolveDirectory(options.ConfigOutputDirectory, false);
+            RemoveLegacyOutputs(
+                outputRoot,
+                new[] { ConfigJsonManifestName, ConfigBinaryManifestName },
+                report);
+            string jsonRoot = Path.Combine(outputRoot, JsonOutputFolderName);
+            string binaryRoot = Path.Combine(outputRoot, BinaryOutputFolderName);
             HashSet<string> codeFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             HashSet<string> jsonFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             HashSet<string> binaryFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -204,7 +231,7 @@ namespace UnityRFramework.Editor
                     report.FileWritten(ToProjectPath(codePath));
                 }
 
-                string jsonPath = Path.Combine(outputRoot, jsonFile);
+                string jsonPath = Path.Combine(jsonRoot, jsonFile);
                 if (JsonExportUtility.WriteTextIfChanged(
                     jsonPath, ConfigJsonExporter.Build(schema)))
                 {
@@ -212,7 +239,7 @@ namespace UnityRFramework.Editor
                     report.FileWritten(ToProjectPath(jsonPath));
                 }
 
-                string binaryPath = Path.Combine(outputRoot, binaryFile);
+                string binaryPath = Path.Combine(binaryRoot, binaryFile);
                 if (ConfigBinaryExporter.WriteBytesIfChanged(
                     binaryPath, ConfigBinaryExporter.BuildV2(schema)))
                 {
@@ -224,9 +251,9 @@ namespace UnityRFramework.Editor
             changed |= SynchronizeManifest(
                 codeRoot, ConfigCodeManifestName, codeFiles, report);
             changed |= SynchronizeManifest(
-                outputRoot, ConfigJsonManifestName, jsonFiles, report);
+                jsonRoot, ConfigJsonManifestName, jsonFiles, report);
             changed |= SynchronizeManifest(
-                outputRoot, ConfigBinaryManifestName, binaryFiles, report);
+                binaryRoot, ConfigBinaryManifestName, binaryFiles, report);
             return changed;
         }
 
@@ -236,6 +263,12 @@ namespace UnityRFramework.Editor
             ConfigPipelineReport report)
         {
             string outputRoot = ResolveDirectory(options.LocalizationOutputDirectory, false);
+            RemoveLegacyOutputs(
+                outputRoot,
+                new[] { LocalizationJsonManifestName, LocalizationBinaryManifestName },
+                report);
+            string jsonRoot = Path.Combine(outputRoot, JsonOutputFolderName);
+            string binaryRoot = Path.Combine(outputRoot, BinaryOutputFolderName);
             HashSet<string> jsonFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             HashSet<string> binaryFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool changed = false;
@@ -244,7 +277,7 @@ namespace UnityRFramework.Editor
                 LocalizationTable localization = localizations[i];
                 string jsonFile = localization.Language + ".json";
                 jsonFiles.Add(jsonFile);
-                string jsonPath = Path.Combine(outputRoot, jsonFile);
+                string jsonPath = Path.Combine(jsonRoot, jsonFile);
                 if (JsonExportUtility.WriteTextIfChanged(
                     jsonPath, LocalizationJsonExporter.Build(localization)))
                 {
@@ -254,7 +287,7 @@ namespace UnityRFramework.Editor
 
                 string binaryFile = localization.Language + ".bytes";
                 binaryFiles.Add(binaryFile);
-                string outputPath = Path.Combine(outputRoot, binaryFile);
+                string outputPath = Path.Combine(binaryRoot, binaryFile);
                 if (ConfigBinaryExporter.WriteBytesIfChanged(
                     outputPath, LocalizationBinaryExporter.BuildV2(localization)))
                 {
@@ -264,10 +297,63 @@ namespace UnityRFramework.Editor
             }
 
             changed |= SynchronizeManifest(
-                outputRoot, LocalizationJsonManifestName, jsonFiles, report);
+                jsonRoot, LocalizationJsonManifestName, jsonFiles, report);
             changed |= SynchronizeManifest(
-                outputRoot, LocalizationBinaryManifestName, binaryFiles, report);
+                binaryRoot, LocalizationBinaryManifestName, binaryFiles, report);
             return changed;
+        }
+
+        private static void RemoveLegacyOutputs(
+            string outputRoot, IReadOnlyList<string> manifestNames, ConfigPipelineReport report)
+        {
+            for (int manifestIndex = 0; manifestIndex < manifestNames.Count; manifestIndex++)
+            {
+                string manifestPath = Path.Combine(outputRoot, manifestNames[manifestIndex]);
+                if (!File.Exists(manifestPath))
+                {
+                    continue;
+                }
+
+                string[] previous = File.ReadAllLines(manifestPath, Encoding.UTF8);
+                for (int fileIndex = 0; fileIndex < previous.Length; fileIndex++)
+                {
+                    string relative = previous[fileIndex].Trim();
+                    if (string.IsNullOrEmpty(relative))
+                    {
+                        continue;
+                    }
+
+                    string legacyPath = Path.GetFullPath(Path.Combine(outputRoot, relative));
+                    EnsureWithinDirectory(outputRoot, legacyPath);
+                    DeleteGeneratedFile(legacyPath, report);
+                }
+
+                DeleteGeneratedFile(manifestPath, report);
+            }
+        }
+
+        private static void DeleteGeneratedFile(string fullPath, ConfigPipelineReport report)
+        {
+            if (!File.Exists(fullPath))
+            {
+                return;
+            }
+
+            string projectPath = ToProjectPath(fullPath);
+            if (projectPath.StartsWith("Assets/", StringComparison.Ordinal))
+            {
+                if (!AssetDatabase.DeleteAsset(projectPath) && File.Exists(fullPath))
+                {
+                    throw new RFrameworkException(
+                        $"Failed to remove legacy generated file '{projectPath}'.");
+                }
+            }
+            else
+            {
+                File.Delete(fullPath);
+            }
+
+            report.AddMessage("Removed legacy generated file: " + projectPath);
         }
 
         private static bool SynchronizeManifest(

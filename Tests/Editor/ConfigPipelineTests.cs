@@ -71,6 +71,9 @@ namespace UnityRFramework.Editor.Tests
         {
             Utility.Json.SetJsonHelper(new DefaultJsonHelper());
             string json = ConfigJsonExporter.Build(CreateSchema());
+            StringAssert.Contains("\"Tables\"", json);
+            StringAssert.Contains("\"TestConfigRow\"", json);
+            StringAssert.DoesNotContain("\"Items\"", json);
             GameObject owner = new GameObject("JsonConfigHelper Tests");
             try
             {
@@ -83,6 +86,51 @@ namespace UnityRFramework.Editor.Tests
                 Assert.AreEqual(12.5f, first.Price);
                 Assert.AreEqual("Shield", second.Name);
                 Assert.AreEqual(20f, second.Price);
+            }
+            finally
+            {
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证 JSON Helper 仍可读取旧 Items 包装格式。</summary>
+        [Test]
+        public void ConfigJsonReaderSupportsLegacyItemsEnvelope()
+        {
+            const string json =
+                "{\"Items\":[{\"Id\":1,\"Name\":\"Legacy\",\"Price\":3.5}]}";
+            GameObject owner = new GameObject("Legacy Config JSON Tests");
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                object table = helper.ParseConfig(
+                    typeof(TestConfigRow), Encoding.UTF8.GetBytes(json));
+
+                Assert.AreEqual("Legacy", helper.GetConfig<TestConfigRow>(table, 1).Name);
+            }
+            finally
+            {
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证多表 JSON 容器会按配置行类型选择对应表。</summary>
+        [Test]
+        public void ConfigJsonReaderSelectsNamedTableFromMultiTableEnvelope()
+        {
+            const string json =
+                "{\"Tables\":{"
+                + "\"Other\":[{\"Id\":9,\"Name\":\"Wrong\",\"Price\":0}],"
+                + "\"TestConfigRow\":[{\"Id\":2,\"Name\":\"Selected\",\"Price\":8.5}]}}";
+            GameObject owner = new GameObject("Multi-table Config JSON Tests");
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                object table = helper.ParseConfig(
+                    typeof(TestConfigRow), Encoding.UTF8.GetBytes(json));
+
+                Assert.AreEqual("Selected", helper.GetConfig<TestConfigRow>(table, 2).Name);
+                Assert.IsNull(helper.GetConfig<TestConfigRow>(table, 9));
             }
             finally
             {
@@ -241,6 +289,133 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        /// <summary>验证枚举、数组、List 和字符串换行的 Schema 与 JSON 闭环。</summary>
+        [Test]
+        public void ComplexFieldsRoundTripThroughJsonHelper()
+        {
+            ConfigTableSchema schema = CreateComplexSchema();
+            string code = ConfigCodeGenerator.Generate(schema);
+            StringAssert.Contains("public enum TestComplexConfigStateEnum", code);
+            StringAssert.Contains("BinaryConfigCollectionUtility.ReadArray<int>", code);
+            StringAssert.Contains("BinaryConfigCollectionUtility.ReadList<string>", code);
+            string[] generatedLines = code.Replace("\r\n", "\n").Split('\n');
+            for (int i = 0; i < generatedLines.Length; i++)
+            {
+                Assert.LessOrEqual(
+                    generatedLines[i].Length, 120,
+                    $"Generated complex line {i + 1} is too long.");
+            }
+
+            Utility.Json.SetJsonHelper(new DefaultJsonHelper());
+            string json = ConfigJsonExporter.Build(schema);
+            GameObject owner = new GameObject("Complex JsonConfigHelper Tests");
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                object table = helper.ParseConfig(
+                    typeof(TestComplexConfig), Encoding.UTF8.GetBytes(json));
+                TestComplexConfig row = helper.GetConfig<TestComplexConfig>(table, 1);
+
+                Assert.AreEqual(TestComplexConfigStateEnum.Run, row.State);
+                CollectionAssert.AreEqual(new[] { 1, 2, 3 }, row.Levels);
+                CollectionAssert.AreEqual(new[] { "alpha", "beta|gamma" }, row.Tags);
+                Assert.AreEqual("Line1\nLine2", row.Description);
+            }
+            finally
+            {
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证复杂字段可由 URFC v2 Codec 完整回读。</summary>
+        [Test]
+        public void ComplexFieldsRoundTripThroughBinaryHelper()
+        {
+            ConfigTableSchema schema = CreateComplexSchema();
+            BinaryConfigCodecRegistry.Register(
+                new TestComplexConfigCodec(schema.TableId, schema.SchemaHash));
+            byte[] bytes = ConfigBinaryExporter.BuildV2(schema);
+            GameObject owner = new GameObject("Complex BinaryConfigHelper Tests");
+            try
+            {
+                BinaryConfigHelper helper = owner.AddComponent<BinaryConfigHelper>();
+                object table = helper.ParseConfig(typeof(TestComplexConfig), bytes);
+                TestComplexConfig row = helper.GetConfig<TestComplexConfig>(table, 1);
+
+                Assert.AreEqual(TestComplexConfigStateEnum.Run, row.State);
+                CollectionAssert.AreEqual(new[] { 1, 2, 3 }, row.Levels);
+                CollectionAssert.AreEqual(new[] { "alpha", "beta|gamma" }, row.Tags);
+                Assert.AreEqual("Line1\nLine2", row.Description);
+            }
+            finally
+            {
+                BinaryConfigCodecRegistry.Unregister(typeof(TestComplexConfig));
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证集合中的非法转义会在导出前被拒绝。</summary>
+        [Test]
+        public void CollectionRejectsUnsupportedEscapeSequence()
+        {
+            const string csv =
+                "Id,Values\nint,List<string>\n编号,值\n1,bad\\qvalue";
+            CsvDocument document = CsvDocumentReader.Parse("InvalidCollection.csv", csv);
+
+            Assert.Throws<RFrameworkException>(() =>
+                ConfigSchemaParser.ParseConfig(document, "Game.Config"));
+        }
+
+        /// <summary>验证 JSON Helper 保留 decimal 字段。</summary>
+        [Test]
+        public void JsonHelperPreservesDecimalValue()
+        {
+            TestJsonPrimitiveConfig row = LoadExtendedPrimitiveRow();
+            Assert.AreEqual(12.5m, row.DecimalValue);
+        }
+
+        /// <summary>验证 JSON Helper 保留 char 字段。</summary>
+        [Test]
+        public void JsonHelperPreservesCharValue()
+        {
+            TestJsonPrimitiveConfig row = LoadExtendedPrimitiveRow();
+            Assert.AreEqual('Z', row.CharValue);
+        }
+
+        /// <summary>验证 JSON Helper 保留 ulong 字段。</summary>
+        [Test]
+        public void JsonHelperPreservesUInt64Value()
+        {
+            TestJsonPrimitiveConfig row = LoadExtendedPrimitiveRow();
+            Assert.AreEqual(ulong.MaxValue, row.ULongValue);
+        }
+
+        private static TestJsonPrimitiveConfig LoadExtendedPrimitiveRow()
+        {
+            const string csv =
+                "Id,DecimalValue,CharValue,ULongValue\n"
+                + "int,decimal,char,ulong\n"
+                + "编号,定点数,字符,大整数\n"
+                + "1,12.5,Z,18446744073709551615";
+            ConfigTableSchema schema = ConfigSchemaParser.ParseConfig(
+                CsvDocumentReader.Parse("TestJsonPrimitive.csv", csv),
+                "UnityRFramework.Editor.Tests");
+            Utility.Json.SetJsonHelper(new DefaultJsonHelper());
+            string json = ConfigJsonExporter.Build(schema);
+            GameObject owner = new GameObject("Extended Primitive JSON Tests");
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                object table = helper.ParseConfig(
+                    typeof(TestJsonPrimitiveConfig), Encoding.UTF8.GetBytes(json));
+                return helper.GetConfig<TestJsonPrimitiveConfig>(table, 1);
+            }
+            finally
+            {
+                Object.DestroyImmediate(owner);
+            }
+        }
+
         /// <summary>验证生成代码使用静态 Codec，不包含运行时字段反射。</summary>
         [Test]
         public void CodeGeneratorProducesStaticCodecWithoutReflection()
@@ -248,6 +423,7 @@ namespace UnityRFramework.Editor.Tests
             string code = ConfigCodeGenerator.Generate(CreateSchema());
 
             StringAssert.Contains("IBinaryConfigCodec", code);
+            StringAssert.Contains("[ConfigTable(\"TestConfigRow\")]", code);
             StringAssert.Contains("BinaryConfigCodecRegistry.Register", code);
             StringAssert.DoesNotContain("Activator.CreateInstance", code);
             StringAssert.DoesNotContain("FieldInfo", code);
@@ -310,6 +486,18 @@ namespace UnityRFramework.Editor.Tests
                 TableId = BinaryFormatUtility.ComputeFnv1A32(fullTypeName),
                 SchemaHash = BinaryFormatUtility.ComputeFnv1A64(identity)
             };
+        }
+
+        private static ConfigTableSchema CreateComplexSchema()
+        {
+            const string csv =
+                "Id,State,Levels,Tags,Description\n"
+                + "int,enum<Idle=0|Run=2>,int[],List<string>,string\n"
+                + "编号,状态,等级,标签,描述\n"
+                + "1,Run,1|2|3,alpha|beta\\|gamma,Line1\\nLine2";
+            return ConfigSchemaParser.ParseConfig(
+                CsvDocumentReader.Parse("TestComplex.csv", csv),
+                "UnityRFramework.Editor.Tests");
         }
 
     }
