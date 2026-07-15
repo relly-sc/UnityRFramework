@@ -1,0 +1,4 @@
+Id,NameKey,Power
+int,string,float
+编号,名称键,威力
+1000,acceptance_partition_low,10

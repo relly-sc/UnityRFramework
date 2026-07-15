@@ -82,7 +82,23 @@ namespace UnityRFramework.Editor
                     "Field and type rows must contain the same non-zero number of columns.");
             }
 
-            string tableName = Path.GetFileNameWithoutExtension(document.SourcePath);
+            string segmentName = Path.GetFileNameWithoutExtension(document.SourcePath);
+            string tableName = segmentName;
+            int separatorIndex = segmentName.IndexOf('@');
+            if (separatorIndex >= 0)
+            {
+                if (separatorIndex == 0 || separatorIndex == segmentName.Length - 1
+                    || segmentName.IndexOf('@', separatorIndex + 1) >= 0)
+                {
+                    throw Error(document.SourcePath, 1,
+                        "Config partition file name must use 'Table@Segment.csv'.");
+                }
+
+                tableName = segmentName.Substring(0, separatorIndex);
+                string partitionName = segmentName.Substring(separatorIndex + 1);
+                ValidateIdentifier(partitionName, "partition", document.SourcePath, 1);
+            }
+
             ValidateIdentifier(tableName, "table", document.SourcePath, 1);
             string rowTypeName = tableName.EndsWith("Config", StringComparison.Ordinal)
                 ? tableName
@@ -159,6 +175,7 @@ namespace UnityRFramework.Editor
             {
                 SourcePath = document.SourcePath,
                 TableName = tableName,
+                SegmentName = segmentName,
                 Namespace = namespaceName,
                 RowTypeName = rowTypeName,
                 Fields = fields,

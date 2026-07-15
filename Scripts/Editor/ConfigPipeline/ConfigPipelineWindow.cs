@@ -57,6 +57,15 @@ namespace UnityRFramework.Editor
             DrawFolderField("CSV 目录", ref options.ConfigSourceDirectory);
             DrawFolderField("生成代码目录", ref options.GeneratedCodeDirectory);
             DrawFolderField("输出目录", ref options.ConfigOutputDirectory);
+            options.ExportConfigBundle = EditorGUILayout.Toggle(
+                new GUIContent("导出多表容器", "同时导出 JSON 与二进制多表容器。"),
+                options.ExportConfigBundle);
+            using (new EditorGUI.DisabledScope(!options.ExportConfigBundle))
+            {
+                options.ConfigBundleName = EditorGUILayout.TextField(
+                    new GUIContent("容器文件名", "不含 .json 或 .bytes 扩展名。"),
+                    options.ConfigBundleName);
+            }
             options.GeneratedNamespace = EditorGUILayout.TextField(
                 new GUIContent(
                     "生成命名空间",

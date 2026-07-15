@@ -205,6 +205,77 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        /// <summary>验证 JSON 与二进制容器都能合并同一类型的多个分片。</summary>
+        [Test]
+        public void ConfigBundlesMergeSameTypePartitions()
+        {
+            ConfigTableSchema low = CreatePartitionSchema(
+                "TestConfigRow@Low", new CsvRow(4, new[] { "1", "Sword", "12.5" }));
+            ConfigTableSchema high = CreatePartitionSchema(
+                "TestConfigRow@High", new CsvRow(4, new[] { "2", "Shield", "20" }));
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), low.TableId, low.SchemaHash);
+            BinaryConfigCodecRegistry.Register(
+                new TestConfigRowCodec(low.TableId, low.SchemaHash));
+            GameObject owner = new GameObject("Config Bundle Tests");
+            try
+            {
+                JsonConfigHelper jsonHelper = owner.AddComponent<JsonConfigHelper>();
+                IReadOnlyDictionary<Type, object> jsonTables = jsonHelper.ParseConfigBundle(
+                    Encoding.UTF8.GetBytes(ConfigJsonExporter.BuildBundle(new[] { low, high })));
+                Assert.AreEqual("Sword", jsonHelper.GetConfig<TestConfigRow>(
+                    jsonTables[typeof(TestConfigRow)], 1).Name);
+                Assert.AreEqual("Shield", jsonHelper.GetConfig<TestConfigRow>(
+                    jsonTables[typeof(TestConfigRow)], 2).Name);
+
+                BinaryConfigHelper binaryHelper = owner.AddComponent<BinaryConfigHelper>();
+                IReadOnlyDictionary<Type, object> binaryTables = binaryHelper.ParseConfigBundle(
+                    ConfigBinaryExporter.BuildBundle(new[] { low, high }));
+                Assert.AreEqual("Sword", binaryHelper.GetConfig<TestConfigRow>(
+                    binaryTables[typeof(TestConfigRow)], 1).Name);
+                Assert.AreEqual("Shield", binaryHelper.GetConfig<TestConfigRow>(
+                    binaryTables[typeof(TestConfigRow)], 2).Name);
+            }
+            finally
+            {
+                BinaryConfigCodecRegistry.Unregister(typeof(TestConfigRow));
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证跨分片重复 Id 会使 JSON 与二进制容器整体失败。</summary>
+        [Test]
+        public void ConfigBundlesRejectDuplicateIdsAcrossPartitions()
+        {
+            ConfigTableSchema first = CreatePartitionSchema(
+                "TestConfigRow@First", new CsvRow(4, new[] { "1", "Sword", "12.5" }));
+            ConfigTableSchema duplicate = CreatePartitionSchema(
+                "TestConfigRow@Duplicate", new CsvRow(4, new[] { "1", "Shield", "20" }));
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), first.TableId, first.SchemaHash);
+            BinaryConfigCodecRegistry.Register(
+                new TestConfigRowCodec(first.TableId, first.SchemaHash));
+            GameObject owner = new GameObject("Config Bundle Duplicate Tests");
+            try
+            {
+                JsonConfigHelper jsonHelper = owner.AddComponent<JsonConfigHelper>();
+                Assert.Throws<RFrameworkException>(() => jsonHelper.ParseConfigBundle(
+                    Encoding.UTF8.GetBytes(
+                        ConfigJsonExporter.BuildBundle(new[] { first, duplicate }))));
+
+                BinaryConfigHelper binaryHelper = owner.AddComponent<BinaryConfigHelper>();
+                Assert.Throws<RFrameworkException>(() => binaryHelper.ParseConfigBundle(
+                    ConfigBinaryExporter.BuildBundle(new[] { first, duplicate })));
+            }
+            finally
+            {
+                BinaryConfigCodecRegistry.Unregister(typeof(TestConfigRow));
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
+                Object.DestroyImmediate(owner);
+            }
+        }
+
         /// <summary>验证 Localization JSON 导出、转义和 JsonLocalizationHelper 回读。</summary>
         [Test]
         public void LocalizationJsonRoundTripsThroughJsonHelper()
@@ -693,6 +764,15 @@ namespace UnityRFramework.Editor.Tests
                 TableId = BinaryFormatUtility.ComputeFnv1A32(fullTypeName),
                 SchemaHash = BinaryFormatUtility.ComputeFnv1A64(identity)
             };
+        }
+
+        private static ConfigTableSchema CreatePartitionSchema(
+            string segmentName, CsvRow row)
+        {
+            ConfigTableSchema schema = CreateSchema();
+            schema.SegmentName = segmentName;
+            schema.Rows = new[] { row };
+            return schema;
         }
 
         private static ConfigTableSchema CreateLegacySchema()

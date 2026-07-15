@@ -17,6 +17,9 @@ namespace UnityRFramework.Runtime
         /// <summary>URFC 生成代码协议版本。</summary>
         public const ushort ConfigGeneratedVersion = 2;
 
+        /// <summary>URFM 多表配置容器协议版本。</summary>
+        public const ushort ConfigBundleVersion = 1;
+
         /// <summary>URFL 无校验兼容协议版本。</summary>
         public const ushort LocalizationLegacyVersion = 1;
 

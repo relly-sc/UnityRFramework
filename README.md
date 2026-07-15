@@ -219,6 +219,10 @@ await GameEntry.Config.LoadConfigAsync<ItemConfig>("Config/Json/items.json");
 // 再在 Inspector 选择 BinaryConfigHelper
 await GameEntry.Config.LoadConfigAsync<ItemConfig>("Config/Binary/items.bytes");
 
+// 多表容器：当前 Helper 必须为 JsonConfigHelper 或 BinaryConfigHelper
+await GameEntry.Config.LoadConfigBundleAsync("Config/Json/ConfigBundle.json");
+// BinaryConfigHelper 对应加载 Config/Binary/ConfigBundle.bytes
+
 // JSON 模式（直接解析字符串）
 string json = "[{\"Id\":1,\"Name\":\"Sword\"},{\"Id\":2,\"Name\":\"Shield\"}]";
 GameEntry.Config.LoadConfigFromString<ItemConfig>(json);
@@ -236,7 +240,7 @@ if (GameEntry.Config.HasConfigRow<ItemConfig>(1001)) { ... }
 // 自定义模式：继承 ConfigHelperBase，适配 Luban 或项目私有二进制格式
 ```
 
-`ParseConfig(Type, byte[])` 的字节格式由当前 `IConfigHelper` 决定。框架默认 JSON；`BinaryConfigHelper` 兼容反射映射的 URFC v1，并使用生成 Codec 读取带 TableId、SchemaHash 和 CRC32 的 URFC v2。项目私有格式可直接继承 `ConfigHelperBase`。
+`ParseConfig(Type, byte[])` 的字节格式由当前 `IConfigHelper` 决定。框架默认 JSON；`BinaryConfigHelper` 兼容反射映射的 URFC v1，并使用生成 Codec 读取带 TableId、SchemaHash 和 CRC32 的 URFC v2。JSON/二进制默认 Helper 还实现可选 `IConfigBundleHelper`，分别读取 JSON 多表容器与 URFM v1。项目私有格式可直接继承 `ConfigHelperBase`。
 
 JSON 与 URFC v2 均支持显式历史 Schema 迁移。二进制实现 `IBinaryConfigMigration` 并注册到
 `BinaryConfigMigrationRegistry`；JSON 实现 `IJsonConfigMigration` 并注册到
@@ -245,7 +249,13 @@ JSON 与 URFC v2 均支持显式历史 Schema 迁移。二进制实现 `IBinaryC
 均拒绝。JSON 新格式为 `Tables -> 表名 -> { TableId, SchemaHash, Rows }`；旧的
 `Tables -> 数组`、`Items` 和顶层数组仍可读取，但无 SchemaHash，不能参与显式迁移。
 
-框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具同时生成 JSON、配置行、静态 Codec、URFC v2 和带 CRC32 的 URFL v2，并仅在内容变化时写入。默认流程由 Excel 手动导出 UTF-8 CSV，再由工具生成 JSON/`.bytes`；直接读取 XLSX 的方案放在第三方 Expansion。Config 的 JSON/`.bytes` 共用一个输出目录，Localization 也共用一个输出目录，两类模块的输出目录必须分开。生成命名空间留空时，配置行和 Codec 生成到全局命名空间。Runtime 仍兼容读取无 CRC 的 URFL v1。独立验收场景位于 `Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance`，固定源数据位于 `Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline`；测试只使用 `Acceptance_*` 数据，不依赖 Samples/Demo。Demo 的 `Demo_*` 源文件、生成代码和运行时产物分别位于 `Samples/Demo/ConfigSource`、`Samples/Demo/Generated`、`Samples/Demo/GameAssets/Resources`。可通过 `UnityRFramework/Tests` 下的菜单导出测试数据、重建场景、运行 Play Mode 验收或构建包含 Test Assemblies 的专用 Player。
+框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具同时生成 JSON、配置行、静态 Codec、URFC v2、URFM v1 多表容器和带 CRC32 的 URFL v2，并仅在内容变化时写入。默认流程由 Excel 手动导出 UTF-8 CSV，再由工具生成 JSON/`.bytes`；直接读取 XLSX 的方案放在第三方 Expansion。Config 的 JSON/`.bytes` 共用一个输出目录，Localization 也共用一个输出目录，两类模块的输出目录必须分开。生成命名空间留空时，配置行和 Codec 生成到全局命名空间。Runtime 仍兼容读取无 CRC 的 URFL v1。独立验收场景位于 `Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance`，固定源数据位于 `Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline`；测试只使用 `Acceptance_*` 数据，不依赖 Samples/Demo。Demo 的 `Demo_*` 源文件、生成代码和运行时产物分别位于 `Samples/Demo/ConfigSource`、`Samples/Demo/Generated`、`Samples/Demo/GameAssets/Resources`。可通过 `UnityRFramework/Tests` 下的菜单导出测试数据、重建场景、运行 Play Mode 验收或构建包含 Test Assemblies 的专用 Player。
+
+同一业务集合需要拆成多个源文件时，使用 `逻辑表名@分片名.csv`，例如
+`Warrior@1000_1999.csv` 与 `Warrior@2000_2999.csv`。两者只生成一个 `WarriorConfig`，
+运行时合并后仍通过 `GetConfig<WarriorConfig>(id)` 查询；跨分片重复 Id 或 Schema 不一致会使
+整个导出/加载失败。`ConfigCount` 按行类型计数。若两张表只是结构相同但业务语义独立，
+应使用不同逻辑表名和不同生成类型，而不是同类型分片。
 
 “共用一个输出目录”指共用一个可选择的根目录；工具会自动生成 `Json/` 和
 `Binary/` 子目录，避免 `Resources.Load` 无法区分同名 `.json`/`.bytes`。
@@ -255,8 +265,9 @@ Config 复杂字段第一批支持内联枚举、基础类型一维数组和 `Li
 普通竖线。字符串支持 `\n`、`\r`、`\t`、`\\`，CSV 引号字段中的真实换行也会保留。
 Config JSON 使用框架内置的受限解析器按公开字段类型精确转换，无第三方依赖，
 并避免 `JsonUtility` 对 `decimal` 和 `char` 的静默丢值。
-Config JSON 根结构为 `Tables -> 表名 -> 行数组`；手动 CSV 流程以文件名作为表名，
-未来 Excel 扩展直接使用 Sheet 名。Runtime 仍兼容旧 `Items` 包装和顶层数组。
+Config JSON 根结构为 `Tables -> 分片名 -> { TableId, SchemaHash, Rows }`；手动 CSV
+流程以文件名作为分片名，`@` 前部分作为逻辑表名。未来 Excel 扩展可使用 Sheet 名。
+Runtime 仍兼容旧 `Items`、顶层数组和旧多表数组结构。
 
 ConfigPipeline 支持项目注册自定义标量字段 Codec。实现 `IConfigFieldCodec` 后，需要提供
 唯一类型关键字、公开的运行时类型、与其对应的完整 C# 类型名、大于 0 的 `SchemaVersion`、CSV 解析、

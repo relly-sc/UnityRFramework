@@ -157,6 +157,8 @@ namespace UnityRFramework.Editor
                 LocalizationOutputDirectory =
                     "Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance/"
                     + "Resources/ConfigPipelineAcceptance/Localization",
+                ExportConfigBundle = true,
+                ConfigBundleName = "AcceptanceBundle",
                 GeneratedNamespace = "UnityRFramework.Tests.Config"
             };
         }

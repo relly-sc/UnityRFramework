@@ -13,6 +13,8 @@ namespace UnityRFramework.Runtime
         private static readonly object SyncRoot = new object();
         private static readonly Dictionary<Type, ConfigSchemaInfo> Schemas =
             new Dictionary<Type, ConfigSchemaInfo>();
+        private static readonly Dictionary<uint, ConfigSchemaInfo> SchemasByTableId =
+            new Dictionary<uint, ConfigSchemaInfo>();
 
         /// <summary>注册或替换指定配置行类型的当前 Schema。</summary>
         public static void Register(Type rowType, uint tableId, ulong schemaHash)
@@ -24,7 +26,23 @@ namespace UnityRFramework.Runtime
 
             lock (SyncRoot)
             {
-                Schemas[rowType] = new ConfigSchemaInfo(rowType, tableId, schemaHash);
+                if (SchemasByTableId.TryGetValue(tableId, out ConfigSchemaInfo occupied)
+                    && occupied.RowType != rowType)
+                {
+                    throw new RFrameworkException(
+                        $"Config TableId '{tableId:X8}' is already registered for "
+                        + $"'{occupied.RowType.FullName}'.");
+                }
+
+                if (Schemas.TryGetValue(rowType, out ConfigSchemaInfo previous)
+                    && previous.TableId != tableId)
+                {
+                    SchemasByTableId.Remove(previous.TableId);
+                }
+
+                ConfigSchemaInfo schema = new ConfigSchemaInfo(rowType, tableId, schemaHash);
+                Schemas[rowType] = schema;
+                SchemasByTableId[tableId] = schema;
             }
         }
 
@@ -43,6 +61,21 @@ namespace UnityRFramework.Runtime
             }
         }
 
+        /// <summary>按确定性表标识获取当前 Schema。</summary>
+        public static bool TryGet(uint tableId, out ConfigSchemaInfo schema)
+        {
+            if (tableId == 0)
+            {
+                schema = default;
+                return false;
+            }
+
+            lock (SyncRoot)
+            {
+                return SchemasByTableId.TryGetValue(tableId, out schema);
+            }
+        }
+
         /// <summary>移除指定配置行类型的当前 Schema。</summary>
         public static void Unregister(Type rowType)
         {
@@ -53,7 +86,11 @@ namespace UnityRFramework.Runtime
 
             lock (SyncRoot)
             {
-                Schemas.Remove(rowType);
+                if (Schemas.TryGetValue(rowType, out ConfigSchemaInfo schema))
+                {
+                    Schemas.Remove(rowType);
+                    SchemasByTableId.Remove(schema.TableId);
+                }
             }
         }
 
@@ -63,6 +100,7 @@ namespace UnityRFramework.Runtime
             lock (SyncRoot)
             {
                 Schemas.Clear();
+                SchemasByTableId.Clear();
             }
         }
     }

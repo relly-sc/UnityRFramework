@@ -13,6 +13,7 @@ namespace UnityRFramework.Editor
     public static class ConfigBinaryExporter
     {
         private static readonly byte[] ConfigMagic = Encoding.ASCII.GetBytes("URFC");
+        private static readonly byte[] ConfigBundleMagic = Encoding.ASCII.GetBytes("URFM");
 
         /// <summary>
         /// 构建一张 URFC v2 配置表。
@@ -26,6 +27,53 @@ namespace UnityRFramework.Editor
                 throw new RFrameworkException("Config schema is invalid.");
             }
 
+            byte[] body = BuildBody(schema);
+
+            using (MemoryStream stream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8, true))
+            {
+                writer.Write(ConfigMagic);
+                writer.Write(BinaryFormatUtility.ConfigGeneratedVersion);
+                WriteSegmentPayload(writer, schema, body);
+                writer.Flush();
+                return stream.ToArray();
+            }
+        }
+
+        /// <summary>构建 URFM v1 多表配置容器。</summary>
+        public static byte[] BuildBundle(IReadOnlyList<ConfigTableSchema> schemas)
+        {
+            if (schemas == null || schemas.Count == 0)
+            {
+                throw new RFrameworkException("Config bundle schemas are empty.");
+            }
+
+            using (MemoryStream stream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8, true))
+            {
+                writer.Write(ConfigBundleMagic);
+                writer.Write(BinaryFormatUtility.ConfigBundleVersion);
+                writer.Write(schemas.Count);
+                for (int i = 0; i < schemas.Count; i++)
+                {
+                    ConfigTableSchema schema = schemas[i]
+                        ?? throw new RFrameworkException("Config bundle contains an invalid schema.");
+                    BinaryFormatUtility.WriteUtf8String(
+                        writer,
+                        string.IsNullOrEmpty(schema.SegmentName)
+                            ? schema.TableName
+                            : schema.SegmentName,
+                        false);
+                    WriteSegmentPayload(writer, schema, BuildBody(schema));
+                }
+
+                writer.Flush();
+                return stream.ToArray();
+            }
+        }
+
+        private static byte[] BuildBody(ConfigTableSchema schema)
+        {
             byte[] body;
             using (MemoryStream bodyStream = new MemoryStream())
             using (BinaryWriter bodyWriter = new BinaryWriter(bodyStream, Encoding.UTF8, true))
@@ -48,20 +96,18 @@ namespace UnityRFramework.Editor
                 body = bodyStream.ToArray();
             }
 
-            using (MemoryStream stream = new MemoryStream())
-            using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8, true))
-            {
-                writer.Write(ConfigMagic);
-                writer.Write(BinaryFormatUtility.ConfigGeneratedVersion);
-                writer.Write(schema.TableId);
-                writer.Write(schema.SchemaHash);
-                writer.Write(schema.Rows.Count);
-                writer.Write(body.Length);
-                writer.Write(BinaryFormatUtility.ComputeCrc32(body));
-                writer.Write(body);
-                writer.Flush();
-                return stream.ToArray();
-            }
+            return body;
+        }
+
+        private static void WriteSegmentPayload(
+            BinaryWriter writer, ConfigTableSchema schema, byte[] body)
+        {
+            writer.Write(schema.TableId);
+            writer.Write(schema.SchemaHash);
+            writer.Write(schema.Rows.Count);
+            writer.Write(body.Length);
+            writer.Write(BinaryFormatUtility.ComputeCrc32(body));
+            writer.Write(body);
         }
 
         /// <summary>

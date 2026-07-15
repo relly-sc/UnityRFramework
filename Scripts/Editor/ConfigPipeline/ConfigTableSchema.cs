@@ -13,6 +13,9 @@ namespace UnityRFramework.Editor
         /// <summary>获取或设置表名。</summary>
         public string TableName { get; set; }
 
+        /// <summary>获取或设置容器中的分片名，同时也是单表输出文件名。</summary>
+        public string SegmentName { get; set; }
+
         /// <summary>获取或设置生成代码的命名空间。</summary>
         public string Namespace { get; set; }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
@@ -20,6 +21,7 @@ namespace UnityRFramework.Runtime
         private const int MaxStringBytes = 16 * 1024 * 1024;
 
         private static readonly byte[] ConfigMagic = Encoding.ASCII.GetBytes("URFC");
+        private static readonly byte[] ConfigBundleMagic = Encoding.ASCII.GetBytes("URFM");
         private static readonly byte[] LocalizationMagic = Encoding.ASCII.GetBytes("URFL");
 
         /// <summary>
@@ -39,6 +41,156 @@ namespace UnityRFramework.Runtime
             {
                 ReadAndValidateMagic(reader, ConfigMagic, "config");
                 return reader.ReadUInt16();
+            }
+        }
+
+        /// <summary>
+        /// 读取 URFM v1 多表容器，并按配置行类型合并所有分片。
+        /// </summary>
+        public static IReadOnlyDictionary<Type, object> ReadGeneratedConfigBundle(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                throw new RFrameworkException("Binary config bundle data is empty.");
+            }
+
+            Dictionary<Type, object> result = new Dictionary<Type, object>();
+            try
+            {
+                using (MemoryStream stream = new MemoryStream(bytes, false))
+                using (BinaryReader reader = new BinaryReader(stream, Encoding.UTF8, false))
+                {
+                    ReadAndValidateHeader(
+                        reader, ConfigBundleMagic, BinaryFormatUtility.ConfigBundleVersion,
+                        "config bundle");
+                    int segmentCount = ReadBoundedCount(reader, MaxRows, "config segment");
+                    if (segmentCount == 0)
+                    {
+                        throw new RFrameworkException(
+                            "Binary config bundle must contain at least one segment.");
+                    }
+
+                    HashSet<string> segmentNames =
+                        new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    for (int i = 0; i < segmentCount; i++)
+                    {
+                        string segmentName = ReadUtf8String(reader, false);
+                        if (string.IsNullOrWhiteSpace(segmentName)
+                            || !segmentNames.Add(segmentName))
+                        {
+                            throw new RFrameworkException(
+                                $"Binary config bundle segment {i} has an empty or duplicate name "
+                                + $"'{segmentName}'.");
+                        }
+
+                        uint tableId = reader.ReadUInt32();
+                        ulong schemaHash = reader.ReadUInt64();
+                        int rowCount = ReadBoundedCount(reader, MaxRows, "config row");
+                        int bodyLength = reader.ReadInt32();
+                        uint checksum = reader.ReadUInt32();
+                        if (bodyLength < 0 || bodyLength > stream.Length - stream.Position)
+                        {
+                            throw new RFrameworkException(
+                                $"Binary config bundle segment '{segmentName}' body length is invalid.");
+                        }
+
+                        byte[] body = reader.ReadBytes(bodyLength);
+                        if (body.Length != bodyLength)
+                        {
+                            throw new EndOfStreamException();
+                        }
+
+                        if (BinaryFormatUtility.ComputeCrc32(body) != checksum)
+                        {
+                            throw new RFrameworkException(
+                                $"Binary config bundle segment '{segmentName}' checksum mismatch.");
+                        }
+
+                        if (!ConfigSchemaRegistry.TryGet(tableId, out ConfigSchemaInfo schema))
+                        {
+                            throw new RFrameworkException(
+                                $"No Config Schema is registered for TableId '{tableId:X8}'.");
+                        }
+
+                        object segmentTable = ReadGeneratedConfigTable(
+                            schema.RowType,
+                            BuildGeneratedConfigBytes(
+                                tableId, schemaHash, rowCount, checksum, body));
+                        MergeConfigSegment(result, schema.RowType, segmentName, segmentTable);
+                    }
+
+                    EnsureFullyConsumed(stream, "config bundle");
+                }
+
+                return result;
+            }
+            catch (RFrameworkException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is EndOfStreamException
+                || ex is IOException
+                || ex is ArgumentException
+                || ex is OverflowException)
+            {
+                throw new RFrameworkException(
+                    "Binary config bundle is truncated or malformed.", ex);
+            }
+        }
+
+        private static byte[] BuildGeneratedConfigBytes(
+            uint tableId, ulong schemaHash, int rowCount, uint checksum, byte[] body)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8, true))
+            {
+                writer.Write(ConfigMagic);
+                writer.Write(BinaryFormatUtility.ConfigGeneratedVersion);
+                writer.Write(tableId);
+                writer.Write(schemaHash);
+                writer.Write(rowCount);
+                writer.Write(body.Length);
+                writer.Write(checksum);
+                writer.Write(body);
+                writer.Flush();
+                return stream.ToArray();
+            }
+        }
+
+        private static void MergeConfigSegment(
+            IDictionary<Type, object> result,
+            Type rowType,
+            string segmentName,
+            object segmentTable)
+        {
+            if (!(segmentTable is IDictionary source))
+            {
+                throw new RFrameworkException(
+                    $"Config segment '{segmentName}' did not produce a dictionary table.");
+            }
+
+            if (!result.TryGetValue(rowType, out object destinationObject))
+            {
+                result.Add(rowType, segmentTable);
+                return;
+            }
+
+            if (!(destinationObject is IDictionary destination))
+            {
+                throw new RFrameworkException(
+                    $"Merged config table '{rowType.Name}' is not a dictionary.");
+            }
+
+            foreach (DictionaryEntry entry in source)
+            {
+                if (destination.Contains(entry.Key))
+                {
+                    throw new RFrameworkException(
+                        $"Config row type '{rowType.Name}' contains duplicate Id "
+                        + $"'{entry.Key}' across segments, including '{segmentName}'.");
+                }
+
+                destination.Add(entry.Key, entry.Value);
             }
         }
 

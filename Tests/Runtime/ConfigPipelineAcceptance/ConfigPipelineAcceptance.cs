@@ -22,6 +22,10 @@ namespace UnityRFramework.Tests
             "ConfigPipelineAcceptance/Config/Binary/Acceptance_Action.bytes";
         private const string JsonConfigPath =
             "ConfigPipelineAcceptance/Config/Json/Acceptance_Action.json";
+        private const string BinaryBundlePath =
+            "ConfigPipelineAcceptance/Config/Binary/AcceptanceBundle.bytes";
+        private const string JsonBundlePath =
+            "ConfigPipelineAcceptance/Config/Json/AcceptanceBundle.json";
         private const string EnglishPath =
             "ConfigPipelineAcceptance/Localization/Binary/en.bytes";
 
@@ -67,6 +71,7 @@ namespace UnityRFramework.Tests
 
             await VerifyConfigAsync(config, resource);
             await VerifyJsonConfigAsync(resource);
+            await VerifyConfigBundlesAsync(config, resource);
             await VerifyLocalizationAsync(localization, resource);
         }
 
@@ -159,6 +164,51 @@ namespace UnityRFramework.Tests
                 Acceptance_ActionConfig row =
                     helper.GetConfig<Acceptance_ActionConfig>(table, 1);
                 Require(row?.NameKey == "acceptance_attack", "JSON Config query mismatch.");
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(owner);
+            }
+        }
+
+        private static async Task VerifyConfigBundlesAsync(
+            ConfigComponent config, ResourceComponent resource)
+        {
+            byte[] binaryBytes = await LoadBytesAsync(resource, BinaryBundlePath);
+            config.LoadConfigBundle(binaryBytes);
+            Require(
+                config.GetConfig<Acceptance_PartitionConfig>(1000)?.NameKey
+                    == "acceptance_partition_low",
+                "Binary bundle did not load the low partition.");
+            Require(
+                config.GetConfig<Acceptance_PartitionConfig>(2000)?.NameKey
+                    == "acceptance_partition_high",
+                "Binary bundle did not load the high partition.");
+            Require(config.ConfigCount == 2, "Bundle cache must be counted by row type.");
+
+            byte[] badBundle = CloneAndFlip(binaryBytes, binaryBytes.Length - 1);
+            ExpectFailure(() => config.LoadConfigBundle(badBundle), "Config bundle CRC");
+            Require(
+                config.GetConfig<Acceptance_PartitionConfig>(2000)?.NameKey
+                    == "acceptance_partition_high",
+                "Rejected bundle replaced the valid cache.");
+
+            byte[] jsonBytes = await LoadBytesAsync(resource, JsonBundlePath);
+            GameObject owner = new GameObject("JSON Config Bundle Acceptance Helper");
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                IReadOnlyDictionary<Type, object> tables =
+                    helper.ParseConfigBundle(jsonBytes);
+                object table = tables[typeof(Acceptance_PartitionConfig)];
+                Require(
+                    helper.GetConfig<Acceptance_PartitionConfig>(table, 1000)?.NameKey
+                        == "acceptance_partition_low",
+                    "JSON bundle did not load the low partition.");
+                Require(
+                    helper.GetConfig<Acceptance_PartitionConfig>(table, 2000)?.NameKey
+                        == "acceptance_partition_high",
+                    "JSON bundle did not load the high partition.");
             }
             finally
             {

@@ -121,47 +121,114 @@ namespace UnityRFramework.Editor
             HashSet<string> generatedTypeNames =
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             Dictionary<uint, string> tableIds = new Dictionary<uint, string>();
+            Dictionary<string, ConfigTableSchema> logicalTables =
+                new Dictionary<string, ConfigTableSchema>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> segmentNames =
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < files.Length; i++)
             {
                 ConfigTableSchema schema = ConfigSchemaParser.ParseConfig(
                     CsvDocumentReader.ReadFile(files[i]), options.GeneratedNamespace?.Trim());
-                if (!generatedTypeNames.Add(schema.FullRowTypeName))
+                if (!segmentNames.Add(schema.SegmentName))
                 {
                     throw new RFrameworkException(
-                        $"Duplicate generated config type '{schema.FullRowTypeName}'.");
+                        $"Duplicate config segment name '{schema.SegmentName}'.");
                 }
 
-                for (int fieldIndex = 0; fieldIndex < schema.Fields.Count; fieldIndex++)
+                if (logicalTables.TryGetValue(
+                    schema.FullRowTypeName, out ConfigTableSchema firstPartition))
                 {
-                    ConfigFieldSchema field = schema.Fields[fieldIndex];
-                    if (field.Kind != ConfigFieldKind.Enum)
-                    {
-                        continue;
-                    }
-
-                    string enumTypeName = string.IsNullOrEmpty(schema.Namespace)
-                        ? field.CSharpTypeName
-                        : schema.Namespace + "." + field.CSharpTypeName;
-                    if (!generatedTypeNames.Add(enumTypeName))
+                    if (firstPartition.TableId != schema.TableId
+                        || firstPartition.SchemaHash != schema.SchemaHash)
                     {
                         throw new RFrameworkException(
-                            $"Duplicate generated enum type '{enumTypeName}'.");
+                            $"Config partitions '{firstPartition.SegmentName}' and "
+                            + $"'{schema.SegmentName}' do not use the same schema.");
                     }
                 }
-
-                if (tableIds.TryGetValue(schema.TableId, out string other))
+                else
                 {
-                    throw new RFrameworkException(
-                        $"Config TableId collision: '{schema.FullRowTypeName}' and '{other}' "
-                        + $"both use '{schema.TableId:X8}'. Rename one table.");
+                    logicalTables.Add(schema.FullRowTypeName, schema);
+                    if (!generatedTypeNames.Add(schema.FullRowTypeName))
+                    {
+                        throw new RFrameworkException(
+                            $"Duplicate generated type '{schema.FullRowTypeName}'.");
+                    }
+
+                    for (int fieldIndex = 0; fieldIndex < schema.Fields.Count; fieldIndex++)
+                    {
+                        ConfigFieldSchema field = schema.Fields[fieldIndex];
+                        if (field.Kind != ConfigFieldKind.Enum)
+                        {
+                            continue;
+                        }
+
+                        string enumTypeName = string.IsNullOrEmpty(schema.Namespace)
+                            ? field.CSharpTypeName
+                            : schema.Namespace + "." + field.CSharpTypeName;
+                        if (!generatedTypeNames.Add(enumTypeName))
+                        {
+                            throw new RFrameworkException(
+                                $"Duplicate generated enum type '{enumTypeName}'.");
+                        }
+                    }
+
+                    if (tableIds.TryGetValue(schema.TableId, out string other))
+                    {
+                        throw new RFrameworkException(
+                            $"Config TableId collision: '{schema.FullRowTypeName}' and '{other}' "
+                            + $"both use '{schema.TableId:X8}'. Rename one table.");
+                    }
+
+                    tableIds.Add(schema.TableId, schema.FullRowTypeName);
                 }
 
-                tableIds.Add(schema.TableId, schema.FullRowTypeName);
                 result.Add(schema);
                 report.FileProcessed();
             }
 
+            ValidatePartitionIds(result);
+
             return result;
+        }
+
+        private static void ValidatePartitionIds(IReadOnlyList<ConfigTableSchema> schemas)
+        {
+            Dictionary<string, HashSet<int>> idsByType =
+                new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < schemas.Count; i++)
+            {
+                ConfigTableSchema schema = schemas[i];
+                if (!idsByType.TryGetValue(schema.FullRowTypeName, out HashSet<int> ids))
+                {
+                    ids = new HashSet<int>();
+                    idsByType.Add(schema.FullRowTypeName, ids);
+                }
+
+                int idIndex = -1;
+                for (int fieldIndex = 0; fieldIndex < schema.Fields.Count; fieldIndex++)
+                {
+                    if (string.Equals(
+                        schema.Fields[fieldIndex].Name, "Id", StringComparison.OrdinalIgnoreCase))
+                    {
+                        idIndex = fieldIndex;
+                        break;
+                    }
+                }
+
+                for (int rowIndex = 0; rowIndex < schema.Rows.Count; rowIndex++)
+                {
+                    int id = int.Parse(
+                        schema.Rows[rowIndex].Values[idIndex],
+                        System.Globalization.CultureInfo.InvariantCulture);
+                    if (!ids.Add(id))
+                    {
+                        throw new RFrameworkException(
+                            $"Config type '{schema.FullRowTypeName}' contains duplicate Id '{id}' "
+                            + $"across partitions, including '{schema.SegmentName}'.");
+                    }
+                }
+            }
         }
 
         private static List<LocalizationTable> ParseLocalizations(
@@ -212,23 +279,28 @@ namespace UnityRFramework.Editor
             HashSet<string> jsonFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             HashSet<string> binaryFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool changed = false;
+            HashSet<string> generatedTypes =
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             for (int i = 0; i < configs.Count; i++)
             {
                 ConfigTableSchema schema = configs[i];
                 string codeFile = schema.RowTypeName + ".g.cs";
-                string jsonFile = schema.TableName + ".json";
-                string binaryFile = schema.TableName + ".bytes";
-                codeFiles.Add(codeFile);
+                string jsonFile = schema.SegmentName + ".json";
+                string binaryFile = schema.SegmentName + ".bytes";
                 jsonFiles.Add(jsonFile);
                 binaryFiles.Add(binaryFile);
 
-                string codePath = Path.Combine(codeRoot, codeFile);
-                if (ConfigCodeGenerator.WriteCodeIfChanged(
-                    codePath, ConfigCodeGeneratorRegistry.Current.Generate(schema)))
+                if (generatedTypes.Add(schema.FullRowTypeName))
                 {
-                    changed = true;
-                    report.FileWritten(ToProjectPath(codePath));
+                    codeFiles.Add(codeFile);
+                    string codePath = Path.Combine(codeRoot, codeFile);
+                    if (ConfigCodeGenerator.WriteCodeIfChanged(
+                        codePath, ConfigCodeGeneratorRegistry.Current.Generate(schema)))
+                    {
+                        changed = true;
+                        report.FileWritten(ToProjectPath(codePath));
+                    }
                 }
 
                 string jsonPath = Path.Combine(jsonRoot, jsonFile);
@@ -248,6 +320,30 @@ namespace UnityRFramework.Editor
                 }
             }
 
+            if (options.ExportConfigBundle)
+            {
+                string bundleName = ValidateBundleName(options.ConfigBundleName);
+                string jsonFile = bundleName + ".json";
+                string binaryFile = bundleName + ".bytes";
+                jsonFiles.Add(jsonFile);
+                binaryFiles.Add(binaryFile);
+                string jsonPath = Path.Combine(jsonRoot, jsonFile);
+                if (JsonExportUtility.WriteTextIfChanged(
+                    jsonPath, ConfigJsonExporter.BuildBundle(configs)))
+                {
+                    changed = true;
+                    report.FileWritten(ToProjectPath(jsonPath));
+                }
+
+                string binaryPath = Path.Combine(binaryRoot, binaryFile);
+                if (ConfigBinaryExporter.WriteBytesIfChanged(
+                    binaryPath, ConfigBinaryExporter.BuildBundle(configs)))
+                {
+                    changed = true;
+                    report.FileWritten(ToProjectPath(binaryPath));
+                }
+            }
+
             changed |= SynchronizeManifest(
                 codeRoot, ConfigCodeManifestName, codeFiles, report);
             changed |= SynchronizeManifest(
@@ -255,6 +351,20 @@ namespace UnityRFramework.Editor
             changed |= SynchronizeManifest(
                 binaryRoot, ConfigBinaryManifestName, binaryFiles, report);
             return changed;
+        }
+
+        private static string ValidateBundleName(string value)
+        {
+            string name = value?.Trim();
+            if (string.IsNullOrEmpty(name)
+                || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+                || name.IndexOf('/') >= 0
+                || name.IndexOf('\\') >= 0)
+            {
+                throw new RFrameworkException("Config bundle file name is invalid.");
+            }
+
+            return name;
         }
 
         private static bool ExportLocalizations(

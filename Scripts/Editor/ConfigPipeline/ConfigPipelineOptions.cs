@@ -22,6 +22,12 @@ namespace UnityRFramework.Editor
         [FormerlySerializedAs("ConfigBinaryDirectory")]
         public string ConfigOutputDirectory = "Assets/Resources/Config";
 
+        /// <summary>是否额外导出包含全部 Config 分片的 JSON 与二进制容器。</summary>
+        public bool ExportConfigBundle = true;
+
+        /// <summary>Config 多表容器文件名，不含扩展名。</summary>
+        public string ConfigBundleName = "ConfigBundle";
+
         /// <summary>Localization 统一输出根目录，内部自动分为 Json/Binary。</summary>
         [FormerlySerializedAs("LocalizationBinaryDirectory")]
         public string LocalizationOutputDirectory = "Assets/Resources/Localization";

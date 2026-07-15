@@ -26,6 +26,98 @@ namespace UnityRFramework.Runtime
             return ParseRows(rowType, json, true, false);
         }
 
+        /// <summary>
+        /// 读取带 Schema 元数据的多表 JSON，并按配置行类型合并分片行。
+        /// </summary>
+        public static IReadOnlyDictionary<Type, IReadOnlyList<object>> ParseBundleRows(string json)
+        {
+            return ParseBundleRows(json, 0);
+        }
+
+        private static IReadOnlyDictionary<Type, IReadOnlyList<object>> ParseBundleRows(
+            string json, int migrationDepth)
+        {
+            if (migrationDepth > 32)
+            {
+                throw new RFrameworkException("Config JSON bundle migration exceeded 32 steps.");
+            }
+
+            object root = new Parser(json).Parse();
+            if (!(root is Dictionary<string, object> rootObject)
+                || !rootObject.TryGetValue("Tables", out object tablesValue)
+                || !(tablesValue is Dictionary<string, object> tables)
+                || tables.Count == 0)
+            {
+                throw new RFrameworkException(
+                    "Config JSON bundle must contain a non-empty 'Tables' object.");
+            }
+
+            Dictionary<Type, List<object>> grouped = new Dictionary<Type, List<object>>();
+            foreach (KeyValuePair<string, object> pair in tables)
+            {
+                if (!(pair.Value is Dictionary<string, object> envelope)
+                    || !envelope.TryGetValue("TableId", out object tableIdValue)
+                    || !envelope.TryGetValue("SchemaHash", out object schemaHashValue)
+                    || !envelope.TryGetValue("Rows", out object rowsValue))
+                {
+                    throw new RFrameworkException(
+                        $"Config JSON bundle table '{pair.Key}' has invalid metadata.");
+                }
+
+                uint tableId = ParseHexUInt32(tableIdValue, "TableId");
+                ulong schemaHash = ParseHexUInt64(schemaHashValue, "SchemaHash");
+                if (!ConfigSchemaRegistry.TryGet(tableId, out ConfigSchemaInfo schema))
+                {
+                    throw new RFrameworkException(
+                        $"No Config Schema is registered for TableId '{tableId:X8}'.");
+                }
+
+                if (schemaHash != schema.SchemaHash)
+                {
+                    if (!JsonConfigMigrationRegistry.TryGet(
+                        schema.RowType, schemaHash, out IJsonConfigMigration migration))
+                    {
+                        throw new RFrameworkException(
+                            $"Config JSON bundle schema mismatch for '{pair.Key}'. "
+                            + $"File '{schemaHash:X16}', current '{schema.SchemaHash:X16}'.");
+                    }
+
+                    if (migration.TargetSchemaHash != schema.SchemaHash)
+                    {
+                        throw new RFrameworkException(
+                            $"Config JSON migration target mismatch for '{pair.Key}'.");
+                    }
+
+                    string migrated = migration.Migrate(json);
+                    if (string.IsNullOrWhiteSpace(migrated)
+                        || string.Equals(migrated, json, StringComparison.Ordinal))
+                    {
+                        throw new RFrameworkException(
+                            $"Config JSON migration for '{pair.Key}' made no progress.");
+                    }
+
+                    return ParseBundleRows(migrated, migrationDepth + 1);
+                }
+
+                if (!grouped.TryGetValue(schema.RowType, out List<object> rows))
+                {
+                    rows = new List<object>();
+                    grouped.Add(schema.RowType, rows);
+                }
+
+                rows.AddRange(ParseRowArray(schema.RowType, rowsValue));
+            }
+
+            Dictionary<Type, IReadOnlyList<object>> result =
+                new Dictionary<Type, IReadOnlyList<object>>(grouped.Count);
+            foreach (KeyValuePair<Type, List<object>> pair in grouped)
+            {
+                result.Add(pair.Key, pair.Value);
+            }
+
+            return result;
+        }
+
         private static IReadOnlyList<object> ParseRows(
             Type rowType, string json, bool allowMigration, bool requireSchemaMetadata)
         {

@@ -133,6 +133,49 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>
+        /// 异步加载多表配置容器，并在全部解析成功后原子提交缓存。
+        /// </summary>
+        public async Task LoadConfigBundleAsync(
+            string assetPath, CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(assetPath))
+            {
+                throw new RFrameworkException("ConfigComponent: assetPath is null or empty.");
+            }
+
+            ResourceComponent resource = GameEntry.Resource;
+            if (resource == null)
+            {
+                throw new RFrameworkException(
+                    "ConfigComponent: ResourceComponent not found. "
+                    + "Ensure Resource module is initialized first.");
+            }
+
+            await resource.InitializeAsync();
+            TextAsset textAsset = await resource.LoadAssetAsync<TextAsset>(assetPath, 0, ct);
+            if (textAsset == null)
+            {
+                throw new RFrameworkException(
+                    $"ConfigComponent: Failed to load config bundle '{assetPath}'.");
+            }
+
+            try
+            {
+                configModule.LoadConfigBundle(textAsset.bytes);
+            }
+            finally
+            {
+                resource.UnloadAsset<TextAsset>(assetPath);
+            }
+        }
+
+        /// <summary>从原始字节原子加载多表配置容器。</summary>
+        public void LoadConfigBundle(byte[] bytes)
+        {
+            configModule.LoadConfigBundle(bytes);
+        }
+
+        /// <summary>
         /// 从 JSON 字符串加载配置表。适用于运行时动态生成配置、编辑器预览等场景。
         /// </summary>
         /// <typeparam name="T">配置行类型。</typeparam>

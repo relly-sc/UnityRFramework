@@ -1,1 +1,4 @@
+AcceptanceBundle.bytes
 Acceptance_Action.bytes
+Acceptance_Partition@High.bytes
+Acceptance_Partition@Low.bytes

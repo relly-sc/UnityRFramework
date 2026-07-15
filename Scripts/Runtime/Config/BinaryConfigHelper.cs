@@ -7,7 +7,7 @@ namespace UnityRFramework.Runtime
     /// 框架单配置表二进制协议解析器（URFC v1/v2）。
     /// JSON 字符串入口由 DictionaryConfigHelperBase 保留。
     /// </summary>
-    public sealed class BinaryConfigHelper : DictionaryConfigHelperBase
+    public sealed class BinaryConfigHelper : DictionaryConfigHelperBase, IConfigBundleHelper
     {
         /// <inheritdoc/>
         public override object ParseConfig(Type tableType, byte[] bytes)
@@ -26,6 +26,13 @@ namespace UnityRFramework.Runtime
 
             throw new RFrameworkException(
                 $"Binary config version '{version}' is not supported. Expected version 1 or 2.");
+        }
+
+        /// <inheritdoc/>
+        public System.Collections.Generic.IReadOnlyDictionary<Type, object> ParseConfigBundle(
+            byte[] bytes)
+        {
+            return BinaryTableUtility.ReadGeneratedConfigBundle(bytes);
         }
     }
 }
