@@ -162,6 +162,14 @@ namespace UnityRFramework.Runtime
                 return ConvertValue(value, nullableType, fieldName);
             }
 
+            if (ConfigFieldCodecRegistry.TryGet(targetType, out IConfigFieldCodec customCodec))
+            {
+                string customText = RequireString(value, fieldName);
+                object customValue = customCodec.ParseJson(customText);
+                ValidateCustomValue(customCodec, customValue, fieldName);
+                return customValue;
+            }
+
             if (targetType == typeof(string))
             {
                 return RequireString(value, fieldName);
@@ -254,6 +262,30 @@ namespace UnityRFramework.Runtime
 
             throw new RFrameworkException(
                 $"Config JSON field '{fieldName}' uses unsupported type '{targetType.FullName}'.");
+        }
+
+        private static void ValidateCustomValue(
+            IConfigFieldCodec codec, object value, string fieldName)
+        {
+            if (value == null)
+            {
+                if (!codec.ValueType.IsValueType
+                    || Nullable.GetUnderlyingType(codec.ValueType) != null)
+                {
+                    return;
+                }
+
+                throw new RFrameworkException(
+                    $"Config JSON field '{fieldName}' codec '{codec.TypeKeyword}' returned null "
+                    + $"for value type '{codec.ValueType.FullName}'.");
+            }
+
+            if (!codec.ValueType.IsInstanceOfType(value))
+            {
+                throw new RFrameworkException(
+                    $"Config JSON field '{fieldName}' codec '{codec.TypeKeyword}' returned "
+                    + $"'{value.GetType().FullName}', expected '{codec.ValueType.FullName}'.");
+            }
         }
 
         private static string RequireString(object value, string fieldName)

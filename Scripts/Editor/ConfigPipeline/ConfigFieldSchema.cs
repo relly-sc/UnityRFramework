@@ -27,5 +27,8 @@ namespace UnityRFramework.Editor
 
         /// <summary>获取或设置枚举字段的成员定义。</summary>
         public IReadOnlyList<ConfigEnumValueSchema> EnumValues { get; set; }
+
+        /// <summary>获取或设置自定义字段 Codec 的 Schema 版本。</summary>
+        public uint CustomCodecSchemaVersion { get; set; }
     }
 }

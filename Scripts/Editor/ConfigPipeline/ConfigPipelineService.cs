@@ -225,7 +225,7 @@ namespace UnityRFramework.Editor
 
                 string codePath = Path.Combine(codeRoot, codeFile);
                 if (ConfigCodeGenerator.WriteCodeIfChanged(
-                    codePath, ConfigCodeGenerator.Generate(schema)))
+                    codePath, ConfigCodeGeneratorRegistry.Current.Generate(schema)))
                 {
                     changed = true;
                     report.FileWritten(ToProjectPath(codePath));

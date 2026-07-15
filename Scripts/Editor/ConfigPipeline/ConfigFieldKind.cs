@@ -38,6 +38,8 @@ namespace UnityRFramework.Editor
         /// <summary>一维数组。</summary>
         Array,
         /// <summary>List 集合。</summary>
-        List
+        List,
+        /// <summary>由项目注册的自定义标量 Codec。</summary>
+        Custom
     }
 }

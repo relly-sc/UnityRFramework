@@ -76,6 +76,13 @@ namespace UnityRFramework.Editor
                 return;
             }
 
+            if (field.Kind == ConfigFieldKind.Custom)
+            {
+                IConfigFieldCodec codec = GetCustomCodec(field);
+                codec.WriteBinary(writer, parsed);
+                return;
+            }
+
             WriteScalar(writer, field.Kind, parsed);
         }
 
@@ -112,7 +119,51 @@ namespace UnityRFramework.Editor
                 return result;
             }
 
+            if (field.Kind == ConfigFieldKind.Custom)
+            {
+                IConfigFieldCodec codec = GetCustomCodec(field);
+                object parsed = codec.ParseCsv(value);
+                ValidateCustomValue(codec, parsed, "CSV parser");
+                return parsed;
+            }
+
             return ParseScalar(field.Kind, value);
+        }
+
+        private static IConfigFieldCodec GetCustomCodec(ConfigFieldSchema field)
+        {
+            if (!ConfigFieldCodecRegistry.TryGet(
+                field.TypeKeyword, out IConfigFieldCodec codec))
+            {
+                throw new RFrameworkException(
+                    $"Config field codec '{field.TypeKeyword}' is not registered.");
+            }
+
+            return codec;
+        }
+
+        private static void ValidateCustomValue(
+            IConfigFieldCodec codec, object value, string operation)
+        {
+            if (value == null)
+            {
+                if (!codec.ValueType.IsValueType
+                    || Nullable.GetUnderlyingType(codec.ValueType) != null)
+                {
+                    return;
+                }
+
+                throw new RFrameworkException(
+                    $"Config field codec '{codec.TypeKeyword}' {operation} returned null for "
+                    + $"value type '{codec.ValueType.FullName}'.");
+            }
+
+            if (!codec.ValueType.IsInstanceOfType(value))
+            {
+                throw new RFrameworkException(
+                    $"Config field codec '{codec.TypeKeyword}' {operation} returned "
+                    + $"'{value.GetType().FullName}', expected '{codec.ValueType.FullName}'.");
+            }
         }
 
         private static object ParseScalar(

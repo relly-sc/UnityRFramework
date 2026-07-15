@@ -232,6 +232,19 @@ namespace UnityRFramework.Editor
             bool isLast)
         {
             string suffix = isLast ? string.Empty : ",";
+            if (field.Kind == ConfigFieldKind.Custom)
+            {
+                builder.Append(indent).Append("                ").Append(field.Name)
+                    .AppendLine(" = ConfigFieldCodecRegistry");
+                builder.Append(indent).Append("                    .ReadBinary<")
+                    .Append(field.CSharpTypeName).AppendLine(">(");
+                builder.Append(indent).Append("                        \"")
+                    .Append(EscapeCSharpString(field.TypeKeyword)).Append("\", ")
+                    .Append(field.CustomCodecSchemaVersion).Append("u, reader)")
+                    .AppendLine(suffix);
+                return;
+            }
+
             if (field.Kind == ConfigFieldKind.Array || field.Kind == ConfigFieldKind.List)
             {
                 string method = field.Kind == ConfigFieldKind.Array ? "ReadArray" : "ReadList";
@@ -257,6 +270,11 @@ namespace UnityRFramework.Editor
             }
 
             return GetScalarReadExpression(field.Kind, "reader");
+        }
+
+        private static string EscapeCSharpString(string value)
+        {
+            return (value ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
         }
 
         private static string GetScalarReadExpression(ConfigFieldKind kind, string readerName)

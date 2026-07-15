@@ -354,6 +354,72 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        /// <summary>验证自定义字段 Codec 可完成 CSV、JSON、URFC 和生成代码闭环。</summary>
+        [Test]
+        public void CustomFieldCodecRoundTripsThroughJsonAndBinary()
+        {
+            ConfigFieldCodecRegistry.Register(new TestCustomValueCodec());
+            const string csv =
+                "Id,Point\nint,point2\n编号,坐标\n1,10:20\n2,-3:7";
+            ConfigTableSchema schema = ConfigSchemaParser.ParseConfig(
+                CsvDocumentReader.Parse("TestCustom.csv", csv),
+                "UnityRFramework.Editor.Tests");
+            BinaryConfigCodecRegistry.Register(
+                new TestCustomConfigCodec(schema.TableId, schema.SchemaHash));
+            GameObject owner = new GameObject("Custom Config Codec Tests");
+            try
+            {
+                Assert.AreEqual(ConfigFieldKind.Custom, schema.Fields[1].Kind);
+                string generated = ConfigCodeGenerator.Generate(schema);
+                StringAssert.Contains(
+                    ".ReadBinary<UnityRFramework.Editor.Tests.TestCustomValue>(",
+                    generated);
+                StringAssert.Contains("\"point2\", 1u, reader)", generated);
+
+                JsonConfigHelper jsonHelper = owner.AddComponent<JsonConfigHelper>();
+                string json = ConfigJsonExporter.Build(schema);
+                object jsonTable = jsonHelper.ParseConfig(
+                    typeof(TestCustomConfig), Encoding.UTF8.GetBytes(json));
+                Assert.AreEqual(
+                    new TestCustomValue { X = 10, Y = 20 },
+                    jsonHelper.GetConfig<TestCustomConfig>(jsonTable, 1).Point);
+
+                BinaryConfigHelper binaryHelper = owner.AddComponent<BinaryConfigHelper>();
+                object binaryTable = binaryHelper.ParseConfig(
+                    typeof(TestCustomConfig), ConfigBinaryExporter.BuildV2(schema));
+                Assert.AreEqual(
+                    new TestCustomValue { X = -3, Y = 7 },
+                    binaryHelper.GetConfig<TestCustomConfig>(binaryTable, 2).Point);
+            }
+            finally
+            {
+                BinaryConfigCodecRegistry.Unregister(typeof(TestCustomConfig));
+                ConfigFieldCodecRegistry.Unregister("point2");
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证项目可替换并恢复 ConfigPipeline 代码生成策略。</summary>
+        [Test]
+        public void CodeGeneratorStrategyCanBeReplacedAndReset()
+        {
+            try
+            {
+                ConfigCodeGeneratorRegistry.Set(new TestCodeGenerator());
+                Assert.AreEqual(
+                    "// custom:TestConfigRow",
+                    ConfigCodeGeneratorRegistry.Current.Generate(CreateSchema()));
+            }
+            finally
+            {
+                ConfigCodeGeneratorRegistry.Reset();
+            }
+
+            StringAssert.Contains(
+                "public sealed class TestConfigRow",
+                ConfigCodeGeneratorRegistry.Current.Generate(CreateSchema()));
+        }
+
         /// <summary>验证集合中的非法转义会在导出前被拒绝。</summary>
         [Test]
         public void CollectionRejectsUnsupportedEscapeSequence()
@@ -498,6 +564,15 @@ namespace UnityRFramework.Editor.Tests
             return ConfigSchemaParser.ParseConfig(
                 CsvDocumentReader.Parse("TestComplex.csv", csv),
                 "UnityRFramework.Editor.Tests");
+        }
+
+        private sealed class TestCodeGenerator : IConfigCodeGenerator
+        {
+            /// <inheritdoc/>
+            public string Generate(ConfigTableSchema schema)
+            {
+                return "// custom:" + schema.TableName;
+            }
         }
 
     }

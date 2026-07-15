@@ -172,7 +172,11 @@ namespace UnityRFramework.Editor
             string fullTypeName, IReadOnlyList<ConfigFieldSchema> fields)
         {
             return fullTypeName + "|" + string.Join(";", fields.Select(
-                field => field.Name + ":" + field.TypeKeyword));
+                field => field.Name + ":" + field.TypeKeyword
+                    + (field.Kind == ConfigFieldKind.Custom
+                        ? "@" + field.CustomCodecSchemaVersion.ToString(
+                            CultureInfo.InvariantCulture)
+                        : string.Empty)));
         }
 
         private static ConfigFieldSchema ParseFieldType(
@@ -224,6 +228,17 @@ namespace UnityRFramework.Editor
                     CSharpTypeName = enumTypeName,
                     Kind = ConfigFieldKind.Enum,
                     EnumValues = values
+                };
+            }
+
+            if (ConfigFieldCodecRegistry.TryGet(typeKeyword, out IConfigFieldCodec codec))
+            {
+                return new ConfigFieldSchema
+                {
+                    TypeKeyword = codec.TypeKeyword,
+                    CSharpTypeName = codec.CSharpTypeName,
+                    Kind = ConfigFieldKind.Custom,
+                    CustomCodecSchemaVersion = codec.SchemaVersion
                 };
             }
 

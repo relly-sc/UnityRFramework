@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using RFramework;
+using UnityRFramework.Runtime;
 
 namespace UnityRFramework.Editor
 {
@@ -89,6 +90,26 @@ namespace UnityRFramework.Editor
             if (field.Kind == ConfigFieldKind.Enum)
             {
                 builder.Append((int)parsed);
+                return;
+            }
+
+            if (field.Kind == ConfigFieldKind.Custom)
+            {
+                if (!ConfigFieldCodecRegistry.TryGet(
+                    field.TypeKeyword, out IConfigFieldCodec codec))
+                {
+                    throw new RFrameworkException(
+                        $"Config field codec '{field.TypeKeyword}' is not registered.");
+                }
+
+                string jsonValue = codec.FormatJson(parsed);
+                if (jsonValue == null)
+                {
+                    throw new RFrameworkException(
+                        $"Config field codec '{field.TypeKeyword}' returned a null JSON value.");
+                }
+
+                JsonExportUtility.AppendString(builder, jsonValue);
                 return;
             }
 
