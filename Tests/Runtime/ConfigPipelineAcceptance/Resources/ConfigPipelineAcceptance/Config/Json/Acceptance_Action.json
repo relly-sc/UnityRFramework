@@ -1,16 +1,20 @@
 {
   "Tables": {
-    "Acceptance_Action": [
-      {
-        "Id": 1,
-        "NameKey": "acceptance_attack",
-        "Power": 1
-      },
-      {
-        "Id": 2,
-        "NameKey": "acceptance_skill",
-        "Power": 1.5
-      }
-    ]
+    "Acceptance_Action": {
+      "TableId": "AA6DA36B",
+      "SchemaHash": "3295B1DE6344398F",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "acceptance_attack",
+          "Power": 1
+        },
+        {
+          "Id": 2,
+          "NameKey": "acceptance_skill",
+          "Power": 1.5
+        }
+      ]
+    }
   }
 }

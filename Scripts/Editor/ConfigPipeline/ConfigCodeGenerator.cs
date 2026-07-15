@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Security;
 using System.Text;
@@ -160,6 +161,12 @@ namespace UnityRFramework.Editor
                 "    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]");
             builder.Append(indent).AppendLine("    private static void RegisterRuntime()");
             builder.Append(indent).AppendLine("    {");
+            builder.Append(indent).Append("        ConfigSchemaRegistry.Register(typeof(")
+                .Append(schema.RowTypeName).Append("), 0x")
+                .Append(schema.TableId.ToString("X8", CultureInfo.InvariantCulture))
+                .Append("u, 0x")
+                .Append(schema.SchemaHash.ToString("X16", CultureInfo.InvariantCulture))
+                .AppendLine("UL);");
             builder.Append(indent).Append("        BinaryConfigCodecRegistry.Register(new ")
                 .Append(schema.RowTypeName).AppendLine("BinaryCodec());");
             builder.Append(indent).AppendLine("    }");

@@ -24,15 +24,22 @@ namespace UnityRFramework.Editor
             builder.AppendLine("  \"Tables\": {");
             builder.Append("    ");
             JsonExportUtility.AppendString(builder, schema.TableName);
-            builder.AppendLine(": [");
+            builder.AppendLine(": {");
+            builder.Append("      \"TableId\": \"")
+                .Append(schema.TableId.ToString("X8", CultureInfo.InvariantCulture))
+                .AppendLine("\",");
+            builder.Append("      \"SchemaHash\": \"")
+                .Append(schema.SchemaHash.ToString("X16", CultureInfo.InvariantCulture))
+                .AppendLine("\",");
+            builder.AppendLine("      \"Rows\": [");
             for (int rowIndex = 0; rowIndex < schema.Rows.Count; rowIndex++)
             {
                 CsvRow row = schema.Rows[rowIndex];
-                builder.AppendLine("      {");
+                builder.AppendLine("        {");
                 for (int fieldIndex = 0; fieldIndex < schema.Fields.Count; fieldIndex++)
                 {
                     ConfigFieldSchema field = schema.Fields[fieldIndex];
-                    builder.Append("        ");
+                    builder.Append("          ");
                     JsonExportUtility.AppendString(builder, field.Name);
                     builder.Append(": ");
                     AppendValue(builder, field, row.Values[fieldIndex], schema.SourcePath,
@@ -40,11 +47,12 @@ namespace UnityRFramework.Editor
                     builder.AppendLine(fieldIndex + 1 == schema.Fields.Count ? string.Empty : ",");
                 }
 
-                builder.Append("      }");
+                builder.Append("        }");
                 builder.AppendLine(rowIndex + 1 == schema.Rows.Count ? string.Empty : ",");
             }
 
-            builder.AppendLine("    ]");
+            builder.AppendLine("      ]");
+            builder.AppendLine("    }");
             builder.AppendLine("  }");
             builder.Append('}');
             return builder.ToString();

@@ -23,6 +23,12 @@ namespace UnityRFramework.Runtime
         /// <returns>强类型配置行集合。</returns>
         public static IReadOnlyList<object> ParseRows(Type rowType, string json)
         {
+            return ParseRows(rowType, json, true, false);
+        }
+
+        private static IReadOnlyList<object> ParseRows(
+            Type rowType, string json, bool allowMigration, bool requireSchemaMetadata)
+        {
             object root = new Parser(json).Parse();
             if (root is Dictionary<string, object> rootObject)
             {
@@ -37,6 +43,84 @@ namespace UnityRFramework.Runtime
                 }
             }
 
+            if (root is Dictionary<string, object> tableEnvelope)
+            {
+                return ParseVersionedTable(
+                    rowType, json, tableEnvelope, allowMigration);
+            }
+
+            if (requireSchemaMetadata)
+            {
+                throw new RFrameworkException(
+                    "Migrated Config JSON must contain TableId, SchemaHash and Rows metadata.");
+            }
+
+            return ParseRowArray(rowType, root);
+        }
+
+        private static IReadOnlyList<object> ParseVersionedTable(
+            Type rowType,
+            string sourceJson,
+            IReadOnlyDictionary<string, object> envelope,
+            bool allowMigration)
+        {
+            if (!envelope.TryGetValue("TableId", out object tableIdValue)
+                || !envelope.TryGetValue("SchemaHash", out object schemaHashValue)
+                || !envelope.TryGetValue("Rows", out object rowsValue))
+            {
+                throw new RFrameworkException(
+                    "Config JSON table metadata must contain TableId, SchemaHash and Rows.");
+            }
+
+            uint sourceTableId = ParseHexUInt32(tableIdValue, "TableId");
+            ulong sourceSchemaHash = ParseHexUInt64(schemaHashValue, "SchemaHash");
+            if (!ConfigSchemaRegistry.TryGet(rowType, out ConfigSchemaInfo currentSchema))
+            {
+                throw new RFrameworkException(
+                    $"No current Config Schema is registered for '{rowType.FullName}'.");
+            }
+
+            if (sourceTableId != currentSchema.TableId)
+            {
+                throw new RFrameworkException(
+                    $"Config JSON table id mismatch for '{rowType.Name}'. "
+                    + $"File '{sourceTableId:X8}', current '{currentSchema.TableId:X8}'.");
+            }
+
+            if (sourceSchemaHash == currentSchema.SchemaHash)
+            {
+                return ParseRowArray(rowType, rowsValue);
+            }
+
+            if (!allowMigration || !JsonConfigMigrationRegistry.TryGet(
+                rowType, sourceSchemaHash, out IJsonConfigMigration migration))
+            {
+                throw new RFrameworkException(
+                    $"Config JSON schema mismatch for '{rowType.Name}'. "
+                    + $"File '{sourceSchemaHash:X16}', current "
+                    + $"'{currentSchema.SchemaHash:X16}', and no migration is registered.");
+            }
+
+            if (migration.TargetSchemaHash != currentSchema.SchemaHash)
+            {
+                throw new RFrameworkException(
+                    $"Config JSON migration target mismatch for '{rowType.Name}'. "
+                    + $"Migration '{migration.TargetSchemaHash:X16}', current "
+                    + $"'{currentSchema.SchemaHash:X16}'.");
+            }
+
+            string migratedJson = migration.Migrate(sourceJson);
+            if (string.IsNullOrWhiteSpace(migratedJson))
+            {
+                throw new RFrameworkException(
+                    $"Config JSON migration for '{rowType.Name}' returned empty content.");
+            }
+
+            return ParseRows(rowType, migratedJson, false, true);
+        }
+
+        private static IReadOnlyList<object> ParseRowArray(Type rowType, object root)
+        {
             if (!(root is List<object> items))
             {
                 throw new RFrameworkException(
@@ -61,6 +145,33 @@ namespace UnityRFramework.Runtime
             }
 
             return rows;
+        }
+
+        private static uint ParseHexUInt32(object value, string fieldName)
+        {
+            ulong parsed = ParseHexUInt64(value, fieldName);
+            if (parsed > uint.MaxValue)
+            {
+                throw new RFrameworkException(
+                    $"Config JSON metadata '{fieldName}' exceeds UInt32 range.");
+            }
+
+            return (uint)parsed;
+        }
+
+        private static ulong ParseHexUInt64(object value, string fieldName)
+        {
+            if (!(value is string text)
+                || !ulong.TryParse(
+                    text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture,
+                    out ulong parsed)
+                || parsed == 0)
+            {
+                throw new RFrameworkException(
+                    $"Config JSON metadata '{fieldName}' must be a non-zero hexadecimal string.");
+            }
+
+            return parsed;
         }
 
         private static object SelectTable(Type rowType, object tablesValue)

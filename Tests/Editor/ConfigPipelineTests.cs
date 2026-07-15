@@ -70,9 +70,15 @@ namespace UnityRFramework.Editor.Tests
         public void ConfigJsonRoundTripsThroughJsonHelper()
         {
             Utility.Json.SetJsonHelper(new DefaultJsonHelper());
-            string json = ConfigJsonExporter.Build(CreateSchema());
+            ConfigTableSchema schema = CreateSchema();
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), schema.TableId, schema.SchemaHash);
+            string json = ConfigJsonExporter.Build(schema);
             StringAssert.Contains("\"Tables\"", json);
             StringAssert.Contains("\"TestConfigRow\"", json);
+            StringAssert.Contains("\"TableId\"", json);
+            StringAssert.Contains("\"SchemaHash\"", json);
+            StringAssert.Contains("\"Rows\"", json);
             StringAssert.DoesNotContain("\"Items\"", json);
             GameObject owner = new GameObject("JsonConfigHelper Tests");
             try
@@ -89,6 +95,7 @@ namespace UnityRFramework.Editor.Tests
             }
             finally
             {
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
                 Object.DestroyImmediate(owner);
             }
         }
@@ -110,6 +117,66 @@ namespace UnityRFramework.Editor.Tests
             }
             finally
             {
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证带元数据的历史 JSON 只有显式注册迁移器后才能读取。</summary>
+        [Test]
+        public void ConfigJsonMigratesRegisteredLegacySchema()
+        {
+            ConfigTableSchema currentSchema = CreateSchema();
+            ConfigTableSchema legacySchema = CreateLegacyJsonSchema();
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), currentSchema.TableId, currentSchema.SchemaHash);
+            string legacyJson = ConfigJsonExporter.Build(legacySchema);
+            GameObject owner = new GameObject("JSON Config Migration Tests");
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                Assert.Throws<RFrameworkException>(() => helper.ParseConfigFromString(
+                    typeof(TestConfigRow), legacyJson));
+
+                JsonConfigMigrationRegistry.Register(new TestLegacyJsonConfigMigration(
+                    legacySchema.SchemaHash, currentSchema.SchemaHash));
+                object table = helper.ParseConfigFromString(
+                    typeof(TestConfigRow), legacyJson);
+                TestConfigRow first = helper.GetConfig<TestConfigRow>(table, 1);
+
+                Assert.AreEqual("Sword", first.Name);
+                Assert.AreEqual(0f, first.Price);
+            }
+            finally
+            {
+                JsonConfigMigrationRegistry.Unregister(
+                    typeof(TestConfigRow), legacySchema.SchemaHash);
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证 JSON 迁移器目标必须与当前 Schema 完全一致。</summary>
+        [Test]
+        public void ConfigJsonRejectsMigrationForAnotherTargetSchema()
+        {
+            ConfigTableSchema currentSchema = CreateSchema();
+            ConfigTableSchema legacySchema = CreateLegacyJsonSchema();
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), currentSchema.TableId, currentSchema.SchemaHash);
+            JsonConfigMigrationRegistry.Register(new TestLegacyJsonConfigMigration(
+                legacySchema.SchemaHash, currentSchema.SchemaHash + 1));
+            GameObject owner = new GameObject("JSON Config Migration Target Tests");
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                Assert.Throws<RFrameworkException>(() => helper.ParseConfigFromString(
+                    typeof(TestConfigRow), ConfigJsonExporter.Build(legacySchema)));
+            }
+            finally
+            {
+                JsonConfigMigrationRegistry.Unregister(
+                    typeof(TestConfigRow), legacySchema.SchemaHash);
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
                 Object.DestroyImmediate(owner);
             }
         }
@@ -372,6 +439,8 @@ namespace UnityRFramework.Editor.Tests
 
             Utility.Json.SetJsonHelper(new DefaultJsonHelper());
             string json = ConfigJsonExporter.Build(schema);
+            ConfigSchemaRegistry.Register(
+                typeof(TestComplexConfig), schema.TableId, schema.SchemaHash);
             GameObject owner = new GameObject("Complex JsonConfigHelper Tests");
             try
             {
@@ -387,6 +456,7 @@ namespace UnityRFramework.Editor.Tests
             }
             finally
             {
+                ConfigSchemaRegistry.Unregister(typeof(TestComplexConfig));
                 Object.DestroyImmediate(owner);
             }
         }
@@ -430,6 +500,8 @@ namespace UnityRFramework.Editor.Tests
                 "UnityRFramework.Editor.Tests");
             BinaryConfigCodecRegistry.Register(
                 new TestCustomConfigCodec(schema.TableId, schema.SchemaHash));
+            ConfigSchemaRegistry.Register(
+                typeof(TestCustomConfig), schema.TableId, schema.SchemaHash);
             GameObject owner = new GameObject("Custom Config Codec Tests");
             try
             {
@@ -458,6 +530,7 @@ namespace UnityRFramework.Editor.Tests
             finally
             {
                 BinaryConfigCodecRegistry.Unregister(typeof(TestCustomConfig));
+                ConfigSchemaRegistry.Unregister(typeof(TestCustomConfig));
                 ConfigFieldCodecRegistry.Unregister("point2");
                 Object.DestroyImmediate(owner);
             }
@@ -530,6 +603,8 @@ namespace UnityRFramework.Editor.Tests
             ConfigTableSchema schema = ConfigSchemaParser.ParseConfig(
                 CsvDocumentReader.Parse("TestJsonPrimitive.csv", csv),
                 "UnityRFramework.Editor.Tests");
+            ConfigSchemaRegistry.Register(
+                typeof(TestJsonPrimitiveConfig), schema.TableId, schema.SchemaHash);
             Utility.Json.SetJsonHelper(new DefaultJsonHelper());
             string json = ConfigJsonExporter.Build(schema);
             GameObject owner = new GameObject("Extended Primitive JSON Tests");
@@ -542,6 +617,7 @@ namespace UnityRFramework.Editor.Tests
             }
             finally
             {
+                ConfigSchemaRegistry.Unregister(typeof(TestJsonPrimitiveConfig));
                 Object.DestroyImmediate(owner);
             }
         }
@@ -555,6 +631,7 @@ namespace UnityRFramework.Editor.Tests
             StringAssert.Contains("IBinaryConfigCodec", code);
             StringAssert.Contains("[ConfigTable(\"TestConfigRow\")]", code);
             StringAssert.Contains("BinaryConfigCodecRegistry.Register", code);
+            StringAssert.Contains("ConfigSchemaRegistry.Register", code);
             StringAssert.DoesNotContain("Activator.CreateInstance", code);
             StringAssert.DoesNotContain("FieldInfo", code);
             string[] lines = code.Replace("\r\n", "\n").Split('\n');
@@ -646,6 +723,39 @@ namespace UnityRFramework.Editor.Tests
                 {
                     new CsvRow(4, new[] { "1", "Sword" }),
                     new CsvRow(5, new[] { "2", "Shield" })
+                },
+                TableId = BinaryFormatUtility.ComputeFnv1A32(fullTypeName),
+                SchemaHash = BinaryFormatUtility.ComputeFnv1A64(identity)
+            };
+        }
+
+        private static ConfigTableSchema CreateLegacyJsonSchema()
+        {
+            ConfigFieldSchema[] fields =
+            {
+                new ConfigFieldSchema
+                {
+                    Name = "Id", TypeKeyword = "int", CSharpTypeName = "int",
+                    Kind = ConfigFieldKind.Int32
+                },
+                new ConfigFieldSchema
+                {
+                    Name = "LegacyName", TypeKeyword = "string", CSharpTypeName = "string",
+                    Kind = ConfigFieldKind.String
+                }
+            };
+            const string fullTypeName = "UnityRFramework.Editor.Tests.TestConfigRow";
+            string identity = fullTypeName + "|Id:int;LegacyName:string";
+            return new ConfigTableSchema
+            {
+                SourcePath = "legacy-json-memory.csv",
+                TableName = "TestConfigRow",
+                Namespace = "UnityRFramework.Editor.Tests",
+                RowTypeName = nameof(TestConfigRow),
+                Fields = fields,
+                Rows = new[]
+                {
+                    new CsvRow(4, new[] { "1", "Sword" })
                 },
                 TableId = BinaryFormatUtility.ComputeFnv1A32(fullTypeName),
                 SchemaHash = BinaryFormatUtility.ComputeFnv1A64(identity)

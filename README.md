@@ -238,11 +238,12 @@ if (GameEntry.Config.HasConfigRow<ItemConfig>(1001)) { ... }
 
 `ParseConfig(Type, byte[])` 的字节格式由当前 `IConfigHelper` 决定。框架默认 JSON；`BinaryConfigHelper` 兼容反射映射的 URFC v1，并使用生成 Codec 读取带 TableId、SchemaHash 和 CRC32 的 URFC v2。项目私有格式可直接继承 `ConfigHelperBase`。
 
-URFC v2 的历史数据兼容采用显式迁移器。实现 `IBinaryConfigMigration` 并注册到
-`BinaryConfigMigrationRegistry` 后，新客户端可以按历史 `SourceSchemaHash` 读取旧 Body，
-并直接转换为当前 Codec 对应的表。迁移目标必须等于当前 `SchemaHash`；未知、未来或目标已
-过期的 Schema 均拒绝加载。迁移不能绕过 TableId、CRC32、Body 长度和完整消费校验。
-JSON 继续按字段名提供新增/删除字段的有限兼容，字段重命名或类型变化应使用自定义 Helper。
+JSON 与 URFC v2 均支持显式历史 Schema 迁移。二进制实现 `IBinaryConfigMigration` 并注册到
+`BinaryConfigMigrationRegistry`；JSON 实现 `IJsonConfigMigration` 并注册到
+`JsonConfigMigrationRegistry`。生成代码会通过 `ConfigSchemaRegistry` 注册两种格式共用的
+当前 `TableId/SchemaHash`。迁移目标必须等于当前 Schema，未知、未来或目标过期的 Schema
+均拒绝。JSON 新格式为 `Tables -> 表名 -> { TableId, SchemaHash, Rows }`；旧的
+`Tables -> 数组`、`Items` 和顶层数组仍可读取，但无 SchemaHash，不能参与显式迁移。
 
 框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具同时生成 JSON、配置行、静态 Codec、URFC v2 和带 CRC32 的 URFL v2，并仅在内容变化时写入。默认流程由 Excel 手动导出 UTF-8 CSV，再由工具生成 JSON/`.bytes`；直接读取 XLSX 的方案放在第三方 Expansion。Config 的 JSON/`.bytes` 共用一个输出目录，Localization 也共用一个输出目录，两类模块的输出目录必须分开。生成命名空间留空时，配置行和 Codec 生成到全局命名空间。Runtime 仍兼容读取无 CRC 的 URFL v1。独立验收场景位于 `Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance`，固定源数据位于 `Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline`；测试只使用 `Acceptance_*` 数据，不依赖 Samples/Demo。Demo 的 `Demo_*` 源文件、生成代码和运行时产物分别位于 `Samples/Demo/ConfigSource`、`Samples/Demo/Generated`、`Samples/Demo/GameAssets/Resources`。可通过 `UnityRFramework/Tests` 下的菜单导出测试数据、重建场景、运行 Play Mode 验收或构建包含 Test Assemblies 的专用 Player。
 

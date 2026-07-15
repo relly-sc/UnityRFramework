@@ -20,6 +20,8 @@ namespace UnityRFramework.Tests
 
         private const string ConfigPath =
             "ConfigPipelineAcceptance/Config/Binary/Acceptance_Action.bytes";
+        private const string JsonConfigPath =
+            "ConfigPipelineAcceptance/Config/Json/Acceptance_Action.json";
         private const string EnglishPath =
             "ConfigPipelineAcceptance/Localization/Binary/en.bytes";
 
@@ -59,8 +61,12 @@ namespace UnityRFramework.Tests
             Require(
                 BinaryConfigCodecRegistry.TryGet(typeof(Acceptance_ActionConfig), out _),
                 "Generated Config codec was not registered before scene startup.");
+            Require(
+                ConfigSchemaRegistry.TryGet(typeof(Acceptance_ActionConfig), out _),
+                "Generated Config schema was not registered before scene startup.");
 
             await VerifyConfigAsync(config, resource);
+            await VerifyJsonConfigAsync(resource);
             await VerifyLocalizationAsync(localization, resource);
         }
 
@@ -140,6 +146,24 @@ namespace UnityRFramework.Tests
             Require(
                 localization.GetString("acceptance_title") == "Config Pipeline Acceptance",
                 "Language reload failed.");
+        }
+
+        private static async Task VerifyJsonConfigAsync(ResourceComponent resource)
+        {
+            byte[] bytes = await LoadBytesAsync(resource, JsonConfigPath);
+            GameObject owner = new GameObject("JSON Config Acceptance Helper");
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                object table = helper.ParseConfig(typeof(Acceptance_ActionConfig), bytes);
+                Acceptance_ActionConfig row =
+                    helper.GetConfig<Acceptance_ActionConfig>(table, 1);
+                Require(row?.NameKey == "acceptance_attack", "JSON Config query mismatch.");
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(owner);
+            }
         }
 
         private static async Task<byte[]> LoadBytesAsync(

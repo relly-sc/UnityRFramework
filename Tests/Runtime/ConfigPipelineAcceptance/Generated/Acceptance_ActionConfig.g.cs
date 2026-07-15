@@ -86,6 +86,7 @@ namespace UnityRFramework.Tests.Config
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void RegisterRuntime()
         {
+            ConfigSchemaRegistry.Register(typeof(Acceptance_ActionConfig), 0xAA6DA36Bu, 0x3295B1DE6344398FUL);
             BinaryConfigCodecRegistry.Register(new Acceptance_ActionConfigBinaryCodec());
         }
 
