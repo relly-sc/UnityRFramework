@@ -110,6 +110,11 @@ namespace UnityRFramework.Editor
                 }
             }
 
+            if (GUILayout.Button("分析体积/导出耗时", GUILayout.Height(26f)))
+            {
+                Execute(() => ConfigPipelineService.Analyze(options));
+            }
+
             EditorGUILayout.Space(10f);
             EditorGUILayout.LabelField("结果", EditorStyles.boldLabel);
             scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);

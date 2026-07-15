@@ -260,6 +260,11 @@ JSON 与 URFC v2 均支持显式历史 Schema 迁移。二进制实现 `IBinaryC
 “共用一个输出目录”指共用一个可选择的根目录；工具会自动生成 `Json/` 和
 `Binary/` 子目录，避免 `Resources.Load` 无法区分同名 `.json`/`.bytes`。
 
+配置表工具提供“分析体积/导出耗时”按钮，只在内存中生成各格式并报告 JSON、URFC、
+URFM、URFL、URLM 大小、Deflate 估算和耗时，不写入资源。默认实现只保证无明显重复复制
+和查询分配，不内置压缩、字符串池、变长整数或差量协议；需要极限性能时应在 Expansion
+中接入 Luban、MemoryPack 或项目专用 Helper。
+
 Config 复杂字段第一批支持内联枚举、基础类型一维数组和 `List<T>`。类型示例为
 `enum<Idle=0|Run=1>`、`int[]`、`List<string>`；集合值使用 `|` 分隔，`\|` 表示
 普通竖线。字符串支持 `\n`、`\r`、`\t`、`\\`，CSV 引号字段中的真实换行也会保留。

@@ -92,6 +92,10 @@ namespace UnityRFramework.Editor.Tests
                 Assert.AreEqual(12.5f, first.Price);
                 Assert.AreEqual("Shield", second.Name);
                 Assert.AreEqual(20f, second.Price);
+                Assert.AreSame(
+                    helper.GetAllConfigs<TestConfigRow>(table),
+                    helper.GetAllConfigs<TestConfigRow>(table),
+                    "GetAllConfigs should reuse the table snapshot.");
             }
             finally
             {
@@ -400,6 +404,35 @@ namespace UnityRFramework.Editor.Tests
             {
                 Object.DestroyImmediate(owner);
             }
+        }
+
+        /// <summary>验证体积分析只生成报告且覆盖全部默认格式。</summary>
+        [Test]
+        public void ConfigPipelineAnalysisReportsAllFormats()
+        {
+            ConfigPipelineReport report = ConfigPipelineService.Analyze(
+                new ConfigPipelineOptions
+                {
+                    ConfigSourceDirectory =
+                        "Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline/"
+                        + "ConfigSource/Config",
+                    LocalizationSourceDirectory =
+                        "Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline/"
+                        + "ConfigSource/Localization",
+                    GeneratedCodeDirectory = "Assets/Temp/ConfigPipelineAnalysis/Generated",
+                    ConfigOutputDirectory = "Assets/Temp/ConfigPipelineAnalysis/Config",
+                    LocalizationOutputDirectory =
+                        "Assets/Temp/ConfigPipelineAnalysis/Localization",
+                    GeneratedNamespace = "UnityRFramework.Tests.Config"
+                });
+
+            string text = string.Join("\n", report.Messages);
+            StringAssert.Contains("URFC", text);
+            StringAssert.Contains("URFM", text);
+            StringAssert.Contains("URFL", text);
+            StringAssert.Contains("URLM", text);
+            StringAssert.Contains("Recommendation", text);
+            Assert.AreEqual(0, report.WrittenFileCount);
         }
 
         /// <summary>验证 URFL v2 导出结果可由 Runtime Helper 回读。</summary>

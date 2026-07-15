@@ -30,6 +30,13 @@ namespace UnityRFramework.Editor
             Debug.Log(string.Join("\n", report.Messages));
         }
 
+        [MenuItem("UnityRFramework/Tests/Analyze ConfigPipeline Acceptance Data")]
+        public static void AnalyzeData()
+        {
+            ConfigPipelineReport report = ConfigPipelineService.Analyze(CreateOptions());
+            Debug.Log(string.Join("\n", report.Messages));
+        }
+
         [MenuItem("UnityRFramework/Tests/Rebuild ConfigPipeline Acceptance Scene")]
         public static void RebuildScene()
         {

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using RFramework;
 
 namespace UnityRFramework.Runtime
@@ -14,6 +15,9 @@ namespace UnityRFramework.Runtime
     /// </summary>
     public abstract class DictionaryConfigHelperBase : ConfigHelperBase
     {
+        private readonly ConditionalWeakTable<object, object> rowSnapshots =
+            new ConditionalWeakTable<object, object>();
+
         /// <inheritdoc/>
         public override Type GetTableType(Type rowType)
         {
@@ -61,7 +65,16 @@ namespace UnityRFramework.Runtime
         {
             if (parsedTable is Dictionary<int, T> dict)
             {
-                return new List<T>(dict.Values).AsReadOnly();
+                if (rowSnapshots.TryGetValue(parsedTable, out object cached)
+                    && cached is IReadOnlyList<T> rows)
+                {
+                    return rows;
+                }
+
+                IReadOnlyList<T> snapshot = new List<T>(dict.Values).AsReadOnly();
+                rowSnapshots.Remove(parsedTable);
+                rowSnapshots.Add(parsedTable, snapshot);
+                return snapshot;
             }
 
             return Array.Empty<T>();
@@ -70,6 +83,11 @@ namespace UnityRFramework.Runtime
         /// <inheritdoc/>
         public override void ReleaseConfig(object parsedTable)
         {
+            if (parsedTable != null)
+            {
+                rowSnapshots.Remove(parsedTable);
+            }
+
             if (parsedTable is IDictionary dict)
             {
                 dict.Clear();

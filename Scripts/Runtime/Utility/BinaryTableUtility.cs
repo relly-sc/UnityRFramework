@@ -113,10 +113,8 @@ namespace UnityRFramework.Runtime
                                 $"No Config Schema is registered for TableId '{tableId:X8}'.");
                         }
 
-                        object segmentTable = ReadGeneratedConfigTable(
-                            schema.RowType,
-                            BuildGeneratedConfigBytes(
-                                tableId, schemaHash, rowCount, checksum, body));
+                        object segmentTable = ReadGeneratedConfigBody(
+                            schema.RowType, tableId, schemaHash, rowCount, body);
                         MergeConfigSegment(result, schema.RowType, segmentName, segmentTable);
                     }
 
@@ -136,25 +134,6 @@ namespace UnityRFramework.Runtime
             {
                 throw new RFrameworkException(
                     "Binary config bundle is truncated or malformed.", ex);
-            }
-        }
-
-        private static byte[] BuildGeneratedConfigBytes(
-            uint tableId, ulong schemaHash, int rowCount, uint checksum, byte[] body)
-        {
-            using (MemoryStream stream = new MemoryStream())
-            using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8, true))
-            {
-                writer.Write(ConfigMagic);
-                writer.Write(BinaryFormatUtility.ConfigGeneratedVersion);
-                writer.Write(tableId);
-                writer.Write(schemaHash);
-                writer.Write(rowCount);
-                writer.Write(body.Length);
-                writer.Write(checksum);
-                writer.Write(body);
-                writer.Flush();
-                return stream.ToArray();
             }
         }
 
@@ -247,43 +226,8 @@ namespace UnityRFramework.Runtime
                             + $"Expected '{expectedChecksum:X8}', actual '{actualChecksum:X8}'.");
                     }
 
-                    if (!BinaryConfigCodecRegistry.TryGet(rowType, out IBinaryConfigCodec codec))
-                    {
-                        throw new RFrameworkException(
-                            $"No URFC v2 codec is registered for '{rowType.FullName}'. "
-                            + "Generate the config codec before loading this table.");
-                    }
-
-                    if (codec.TableId != tableId)
-                    {
-                        throw new RFrameworkException(
-                            $"Binary config table id mismatch for '{rowType.Name}'. "
-                            + $"File '{tableId:X8}', codec '{codec.TableId:X8}'.");
-                    }
-
-                    using (MemoryStream bodyStream = new MemoryStream(body, false))
-                    using (BinaryReader bodyReader = new BinaryReader(bodyStream, Encoding.UTF8, false))
-                    {
-                        object table;
-                        if (codec.SchemaHash == schemaHash)
-                        {
-                            table = codec.ReadTable(bodyReader, rowCount);
-                        }
-                        else
-                        {
-                            table = ReadAndMigrateTable(
-                                rowType, schemaHash, codec, bodyReader, rowCount);
-                        }
-
-                        if (table == null)
-                        {
-                            throw new RFrameworkException(
-                                $"Binary config codec for '{rowType.Name}' returned null.");
-                        }
-
-                        EnsureFullyConsumed(bodyStream, "config body");
-                        return table;
-                    }
+                    return ReadGeneratedConfigBody(
+                        rowType, tableId, schemaHash, rowCount, body);
                 }
             }
             catch (RFrameworkException)
@@ -297,6 +241,42 @@ namespace UnityRFramework.Runtime
             {
                 throw new RFrameworkException(
                     $"Generated binary config '{rowType.Name}' is truncated or malformed.", ex);
+            }
+        }
+
+        private static object ReadGeneratedConfigBody(
+            Type rowType, uint tableId, ulong schemaHash, int rowCount, byte[] body)
+        {
+            if (!BinaryConfigCodecRegistry.TryGet(rowType, out IBinaryConfigCodec codec))
+            {
+                throw new RFrameworkException(
+                    $"No URFC v2 codec is registered for '{rowType.FullName}'. "
+                    + "Generate the config codec before loading this table.");
+            }
+
+            if (codec.TableId != tableId)
+            {
+                throw new RFrameworkException(
+                    $"Binary config table id mismatch for '{rowType.Name}'. "
+                    + $"File '{tableId:X8}', codec '{codec.TableId:X8}'.");
+            }
+
+            using (MemoryStream bodyStream = new MemoryStream(body, false))
+            using (BinaryReader bodyReader = new BinaryReader(
+                bodyStream, Encoding.UTF8, false))
+            {
+                object table = codec.SchemaHash == schemaHash
+                    ? codec.ReadTable(bodyReader, rowCount)
+                    : ReadAndMigrateTable(
+                        rowType, schemaHash, codec, bodyReader, rowCount);
+                if (table == null)
+                {
+                    throw new RFrameworkException(
+                        $"Binary config codec for '{rowType.Name}' returned null.");
+                }
+
+                EnsureFullyConsumed(bodyStream, "config body");
+                return table;
             }
         }
 
@@ -585,9 +565,8 @@ namespace UnityRFramework.Runtime
                                 + "checksum mismatch.");
                         }
 
-                        result.Add(language, ReadLocalization(
-                            language,
-                            BuildLocalizationBytes(entryCount, checksum, body)));
+                        result.Add(language,
+                            ReadLocalizationBody(language, entryCount, body));
                     }
 
                     EnsureFullyConsumed(stream, "localization bundle");
@@ -608,20 +587,16 @@ namespace UnityRFramework.Runtime
             }
         }
 
-        private static byte[] BuildLocalizationBytes(
-            int entryCount, uint checksum, byte[] body)
+        private static Dictionary<string, string> ReadLocalizationBody(
+            string language, int entryCount, byte[] body)
         {
-            using (MemoryStream stream = new MemoryStream())
-            using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8, true))
+            using (MemoryStream stream = new MemoryStream(body, false))
+            using (BinaryReader reader = new BinaryReader(stream, Encoding.UTF8, false))
             {
-                writer.Write(LocalizationMagic);
-                writer.Write(BinaryFormatUtility.LocalizationVersion);
-                writer.Write(entryCount);
-                writer.Write(body.Length);
-                writer.Write(checksum);
-                writer.Write(body);
-                writer.Flush();
-                return stream.ToArray();
+                Dictionary<string, string> result = ReadLocalizationEntries(
+                    language, reader, entryCount);
+                EnsureFullyConsumed(stream, "localization body");
+                return result;
             }
         }
 

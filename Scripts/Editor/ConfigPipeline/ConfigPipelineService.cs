@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Diagnostics;
+using System.IO.Compression;
 using RFramework;
 using UnityEditor;
 using UnityEngine;
@@ -37,6 +39,80 @@ namespace UnityRFramework.Editor
             ParseLocalizations(options, report);
             report.AddMessage($"Validation passed. {report.ProcessedFileCount} CSV file(s).");
             return report;
+        }
+
+        /// <summary>
+        /// 在内存中生成全部格式并报告体积、压缩估算和导出耗时，不写入文件。
+        /// </summary>
+        public static ConfigPipelineReport Analyze(ConfigPipelineOptions options)
+        {
+            ValidateOptions(options, true, true);
+            ConfigPipelineReport report = new ConfigPipelineReport();
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            List<ConfigTableSchema> configs = ParseConfigSchemas(options, report);
+            List<LocalizationTable> localizations = ParseLocalizations(options, report);
+
+            long sourceBytes = configs.Sum(schema => new FileInfo(schema.SourcePath).Length)
+                + localizations.Sum(table => new FileInfo(table.SourcePath).Length);
+            long configJsonBytes = configs.Sum(schema =>
+                (long)Encoding.UTF8.GetByteCount(ConfigJsonExporter.Build(schema)));
+            long configBinaryBytes = configs.Sum(schema =>
+                (long)ConfigBinaryExporter.BuildV2(schema).Length);
+            byte[] configBundle = ConfigBinaryExporter.BuildBundle(configs);
+            long localizationJsonBytes = localizations.Sum(table =>
+                (long)Encoding.UTF8.GetByteCount(LocalizationJsonExporter.Build(table)));
+            long localizationBinaryBytes = localizations.Sum(table =>
+                (long)LocalizationBinaryExporter.BuildV2(table).Length);
+            byte[] localizationBundle = LocalizationBinaryExporter.BuildBundle(localizations);
+            stopwatch.Stop();
+
+            report.AddMessage("ConfigPipeline analysis (no files written)");
+            report.AddMessage($"Source CSV: {sourceBytes} bytes");
+            report.AddMessage(
+                $"Config singles: JSON {configJsonBytes} bytes, URFC {configBinaryBytes} bytes "
+                + $"({FormatRatio(configBinaryBytes, configJsonBytes)})");
+            report.AddMessage(
+                $"Config bundle: URFM {configBundle.Length} bytes, Deflate estimate "
+                + $"{EstimateDeflateLength(configBundle)} bytes");
+            report.AddMessage(
+                $"Localization singles: JSON {localizationJsonBytes} bytes, URFL "
+                + $"{localizationBinaryBytes} bytes "
+                + $"({FormatRatio(localizationBinaryBytes, localizationJsonBytes)})");
+            report.AddMessage(
+                $"Localization bundle: URLM {localizationBundle.Length} bytes, Deflate estimate "
+                + $"{EstimateDeflateLength(localizationBundle)} bytes");
+            report.AddMessage($"In-memory export time: {stopwatch.Elapsed.TotalMilliseconds:F2} ms");
+
+            long binaryTotal = configBundle.Length + localizationBundle.Length;
+            int compressedTotal = EstimateDeflateLength(configBundle)
+                + EstimateDeflateLength(localizationBundle);
+            double saving = binaryTotal == 0
+                ? 0d
+                : 1d - (double)compressedTotal / binaryTotal;
+            report.AddMessage(binaryTotal < 64 * 1024 || saving < 0.15d
+                ? "Recommendation: keep current protocols; compression overhead is not justified yet."
+                : $"Recommendation: optional container compression is measurable "
+                    + $"({saving:P1} estimated saving); benchmark load CPU before a protocol upgrade.");
+            return report;
+        }
+
+        private static string FormatRatio(long value, long baseline)
+        {
+            return baseline <= 0 ? "n/a" : $"{(double)value / baseline:P1} of JSON";
+        }
+
+        private static int EstimateDeflateLength(byte[] bytes)
+        {
+            using (MemoryStream output = new MemoryStream())
+            {
+                using (DeflateStream stream = new DeflateStream(
+                    output, System.IO.Compression.CompressionLevel.Optimal, true))
+                {
+                    stream.Write(bytes, 0, bytes.Length);
+                }
+
+                return checked((int)output.Length);
+            }
         }
 
         /// <summary>
