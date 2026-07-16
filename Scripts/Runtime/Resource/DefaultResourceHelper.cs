@@ -19,7 +19,14 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 已加载资源路径 → 对象引用映射，用于 ReleaseAsset 释放。
         /// </summary>
-        private readonly Dictionary<AssetHandleKey, Object> loadedAssets =
+        private readonly Dictionary<AssetHandleKey, object> loadedAssets =
+            new Dictionary<AssetHandleKey, object>();
+
+        /// <summary>
+        /// 请求键对应的底层 Unity 资源。byte[] 和 string 请求实际由 TextAsset 提供，
+        /// 释放时必须归还这个底层对象而不是转换后的托管值。
+        /// </summary>
+        private readonly Dictionary<AssetHandleKey, Object> sourceAssets =
             new Dictionary<AssetHandleKey, Object>();
 
         /// <summary>
@@ -70,6 +77,7 @@ namespace UnityRFramework.Runtime
         {
             // Resources 模式无需初始化
             loadedAssets.Clear();
+            sourceAssets.Clear();
             assetReferenceCounts.Clear();
             loadedScenes.Clear();
             return Task.CompletedTask;
@@ -89,6 +97,7 @@ namespace UnityRFramework.Runtime
             }
 
             loadedAssets.Clear();
+            sourceAssets.Clear();
             assetReferenceCounts.Clear();
             loadedScenes.Clear();
         }
@@ -120,28 +129,47 @@ namespace UnityRFramework.Runtime
             AssetHandleKey key = new AssetHandleKey(path, assetType ?? typeof(Object));
 
             // 检查缓存
-            if (loadedAssets.TryGetValue(key, out Object cached) && cached != null)
+            if (loadedAssets.TryGetValue(key, out object cached) && cached != null)
             {
                 return cached;
             }
 
-            Object asset = Resources.Load(path, assetType ?? typeof(Object));
-            if (asset == null)
+            Type requestedType = assetType ?? typeof(Object);
+            Type resourcesType = requestedType == typeof(byte[]) || requestedType == typeof(string)
+                ? typeof(TextAsset)
+                : requestedType;
+            Object sourceAsset = Resources.Load(path, resourcesType);
+            if (sourceAsset == null)
             {
                 Log.Warning("DefaultResourceHelper: resource '{0}' not found in Resources.", path);
                 return null;
             }
 
-            loadedAssets[key] = asset;
-            if (assetReferenceCounts.TryGetValue(asset, out int referenceCount))
+            object result;
+            if (requestedType == typeof(byte[]))
             {
-                assetReferenceCounts[asset] = referenceCount + 1;
+                result = ((TextAsset)sourceAsset).bytes;
+            }
+            else if (requestedType == typeof(string))
+            {
+                result = ((TextAsset)sourceAsset).text;
             }
             else
             {
-                assetReferenceCounts.Add(asset, 1);
+                result = sourceAsset;
             }
-            return asset;
+
+            loadedAssets[key] = result;
+            sourceAssets[key] = sourceAsset;
+            if (assetReferenceCounts.TryGetValue(sourceAsset, out int referenceCount))
+            {
+                assetReferenceCounts[sourceAsset] = referenceCount + 1;
+            }
+            else
+            {
+                assetReferenceCounts.Add(sourceAsset, 1);
+            }
+            return result;
         }
 
         /// <inheritdoc/>
@@ -154,9 +182,15 @@ namespace UnityRFramework.Runtime
 
             string path = location.StripExtension();
             AssetHandleKey key = new AssetHandleKey(path, assetType ?? typeof(Object));
-            if (loadedAssets.TryGetValue(key, out Object asset))
+            if (loadedAssets.ContainsKey(key))
             {
                 loadedAssets.Remove(key);
+                if (!sourceAssets.TryGetValue(key, out Object asset))
+                {
+                    return;
+                }
+
+                sourceAssets.Remove(key);
 
                 if (assetReferenceCounts.TryGetValue(asset, out int referenceCount))
                 {

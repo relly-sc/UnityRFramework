@@ -12,8 +12,9 @@ namespace UnityRFramework.Runtime
     /// <summary>
     /// 资源模块 Unity 组件。
     /// 负责 Inspector 配置注入（PlayMode、Server URL）并转发调用到 ResourceModule。
-    /// 默认使用基于 Unity Resources API 的 DefaultResourceHelper，
-    /// 可在 Inspector 或启动流程中替换为 YooAsset 等实现。
+    /// 默认使用基于 Unity Resources API 的 DefaultResourceHelper；也可切换到
+    /// LocalFileResourceHelper，按 persistentDataPath、StreamingAssets、Resources 的顺序
+    /// 加载可替换文件，或在 Expansion 中接入 YooAsset 等实现。
     /// </summary>
     [AddComponentMenu("UnityRFramework/Resource Component")]
     public sealed class ResourceComponent : UnityRFrameworkComponent
@@ -21,7 +22,7 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 资源辅助器类型全名。
         /// 必须是继承自 <see cref="ResourceHelperBase"/> 的 MonoBehaviour 类型。
-        /// 默认为基于 Resources.Load 的 DefaultResourceHelper，
+        /// 默认为基于 Resources.Load 的 DefaultResourceHelper，也可选择内置 LocalFileResourceHelper，
         /// 也可在启动流程中通过 SetHelper 方法运行时替换。
         /// </summary>
         [SerializeField]
@@ -49,6 +50,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private IResourceModule resourceModule;
 
+        /// <summary>
+        /// 当前资源辅助器，用于访问 URL 解析等可选扩展能力。
+        /// </summary>
+        private IResourceHelper resourceHelper;
+
         protected override void Awake()
         {
             base.Awake();
@@ -60,6 +66,7 @@ namespace UnityRFramework.Runtime
             {
                 helper.name = $"{helper.GetType().Name} (Resource Helper)";
                 helper.transform.SetParent(transform);
+                resourceHelper = helper;
                 resourceModule.SetHelper(helper);
             }
             else
@@ -88,6 +95,7 @@ namespace UnityRFramework.Runtime
                 throw new RFrameworkException("ResourceComponent: helper is invalid.");
             }
 
+            resourceHelper = helper;
             resourceModule.SetHelper(helper);
         }
 
@@ -103,7 +111,7 @@ namespace UnityRFramework.Runtime
         /// 异步加载资源
         /// </summary>
         public Task<T> LoadAssetAsync<T>(string location, uint priority = 0, CancellationToken ct = default)
-            where T : Object
+            where T : class
         {
             return resourceModule.LoadAssetAsync<T>(location, priority, ct);
         }
@@ -111,7 +119,7 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 同步加载资源
         /// </summary>
-        public T LoadAssetSync<T>(string location) where T : Object
+        public T LoadAssetSync<T>(string location) where T : class
         {
             return resourceModule.LoadAssetSync<T>(location);
         }
@@ -139,6 +147,15 @@ namespace UnityRFramework.Runtime
         /// 卸载资源
         /// </summary>
         public void UnloadAsset(Object asset)
+        {
+            resourceModule.UnloadAsset(asset);
+        }
+
+        /// <summary>
+        /// 卸载非 UnityEngine.Object 资源，例如 byte[] 或 string。
+        /// </summary>
+        /// <param name="asset">资源模块返回的资源对象。</param>
+        public void UnloadAsset(object asset)
         {
             resourceModule.UnloadAsset(asset);
         }
@@ -173,6 +190,23 @@ namespace UnityRFramework.Runtime
         public long GetDownloadSize(string location)
         {
             return resourceModule.GetDownloadSize(location);
+        }
+
+        /// <summary>
+        /// 获取资源的物理路径或 URL，可直接赋给 VideoPlayer.url 等 URL 消费方。
+        /// 当前资源辅助器必须实现 IResourceUrlProvider。
+        /// </summary>
+        /// <param name="location">资源辅助器可识别的逻辑位置。</param>
+        /// <returns>目标平台可访问的文件路径或 URL。</returns>
+        public string GetAssetUrl(string location)
+        {
+            if (!(resourceHelper is IResourceUrlProvider provider))
+            {
+                throw new RFrameworkException(
+                    $"Resource helper '{resourceHelper?.GetType().FullName}' does not provide asset URLs.");
+            }
+
+            return provider.GetAssetUrl(location);
         }
     }
 }

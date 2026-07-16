@@ -8,7 +8,7 @@ using UnityEngine;
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// 本地化 Runtime 组件。通过 ResourceComponent 加载每语言一个 TextAsset，
+    /// 本地化 Runtime 组件。通过 ResourceComponent 加载每语言文件的原始字节，
     /// 再交给 ILocalizationHelper 解析并缓存到 Library 模块。
     /// </summary>
     [AddComponentMenu("UnityRFramework/Localization")]
@@ -183,8 +183,8 @@ namespace UnityRFramework.Runtime
             }
 
             await resource.InitializeAsync();
-            TextAsset textAsset = await resource.LoadAssetAsync<TextAsset>(assetPath, 0, ct);
-            if (textAsset == null)
+            byte[] bytes = await resource.LoadAssetAsync<byte[]>(assetPath, 0, ct);
+            if (bytes == null)
             {
                 throw new RFrameworkException(
                     $"LocalizationComponent: Failed to load language bundle '{assetPath}'.");
@@ -192,11 +192,11 @@ namespace UnityRFramework.Runtime
 
             try
             {
-                localizationModule.LoadLanguageBundle(textAsset.bytes);
+                localizationModule.LoadLanguageBundle(bytes);
             }
             finally
             {
-                resource.UnloadAsset<TextAsset>(assetPath);
+                resource.UnloadAsset<byte[]>(assetPath);
             }
         }
 
@@ -308,8 +308,8 @@ namespace UnityRFramework.Runtime
             await resource.InitializeAsync();
             ct.ThrowIfCancellationRequested();
 
-            TextAsset textAsset = await resource.LoadAssetAsync<TextAsset>(location, 0, ct);
-            if (textAsset == null)
+            byte[] bytes = await resource.LoadAssetAsync<byte[]>(location, 0, ct);
+            if (bytes == null)
             {
                 throw new RFrameworkException(
                     $"LocalizationComponent: Failed to load language asset '{location}'.");
@@ -317,11 +317,11 @@ namespace UnityRFramework.Runtime
 
             try
             {
-                localizationModule.LoadLanguage(language, textAsset.bytes);
+                localizationModule.LoadLanguage(language, bytes);
             }
             finally
             {
-                resource.UnloadAsset<TextAsset>(location);
+                resource.UnloadAsset<byte[]>(location);
             }
         }
 

@@ -379,7 +379,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9942c48f0d5cba646ad202102f05fc2e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  resourceHelperTypeName: UnityRFramework.Runtime.DefaultResourceHelper
+  resourceHelperTypeName: UnityRFramework.Runtime.LocalFileResourceHelper
   playMode: 0
   packageName: DefaultPackage
   defaultHostServer: 
@@ -475,6 +475,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   localizationHelperTypeName: UnityRFramework.Runtime.JsonLocalizationHelper
   defaultLanguage: zh-CN
+  loadDefaultLanguageOnStart: 1
 --- !u!1 &7740000000000000001
 GameObject:
   m_ObjectHideFlags: 0

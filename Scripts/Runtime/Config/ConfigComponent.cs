@@ -84,7 +84,7 @@ namespace UnityRFramework.Runtime
 
         /// <summary>
         /// 异步加载配置表。
-        /// 通过 ResourceComponent 加载 TextAsset 字节数据，再调用 ConfigModule 解析并缓存。
+        /// 通过 ResourceComponent 加载原始字节，再调用 ConfigModule 解析并缓存。
         /// JsonConfigHelper 按 UTF-8 JSON 解析，BinaryConfigHelper 按 URFC v1/v2 解析；
         /// 自定义 Helper 可定义自己的字节格式。
         /// </summary>
@@ -107,8 +107,8 @@ namespace UnityRFramework.Runtime
             }
 
             await resource.InitializeAsync();
-            TextAsset textAsset = await resource.LoadAssetAsync<TextAsset>(assetPath, 0, ct);
-            if (textAsset == null)
+            byte[] bytes = await resource.LoadAssetAsync<byte[]>(assetPath, 0, ct);
+            if (bytes == null)
             {
                 throw new RFrameworkException(
                     $"ConfigComponent: Failed to load config asset '{assetPath}'.");
@@ -116,11 +116,11 @@ namespace UnityRFramework.Runtime
 
             try
             {
-                configModule.LoadConfig<T>(textAsset.bytes);
+                configModule.LoadConfig<T>(bytes);
             }
             finally
             {
-                resource.UnloadAsset<TextAsset>(assetPath);
+                resource.UnloadAsset<byte[]>(assetPath);
             }
         }
 
@@ -152,8 +152,8 @@ namespace UnityRFramework.Runtime
             }
 
             await resource.InitializeAsync();
-            TextAsset textAsset = await resource.LoadAssetAsync<TextAsset>(assetPath, 0, ct);
-            if (textAsset == null)
+            byte[] bytes = await resource.LoadAssetAsync<byte[]>(assetPath, 0, ct);
+            if (bytes == null)
             {
                 throw new RFrameworkException(
                     $"ConfigComponent: Failed to load config bundle '{assetPath}'.");
@@ -161,11 +161,11 @@ namespace UnityRFramework.Runtime
 
             try
             {
-                configModule.LoadConfigBundle(textAsset.bytes);
+                configModule.LoadConfigBundle(bytes);
             }
             finally
             {
-                resource.UnloadAsset<TextAsset>(assetPath);
+                resource.UnloadAsset<byte[]>(assetPath);
             }
         }
 
