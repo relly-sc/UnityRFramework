@@ -438,8 +438,9 @@ GameEntry.Event.Subscribe<NetworkConnectedEvent>(e =>
 ### Localization
 
 ```csharp
-// 默认从 Resources/Localization/Json/{language}.json 加载 Key/Value 项
-// Inspector 未指定语言时使用 zh-CN，并在 Start 时异步加载
+// JsonLocalizationHelper 默认使用 Localization/Json/{language}.json
+// BinaryLocalizationHelper 默认使用 Localization/Binary/{language}.bytes
+// Inspector 未指定语言时使用 zh-CN，并可在 Start 时异步加载
 
 // 查询文本
 var text = GameEntry.Localization.GetString("ui_login_button");
@@ -450,7 +451,14 @@ var welcome = GameEntry.Localization.GetString("ui_welcome", playerName);
 // 切换语言
 await GameEntry.Localization.SwitchLanguageAsync("en-US");
 
-// 二进制语言包：Inspector 选择 BinaryLocalizationHelper，并将扩展名设为 .bytes
+// 非标准目录、YooAsset 地址或自定义 location 显式传入，不由组件拼接
+await GameEntry.Localization.SwitchLanguageAsync(
+    "en-US", "Localization/English");
+
+// 二进制语言：Inspector 选择 BinaryLocalizationHelper 即使用内置二进制位置约定
+
+// 自定义 Helper 实现 ILocalizationLocationProvider 后也支持自动推导 location；
+// 未实现时关闭自动加载，并使用上面的显式 location 重载
 
 // 多语言容器只负责批量预载，不自动切换当前语言
 await GameEntry.Localization.LoadLanguageBundleAsync(

@@ -62,16 +62,14 @@ namespace UnityRFramework.Editor
 
         private SerializedProperty localizationHelperTypeName;
         private SerializedProperty defaultLanguage;
-        private SerializedProperty languageAssetRoot;
-        private SerializedProperty languageFileExtension;
+        private SerializedProperty loadDefaultLanguageOnStart;
         private bool useCustomLanguage;
 
         private void OnEnable()
         {
             localizationHelperTypeName = serializedObject.FindProperty("localizationHelperTypeName");
             defaultLanguage = serializedObject.FindProperty("defaultLanguage");
-            languageAssetRoot = serializedObject.FindProperty("languageAssetRoot");
-            languageFileExtension = serializedObject.FindProperty("languageFileExtension");
+            loadDefaultLanguageOnStart = serializedObject.FindProperty("loadDefaultLanguageOnStart");
             useCustomLanguage = FindLanguageIndex(defaultLanguage.stringValue) < 0;
         }
 
@@ -86,12 +84,9 @@ namespace UnityRFramework.Editor
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
             DrawDefaultLanguage();
-            EditorGUILayout.PropertyField(languageAssetRoot, new GUIContent(
-                "Language Asset Root",
-                "语言文件根路径。DefaultResourceHelper 下对应 Resources 内的相对路径。"));
-            EditorGUILayout.PropertyField(languageFileExtension, new GUIContent(
-                "Language File Extension",
-                "JsonLocalizationHelper 使用 .json；BinaryLocalizationHelper 使用 .bytes。"));
+            EditorGUILayout.PropertyField(loadDefaultLanguageOnStart, new GUIContent(
+                "Load Default Language On Start",
+                "启用时按内置位置约定自动加载默认语言。关闭后可由启动流程传入 YooAsset 地址或自定义 location。"));
 
             serializedObject.ApplyModifiedProperties();
         }

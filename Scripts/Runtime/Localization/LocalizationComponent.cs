@@ -20,12 +20,6 @@ namespace UnityRFramework.Runtime
             "UnityRFramework.Runtime.JsonLocalizationHelper";
         private const string LegacyJsonHelperTypeName =
             "UnityRFramework.Runtime.DefaultLocalizationHelper";
-        private const string BinaryHelperTypeName =
-            "UnityRFramework.Runtime.BinaryLocalizationHelper";
-        private const string LegacyAssetRoot = "Localization";
-        private const string JsonAssetRoot = "Localization/Json";
-        private const string BinaryAssetRoot = "Localization/Binary";
-
         [SerializeField]
         [Tooltip("本地化解析辅助器类型。默认按 UTF-8 JSON 解析。")]
         private string localizationHelperTypeName = JsonHelperTypeName;
@@ -35,17 +29,15 @@ namespace UnityRFramework.Runtime
         private string defaultLanguage = "zh-CN";
 
         [SerializeField]
-        [Tooltip("语言文件根路径。JSON 默认对应 Resources/Localization/Json。")]
-        private string languageAssetRoot = "Localization/Json";
+        [Tooltip("是否在 Start 时使用内置位置约定自动加载并切换默认语言。")]
+        private bool loadDefaultLanguageOnStart = true;
 
-        [SerializeField]
-        [Tooltip("语言文件扩展名。JSON 使用 .json，BinaryLocalizationHelper 使用 .bytes。")]
-        private string languageFileExtension = ".json";
-
-        private readonly Dictionary<string, Task> pendingLanguageLoads = new Dictionary<string, Task>();
+        private readonly Dictionary<LanguageLoadKey, Task> pendingLanguageLoads =
+            new Dictionary<LanguageLoadKey, Task>();
         private readonly SemaphoreSlim switchSemaphore = new SemaphoreSlim(1, 1);
 
         private ILocalizationModule localizationModule;
+        private ILocalizationHelper localizationHelper;
         private CancellationTokenSource lifetimeCts;
 
         public string CurrentLanguage => localizationModule?.CurrentLanguage;
@@ -74,14 +66,13 @@ namespace UnityRFramework.Runtime
                 localizationHelperTypeName = JsonHelperTypeName;
             }
 
-            NormalizeBuiltInAssetSettings();
-
             LocalizationHelperBase helper = Helper.CreateHelper<LocalizationHelperBase>(
                 localizationHelperTypeName, null);
             if (helper != null)
             {
                 helper.name = $"{helper.GetType().Name} (Localization Helper)";
                 helper.transform.SetParent(transform);
+                localizationHelper = helper;
                 localizationModule.SetHelper(helper);
             }
             else
@@ -92,38 +83,13 @@ namespace UnityRFramework.Runtime
             }
         }
 
-        private void NormalizeBuiltInAssetSettings()
+        private void Start()
         {
-            bool usesBinary = string.Equals(
-                localizationHelperTypeName, BinaryHelperTypeName, StringComparison.Ordinal);
-            bool usesJson = string.Equals(
-                localizationHelperTypeName, JsonHelperTypeName, StringComparison.Ordinal);
-            if (!usesBinary && !usesJson)
+            if (!loadDefaultLanguageOnStart)
             {
                 return;
             }
 
-            string normalizedRoot = (languageAssetRoot ?? string.Empty).Trim().Trim('/', '\\');
-            bool usesStandardRoot = string.IsNullOrEmpty(normalizedRoot)
-                || string.Equals(normalizedRoot, LegacyAssetRoot, StringComparison.Ordinal)
-                || string.Equals(normalizedRoot, JsonAssetRoot, StringComparison.Ordinal)
-                || string.Equals(normalizedRoot, BinaryAssetRoot, StringComparison.Ordinal);
-            if (usesStandardRoot)
-            {
-                languageAssetRoot = usesBinary ? BinaryAssetRoot : JsonAssetRoot;
-            }
-
-            string extension = (languageFileExtension ?? string.Empty).Trim();
-            if (string.IsNullOrEmpty(extension)
-                || string.Equals(extension, ".json", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(extension, ".bytes", StringComparison.OrdinalIgnoreCase))
-            {
-                languageFileExtension = usesBinary ? ".bytes" : ".json";
-            }
-        }
-
-        private void Start()
-        {
             string language = string.IsNullOrWhiteSpace(defaultLanguage)
                 ? FallbackLanguage
                 : defaultLanguage.Trim();
@@ -150,6 +116,7 @@ namespace UnityRFramework.Runtime
                 throw new RFrameworkException("LocalizationComponent: helper is invalid.");
             }
 
+            localizationHelper = helper;
             localizationModule.SetHelper(helper);
         }
 
@@ -157,32 +124,36 @@ namespace UnityRFramework.Runtime
         /// 通过 ResourceComponent 加载并解析一个语言文件，不切换当前语言。
         /// 同语言并发加载会共享同一个任务。
         /// </summary>
-        public async Task LoadLanguageAsync(string language)
+        public Task LoadLanguageAsync(
+            string language, CancellationToken ct = default)
+        {
+            return LoadLanguageAsync(language, GetDefaultLanguageLocation(language), ct);
+        }
+
+        /// <summary>
+        /// 通过 ResourceComponent 使用显式资源位置加载语言文件。
+        /// location 由资源辅助器解释，可以是 Resources 路径、YooAsset 地址或自定义标识。
+        /// </summary>
+        public async Task LoadLanguageAsync(
+            string language, string location, CancellationToken ct = default)
         {
             ValidateLanguage(language);
+            ValidateLocation(location);
             if (localizationModule.HasLanguage(language))
             {
                 return;
             }
 
-            if (!pendingLanguageLoads.TryGetValue(language, out Task loadTask))
+            LanguageLoadKey loadKey = new LanguageLoadKey(language, location);
+            if (!pendingLanguageLoads.TryGetValue(loadKey, out Task loadTask))
             {
-                loadTask = LoadLanguageAssetInternalAsync(language, lifetimeCts.Token);
-                pendingLanguageLoads.Add(language, loadTask);
+                loadTask = LoadLanguageAssetInternalAsync(
+                    language, location, lifetimeCts.Token);
+                pendingLanguageLoads.Add(loadKey, loadTask);
+                _ = RemovePendingLoadWhenCompletedAsync(loadKey, loadTask);
             }
 
-            try
-            {
-                await loadTask;
-            }
-            finally
-            {
-                if (pendingLanguageLoads.TryGetValue(language, out Task current)
-                    && ReferenceEquals(current, loadTask))
-                {
-                    pendingLanguageLoads.Remove(language);
-                }
-            }
+            await AwaitWithCancellationAsync(loadTask, ct);
         }
 
         /// <summary>
@@ -238,14 +209,27 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 确保目标语言已加载，然后串行切换当前语言。
         /// </summary>
-        public async Task SwitchLanguageAsync(string language)
+        public Task SwitchLanguageAsync(
+            string language, CancellationToken ct = default)
+        {
+            return SwitchLanguageAsync(language, GetDefaultLanguageLocation(language), ct);
+        }
+
+        /// <summary>
+        /// 使用显式资源位置确保目标语言已加载，然后串行切换当前语言。
+        /// </summary>
+        public async Task SwitchLanguageAsync(
+            string language, string location, CancellationToken ct = default)
         {
             ValidateLanguage(language);
-            CancellationToken token = lifetimeCts.Token;
+            ValidateLocation(location);
+            using CancellationTokenSource linkedCts =
+                CancellationTokenSource.CreateLinkedTokenSource(lifetimeCts.Token, ct);
+            CancellationToken token = linkedCts.Token;
             await switchSemaphore.WaitAsync(token);
             try
             {
-                await LoadLanguageAsync(language);
+                await LoadLanguageAsync(language, location, token);
                 token.ThrowIfCancellationRequested();
                 localizationModule.SwitchLanguage(language);
             }
@@ -288,23 +272,31 @@ namespace UnityRFramework.Runtime
             return localizationModule.HasString(key);
         }
 
-        public string GetLanguageAssetPath(string language)
+        public string GetDefaultLanguageLocation(string language)
         {
             ValidateLanguage(language);
-            string root = (languageAssetRoot ?? string.Empty).Trim().Trim('/', '\\');
-            string extension = string.IsNullOrWhiteSpace(languageFileExtension)
-                ? ".json"
-                : languageFileExtension.Trim();
-            if (!extension.StartsWith(".", StringComparison.Ordinal))
+            if (!(localizationHelper is ILocalizationLocationProvider provider))
             {
-                extension = "." + extension;
+                throw new RFrameworkException(
+                    $"LocalizationComponent: Helper '{localizationHelper?.GetType().FullName}' "
+                    + "does not provide a default language location. Disable automatic "
+                    + "default-language loading and use the overload that accepts an explicit "
+                    + "location, or implement ILocalizationLocationProvider.");
             }
 
-            string fileName = language + extension;
-            return string.IsNullOrEmpty(root) ? fileName : root + "/" + fileName;
+            string location = provider.GetLanguageLocation(language.Trim());
+            ValidateLocation(location);
+            return location;
         }
 
-        private async Task LoadLanguageAssetInternalAsync(string language, CancellationToken ct)
+        [Obsolete("Use GetDefaultLanguageLocation instead.")]
+        public string GetLanguageAssetPath(string language)
+        {
+            return GetDefaultLanguageLocation(language);
+        }
+
+        private async Task LoadLanguageAssetInternalAsync(
+            string language, string location, CancellationToken ct)
         {
             ResourceComponent resource = GameEntry.Resource;
             if (resource == null)
@@ -316,12 +308,11 @@ namespace UnityRFramework.Runtime
             await resource.InitializeAsync();
             ct.ThrowIfCancellationRequested();
 
-            string assetPath = GetLanguageAssetPath(language);
-            TextAsset textAsset = await resource.LoadAssetAsync<TextAsset>(assetPath, 0, ct);
+            TextAsset textAsset = await resource.LoadAssetAsync<TextAsset>(location, 0, ct);
             if (textAsset == null)
             {
                 throw new RFrameworkException(
-                    $"LocalizationComponent: Failed to load language asset '{assetPath}'.");
+                    $"LocalizationComponent: Failed to load language asset '{location}'.");
             }
 
             try
@@ -330,7 +321,47 @@ namespace UnityRFramework.Runtime
             }
             finally
             {
-                resource.UnloadAsset<TextAsset>(assetPath);
+                resource.UnloadAsset<TextAsset>(location);
+            }
+        }
+
+        private static async Task AwaitWithCancellationAsync(
+            Task task, CancellationToken ct)
+        {
+            if (!ct.CanBeCanceled || task.IsCompleted)
+            {
+                await task;
+                return;
+            }
+
+            TaskCompletionSource<bool> cancellation = new TaskCompletionSource<bool>();
+            using (ct.Register(() => cancellation.TrySetResult(true)))
+            {
+                if (!ReferenceEquals(task, await Task.WhenAny(task, cancellation.Task)))
+                {
+                    ct.ThrowIfCancellationRequested();
+                }
+            }
+
+            await task;
+        }
+
+        private async Task RemovePendingLoadWhenCompletedAsync(
+            LanguageLoadKey loadKey, Task loadTask)
+        {
+            try
+            {
+                await loadTask;
+            }
+            catch
+            {
+                // 加载异常由实际等待者观察；此任务只负责移除并发去重记录。
+            }
+
+            if (pendingLanguageLoads.TryGetValue(loadKey, out Task current)
+                && ReferenceEquals(current, loadTask))
+            {
+                pendingLanguageLoads.Remove(loadKey);
             }
         }
 
@@ -356,6 +387,48 @@ namespace UnityRFramework.Runtime
             if (string.IsNullOrWhiteSpace(language))
             {
                 throw new RFrameworkException("LocalizationComponent: language code is invalid.");
+            }
+        }
+
+        private static void ValidateLocation(string location)
+        {
+            if (string.IsNullOrWhiteSpace(location))
+            {
+                throw new RFrameworkException(
+                    "LocalizationComponent: language asset location is invalid.");
+            }
+        }
+
+        private readonly struct LanguageLoadKey : IEquatable<LanguageLoadKey>
+        {
+            public LanguageLoadKey(string language, string location)
+            {
+                Language = language;
+                Location = location;
+            }
+
+            private string Language { get; }
+
+            private string Location { get; }
+
+            public bool Equals(LanguageLoadKey other)
+            {
+                return string.Equals(Language, other.Language, StringComparison.Ordinal)
+                    && string.Equals(Location, other.Location, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is LanguageLoadKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return ((Language != null ? Language.GetHashCode() : 0) * 397)
+                        ^ (Location != null ? Location.GetHashCode() : 0);
+                }
             }
         }
     }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using RFramework;
 
 namespace UnityRFramework.Runtime
 {
@@ -7,8 +8,20 @@ namespace UnityRFramework.Runtime
     /// JSON 字符串入口由 DictionaryLocalizationHelperBase 保留。
     /// </summary>
     public sealed class BinaryLocalizationHelper : DictionaryLocalizationHelperBase,
-        RFramework.ILocalizationBundleHelper
+        ILocalizationBundleHelper, ILocalizationLocationProvider
     {
+        /// <inheritdoc/>
+        public string GetLanguageLocation(string language)
+        {
+            if (string.IsNullOrWhiteSpace(language))
+            {
+                throw new RFrameworkException(
+                    "BinaryLocalizationHelper: language code is invalid.");
+            }
+
+            return $"Localization/Binary/{language.Trim()}.bytes";
+        }
+
         /// <inheritdoc/>
         public override Dictionary<string, string> ParseLanguage(string language, byte[] bytes)
         {

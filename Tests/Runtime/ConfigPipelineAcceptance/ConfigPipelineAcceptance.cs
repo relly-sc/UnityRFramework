@@ -28,6 +28,8 @@ namespace UnityRFramework.Tests
             "ConfigPipelineAcceptance/Config/Json/AcceptanceBundle.json";
         private const string EnglishPath =
             "ConfigPipelineAcceptance/Localization/Binary/en.bytes";
+        private const string ChinesePath =
+            "ConfigPipelineAcceptance/Localization/Binary/zh-CN.bytes";
         private const string BinaryLanguageBundlePath =
             "ConfigPipelineAcceptance/Localization/Binary/AcceptanceLanguages.bytes";
         private const string JsonLanguageBundlePath =
@@ -121,12 +123,28 @@ namespace UnityRFramework.Tests
         private static async Task VerifyLocalizationAsync(
             LocalizationComponent localization, ResourceComponent resource)
         {
-            await localization.SwitchLanguageAsync("zh-CN");
+            AcceptanceLocationProviderHelper customProvider =
+                new AcceptanceLocationProviderHelper();
+            localization.SetHelper(customProvider);
+            Require(
+                localization.GetDefaultLanguageLocation("zh-CN") == ChinesePath,
+                "Custom Localization location provider was not used.");
+
+            GameObject helperOwner = new GameObject("Acceptance Binary Localization Helper");
+            helperOwner.transform.SetParent(localization.transform, false);
+            BinaryLocalizationHelper binaryHelper =
+                helperOwner.AddComponent<BinaryLocalizationHelper>();
+            localization.SetHelper(binaryHelper);
+            Require(
+                localization.GetDefaultLanguageLocation("zh-CN")
+                    == "Localization/Binary/zh-CN.bytes",
+                "Binary Localization default location mismatch.");
+            await localization.SwitchLanguageAsync("zh-CN", ChinesePath);
             Require(
                 localization.GetString("acceptance_title") == "配置管线验收",
                 "Chinese query mismatch.");
 
-            await localization.SwitchLanguageAsync("en");
+            await localization.SwitchLanguageAsync("en", EnglishPath);
             Require(
                 localization.GetString("acceptance_title") == "Config Pipeline Acceptance",
                 "English query mismatch.");
@@ -152,7 +170,7 @@ namespace UnityRFramework.Tests
 
             localization.UnloadLanguage("en");
             Require(!localization.HasLanguage("en"), "Localization unload failed.");
-            await localization.SwitchLanguageAsync("en");
+            await localization.SwitchLanguageAsync("en", EnglishPath);
             Require(
                 localization.GetString("acceptance_title") == "Config Pipeline Acceptance",
                 "Language reload failed.");
@@ -361,6 +379,35 @@ namespace UnityRFramework.Tests
 #else
             Application.Quit(exitCode);
 #endif
+        }
+
+        private sealed class AcceptanceLocationProviderHelper :
+            ILocalizationHelper, ILocalizationLocationProvider
+        {
+            public string GetLanguageLocation(string language)
+            {
+                return $"ConfigPipelineAcceptance/Localization/Binary/{language}.bytes";
+            }
+
+            public Dictionary<string, string> ParseLanguage(
+                string language, byte[] bytes)
+            {
+                throw new RFrameworkException(
+                    "AcceptanceLocationProviderHelper only verifies location resolution.");
+            }
+
+            public Dictionary<string, string> ParseLanguageFromString(
+                string language, string json)
+            {
+                throw new RFrameworkException(
+                    "AcceptanceLocationProviderHelper only verifies location resolution.");
+            }
+
+            public void ReleaseLanguage(
+                string language, Dictionary<string, string> languageDict)
+            {
+                languageDict?.Clear();
+            }
         }
     }
 }

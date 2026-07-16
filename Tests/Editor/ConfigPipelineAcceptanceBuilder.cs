@@ -72,9 +72,7 @@ namespace UnityRFramework.Editor
                 SetString(localization, "localizationHelperTypeName",
                     "UnityRFramework.Runtime.BinaryLocalizationHelper");
                 SetString(localization, "defaultLanguage", "zh-CN");
-                SetString(localization, "languageAssetRoot",
-                    "ConfigPipelineAcceptance/Localization/Binary");
-                SetString(localization, "languageFileExtension", ".bytes");
+                SetBool(localization, "loadDefaultLanguageOnStart", false);
 
                 GameObject acceptance = new GameObject("ConfigPipeline Acceptance");
                 acceptance.AddComponent<ConfigPipelineAcceptance>();
@@ -183,6 +181,22 @@ namespace UnityRFramework.Editor
             }
 
             property.stringValue = value;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            EditorUtility.SetDirty(target);
+        }
+
+        private static void SetBool(Object target, string propertyName, bool value)
+        {
+            SerializedObject serializedObject = new SerializedObject(target);
+            SerializedProperty property = serializedObject.FindProperty(propertyName);
+            if (property == null)
+            {
+                throw new RFramework.RFrameworkException(
+                    $"Serialized property '{propertyName}' was not found on '{target.GetType().Name}'.");
+            }
+
+            property.boolValue = value;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             PrefabUtility.RecordPrefabInstancePropertyModifications(target);
             EditorUtility.SetDirty(target);

@@ -9,8 +9,20 @@ namespace UnityRFramework.Runtime
     /// JSON 本地化解析器。每个文件只包含一种语言的 Key/Value 表。
     /// </summary>
     public sealed class JsonLocalizationHelper : DictionaryLocalizationHelperBase,
-        ILocalizationBundleHelper
+        ILocalizationBundleHelper, ILocalizationLocationProvider
     {
+        /// <inheritdoc/>
+        public string GetLanguageLocation(string language)
+        {
+            if (string.IsNullOrWhiteSpace(language))
+            {
+                throw new RFrameworkException(
+                    "JsonLocalizationHelper: language code is invalid.");
+            }
+
+            return $"Localization/Json/{language.Trim()}.json";
+        }
+
         /// <inheritdoc/>
         public override Dictionary<string, string> ParseLanguage(string language, byte[] bytes)
         {

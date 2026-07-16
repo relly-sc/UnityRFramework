@@ -122,7 +122,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &1844099223
+--- !u!1 &622968141
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -130,8 +130,52 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1844099225}
-  - component: {fileID: 1844099224}
+  - component: {fileID: 622968143}
+  - component: {fileID: 622968142}
+  m_Layer: 0
+  m_Name: ConfigPipeline Acceptance
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &622968142
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 622968141}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 80c35f9e81991e64185b3cf24f040033, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!4 &622968143
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 622968141}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &758696140
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 758696142}
+  - component: {fileID: 758696141}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -139,13 +183,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!20 &1844099224
+--- !u!20 &758696141
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1844099223}
+  m_GameObject: {fileID: 758696140}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 1
@@ -190,13 +234,13 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!4 &1844099225
+--- !u!4 &758696142
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1844099223}
+  m_GameObject: {fileID: 758696140}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -205,51 +249,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1976821706
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1976821708}
-  - component: {fileID: 1976821707}
-  m_Layer: 0
-  m_Name: ConfigPipeline Acceptance
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1976821707
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1976821706}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 80c35f9e81991e64185b3cf24f040033, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!4 &1976821708
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1976821706}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1001 &2056405414
+--- !u!1001 &1218366216
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -257,21 +257,13 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 2624505095415119000, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
-      propertyPath: resourceHelperTypeName
-      value: UnityRFramework.Runtime.DefaultResourceHelper
-      objectReference: {fileID: 0}
     - target: {fileID: 6082128165338467655, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
       propertyPath: m_Name
       value: UnityRFramework
       objectReference: {fileID: 0}
     - target: {fileID: 7730000000000000003, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
-      propertyPath: languageAssetRoot
-      value: ConfigPipelineAcceptance/Localization/Binary
-      objectReference: {fileID: 0}
-    - target: {fileID: 7730000000000000003, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
-      propertyPath: languageFileExtension
-      value: .bytes
+      propertyPath: loadDefaultLanguageOnStart
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7730000000000000003, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
       propertyPath: localizationHelperTypeName
@@ -330,6 +322,6 @@ PrefabInstance:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1976821708}
-  - {fileID: 1844099225}
-  - {fileID: 2056405414}
+  - {fileID: 1218366216}
+  - {fileID: 622968143}
+  - {fileID: 758696142}
