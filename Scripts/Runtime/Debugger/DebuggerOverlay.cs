@@ -64,6 +64,8 @@ namespace UnityRFramework.Runtime
         private Rect fpsBadgeRect = new Rect(10, 10, 130, 40);
         private bool draggingBadge;
         private Vector2 badgeDragOffset;
+        private Vector2 badgePointerDownPosition;
+        private bool badgeWasDragged;
 
         // ---- 完整窗口 ----
         private bool showFullWindow;
@@ -122,7 +124,7 @@ namespace UnityRFramework.Runtime
         internal static void Initialize(DebuggerComponent component)
         {
             GameObject go = new GameObject("[DebuggerOverlay]");
-            DontDestroyOnLoad(go);
+            go.transform.SetParent(component.transform, false);
             DebuggerOverlay overlay = go.AddComponent<DebuggerOverlay>();
             overlay.debuggerComponent = component;
         }
@@ -238,26 +240,33 @@ namespace UnityRFramework.Runtime
             if (Event.current.type == EventType.MouseDown && rect.Contains(Event.current.mousePosition))
             {
                 draggingBadge = true;
+                badgeWasDragged = false;
+                badgePointerDownPosition = Event.current.mousePosition;
                 badgeDragOffset = Event.current.mousePosition - new Vector2(fpsBadgeRect.x, fpsBadgeRect.y);
+                Event.current.Use();
+            }
+
+            if (draggingBadge && Event.current.type == EventType.MouseDrag)
+            {
+                if (Vector2.Distance(
+                        Event.current.mousePosition, badgePointerDownPosition) >= 5f * s)
+                {
+                    badgeWasDragged = true;
+                }
+
+                fpsBadgeRect.x = Event.current.mousePosition.x - badgeDragOffset.x;
+                fpsBadgeRect.y = Event.current.mousePosition.y - badgeDragOffset.y;
                 Event.current.Use();
             }
 
             if (draggingBadge && Event.current.rawType == EventType.MouseUp)
             {
                 draggingBadge = false;
-                // 单击（未明显拖动）则展开
-                if (Vector2.Distance(Event.current.mousePosition,
-                        new Vector2(fpsBadgeRect.x, fpsBadgeRect.y) + badgeDragOffset) < 5f)
+                if (!badgeWasDragged)
                 {
                     ToggleFullWindow();
                 }
                 Event.current.Use();
-            }
-
-            if (draggingBadge && Event.current.type == EventType.Repaint)
-            {
-                fpsBadgeRect.x = Event.current.mousePosition.x - badgeDragOffset.x;
-                fpsBadgeRect.y = Event.current.mousePosition.y - badgeDragOffset.y;
             }
         }
 
