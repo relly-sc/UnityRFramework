@@ -1,0 +1,24 @@
+{
+  "Tables": {
+    "Demo_Enemy": {
+      "TableId": "956B2D43",
+      "SchemaHash": "63693568BD5D8A93",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "enemy_slime",
+          "BaseAtk": 13,
+          "BaseDef": 4,
+          "BaseHp": 72
+        },
+        {
+          "Id": 2,
+          "NameKey": "enemy_abyss_guardian",
+          "BaseAtk": 23,
+          "BaseDef": 8,
+          "BaseHp": 124
+        }
+      ]
+    }
+  }
+}

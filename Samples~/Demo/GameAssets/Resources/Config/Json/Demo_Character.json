@@ -1,0 +1,37 @@
+{
+  "Tables": {
+    "Demo_Character": {
+      "TableId": "590B7654",
+      "SchemaHash": "40FBFED9348F7264",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "char_warrior",
+          "ClassKey": "class_warrior",
+          "BaseAtk": 12,
+          "BaseDef": 8,
+          "BaseHp": 100,
+          "UpgradeCost": 50
+        },
+        {
+          "Id": 2,
+          "NameKey": "char_mage",
+          "ClassKey": "class_mage",
+          "BaseAtk": 18,
+          "BaseDef": 3,
+          "BaseHp": 60,
+          "UpgradeCost": 50
+        },
+        {
+          "Id": 3,
+          "NameKey": "char_priest",
+          "ClassKey": "class_priest",
+          "BaseAtk": 5,
+          "BaseDef": 6,
+          "BaseHp": 80,
+          "UpgradeCost": 50
+        }
+      ]
+    }
+  }
+}

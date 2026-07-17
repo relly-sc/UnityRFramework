@@ -1,0 +1,30 @@
+{
+  "Tables": {
+    "Demo_Quest": {
+      "TableId": "010AA9B9",
+      "SchemaHash": "BED2B063AEB3EDE5",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "quest_1_name",
+          "DescKey": "quest_1_desc",
+          "EnemyId": 1,
+          "Rounds": 3,
+          "Difficulty": 1,
+          "RewardExp": 30,
+          "RewardGold": 100
+        },
+        {
+          "Id": 2,
+          "NameKey": "quest_2_name",
+          "DescKey": "quest_2_desc",
+          "EnemyId": 2,
+          "Rounds": 5,
+          "Difficulty": 3,
+          "RewardExp": 80,
+          "RewardGold": 250
+        }
+      ]
+    }
+  }
+}

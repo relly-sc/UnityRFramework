@@ -1,0 +1,72 @@
+﻿Key,Value
+string,string
+本地化键（唯一标识）,本地化文本（对应语言）
+char_warrior,Warrior
+class_warrior,Melee
+char_mage,Mage
+class_mage,Ranged
+char_priest,Priest
+class_priest,Healer
+enemy_slime,Slime
+enemy_abyss_guardian,Abyss Guardian
+quest_1_name,Slay the Slime
+quest_1_desc,Slimes have overrun the north forest. Clear them out.
+quest_2_name,Abyss Expedition
+quest_2_desc,Strange noises echo from the abandoned mine. Investigate.
+action_attack,Attack
+action_defend,Defend
+action_skill,Skill
+item_potion,Health Potion
+item_scroll,Magic Scroll
+difficulty_easy,Easy
+difficulty_normal,Normal
+difficulty_hard,Hard
+notice_title,Guild Notice
+notice_line_welcome,Welcome to the Adventurer Guild!
+notice_line_weekly,The weekly slime hunt is now open. Form a party to earn rewards.
+notice_line_settings,Use Settings to change the language and adjust the volume.
+ui_recruit,Recruit
+ui_upgrade,Upgrade
+ui_accept,Accept Quest
+ui_expedition,Expedition
+ui_settings,Settings
+UI_GuildTitle,Adventurer Guild
+UI_RosterTitle,Hero Roster
+UI_QuestTitle,Quest Board
+UI_NoticeTitle,Notice
+UI_Loading,Loading...
+UI_NoticeFail,Failed to load notice
+UI_ExpeditionTitle,Expedition
+UI_Depart,Depart
+UI_CurrentState,State
+UI_Standby,Standby
+UI_NoOngoing,No ongoing
+UI_SelectedHero,Selected Hero
+UI_TargetQuest,Target Quest
+UI_NoneSelected,None
+UI_Difficulty,Difficulty
+UI_Reward,Reward
+UI_Gold,Gold
+UI_Diamond,Diamond
+UI_Accepted,Accepted / Ongoing
+UI_Accept,Accept
+UI_Select,Select
+UI_Selected,Selected
+UI_Upgrade,Upgrade
+UI_BattleTitle,Expedition Battle
+UI_Round,Round
+UI_PlayerTurn,Player Turn
+UI_EnemyTurn,Enemy Turn
+UI_HP,HP
+UI_ATK,ATK
+UI_DEF,DEF
+UI_Enemy,Enemy
+UI_Victory,Victory
+UI_Defeat,Defeat
+UI_ReturnHall,Return to Hall
+UI_Exp,EXP
+UI_SkillCooling,Skill is cooling down
+UI_LogDefend,Hero takes a defensive stance
+UI_LogPlayerHit,Hero deals {0} damage
+UI_LogEnemyHit,Enemy deals {0} damage
+UI_Language,English
