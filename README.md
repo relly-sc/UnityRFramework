@@ -362,9 +362,12 @@ public class LoginProcedure : ProcedureStateBase
 }
 
 // 启动流程
-GameEntry.Procedure.Initialize(new LoginProcedure(), new HallProcedure());
+// 自动发现 LoginProcedure 所在业务程序集中的全部 Procedure 状态
+GameEntry.Procedure.InitializeFromAssembly<LoginProcedure>();
 GameEntry.Procedure.StartProcedure<LoginProcedure>();
 ```
+
+自动发现仅扫描显式指定的业务程序集；所有状态必须提供公共无参构造函数。需要构造参数、工厂创建或希望完全避免反射时，仍可使用 `Initialize(new LoginProcedure(), new HallProcedure())` 手动注入。自定义 asmdef 以 IL2CPP 发布时，应在 `link.xml` 中保留对应业务程序集。
 
 ### Entity
 

@@ -68,6 +68,8 @@
     { "Key": "UI_LogDefend", "Value": "Hero takes a defensive stance" },
     { "Key": "UI_LogPlayerHit", "Value": "Hero deals {0} damage" },
     { "Key": "UI_LogEnemyHit", "Value": "Enemy deals {0} damage" },
-    { "Key": "UI_Language", "Value": "English" }
+    { "Key": "UI_Language", "Value": "English" },
+    { "Key": "UI_Restart", "Value": "Restart" },
+    { "Key": "UI_Quit", "Value": "Quit" }
   ]
 }

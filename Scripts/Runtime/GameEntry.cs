@@ -331,6 +331,45 @@ namespace UnityRFramework.Runtime
             return UnityRFrameworkComponentEntry.GetComponent<T>();
         }
 
+        /// <summary>
+        /// 在不退出应用进程的情况下关闭全部框架模块，并重新加载 0 号启动场景。
+        /// </summary>
+        public static void Restart()
+        {
+            UnityRFrameworkComponentEntry.Shutdown(ShutdownType.Restart);
+        }
+
+        /// <summary>
+        /// 关闭全部框架模块并退出应用。
+        /// </summary>
+        public static void Quit()
+        {
+            UnityRFrameworkComponentEntry.Shutdown(ShutdownType.Quit);
+        }
+
+        /// <summary>
+        /// 清空全部内置组件缓存。
+        /// 软重启时旧根节点采用延迟销毁，不能只依赖 Unity 对已销毁对象的 null 判定。
+        /// </summary>
+        internal static void ClearCachedComponents()
+        {
+            baseCache = null;
+            poolCache = null;
+            eventCache = null;
+            timerCache = null;
+            resourceCache = null;
+            configCache = null;
+            fsmCache = null;
+            procedureCache = null;
+            webRequestCache = null;
+            entityCache = null;
+            sceneCache = null;
+            uiCache = null;
+            audioCache = null;
+            localizationCache = null;
+            networkCache = null;
+        }
+
         // ====== 生命周期 ======
 
         /// <summary>

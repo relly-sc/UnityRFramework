@@ -20,13 +20,8 @@ public class DemoGameEntry : UnityEngine.MonoBehaviour
             return;
         }
 
-        // 注册所有 Procedure 状态
-        GameEntry.Procedure.Initialize(
-            new DemoLaunchProcedure(),
-            new DemoMenuProcedure(),
-            new DemoExpeditionProcedure(),
-            new DemoReturnProcedure()
-        );
+        // 自动注册 Demo 所在程序集中的全部 Procedure 状态
+        GameEntry.Procedure.InitializeFromAssembly<DemoLaunchProcedure>();
 
         // 同步启动发射流程（OnEnter 内部 fire-and-forget 启动异步初始化序列）
         GameEntry.Procedure.StartProcedure<DemoLaunchProcedure>();

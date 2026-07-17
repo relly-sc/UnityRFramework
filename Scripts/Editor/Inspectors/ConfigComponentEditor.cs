@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// ConfigComponent 自定义 Inspector。
     /// </summary>
     [CustomEditor(typeof(Runtime.ConfigComponent))]
-    public sealed class ConfigComponentEditor : UnityEditor.Editor
+    public sealed class ConfigComponentEditor : RFrameworkComponentEditor
     {
         private SerializedProperty configHelperTypeName;
 
@@ -26,6 +26,7 @@ namespace UnityRFramework.Editor
                 "Config Helper", configHelperTypeName.stringValue, typeof(Runtime.ConfigHelperBase));
 
             serializedObject.ApplyModifiedProperties();
+            DrawRuntimeInformation();
         }
     }
 }

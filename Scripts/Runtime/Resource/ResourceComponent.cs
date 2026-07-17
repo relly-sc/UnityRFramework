@@ -55,6 +55,22 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private IResourceHelper resourceHelper;
 
+        /// <summary>
+        /// 获取当前已加载资源数量。
+        /// </summary>
+        public int LoadedAssetCount
+        {
+            get { return resourceModule != null ? resourceModule.LoadedAssetCount : 0; }
+        }
+
+        /// <summary>
+        /// 获取当前正在异步加载的资源数量。
+        /// </summary>
+        public int LoadingAssetCount
+        {
+            get { return resourceModule != null ? resourceModule.LoadingAssetCount : 0; }
+        }
+
         protected override void Awake()
         {
             base.Awake();

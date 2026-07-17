@@ -61,6 +61,30 @@ namespace UnityRFramework.Runtime
             set { if (audioModule != null) { audioModule.Muted = value; } }
         }
 
+        /// <summary>
+        /// 获取已缓存音频资源数量。
+        /// </summary>
+        public int LoadedAudioAssetCount
+        {
+            get { return audioModule != null ? audioModule.LoadedAudioAssetCount : 0; }
+        }
+
+        /// <summary>
+        /// 获取当前 BGM 资源路径；未播放时返回 null。
+        /// </summary>
+        public string CurrentBgmAssetName
+        {
+            get { return audioModule != null ? audioModule.CurrentBgmAssetName : null; }
+        }
+
+        /// <summary>
+        /// 获取当前 BGM 是否处于暂停状态。
+        /// </summary>
+        public bool IsBgmPaused
+        {
+            get { return audioModule != null && audioModule.IsBgmPaused; }
+        }
+
         /// <summary>同步播放 Resources 中的 BGM。</summary>
         /// <param name="assetName">音频资源路径。</param>
         /// <param name="volume">音量倍率。</param>

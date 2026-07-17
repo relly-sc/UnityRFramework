@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// LocalizationComponent 自定义 Inspector。
     /// </summary>
     [CustomEditor(typeof(Runtime.LocalizationComponent))]
-    public sealed class LocalizationComponentEditor : UnityEditor.Editor
+    public sealed class LocalizationComponentEditor : RFrameworkComponentEditor
     {
         private static readonly string[] LanguageDisplayNames =
         {
@@ -89,6 +89,7 @@ namespace UnityRFramework.Editor
                 "启用时按内置位置约定自动加载默认语言。关闭后可由启动流程传入 YooAsset 地址或自定义 location。"));
 
             serializedObject.ApplyModifiedProperties();
+            DrawRuntimeInformation();
         }
 
         private void DrawDefaultLanguage()

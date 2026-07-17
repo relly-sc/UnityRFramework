@@ -101,6 +101,14 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>
+        /// 获取当前调试器缓存日志数量。
+        /// </summary>
+        public int LogCount
+        {
+            get { return DebuggerOverlay.LogCount; }
+        }
+
+        /// <summary>
         /// 获取切换页签快捷键。
         /// </summary>
         public KeyCode SwitchTabKey

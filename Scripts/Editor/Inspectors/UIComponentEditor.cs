@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// UIComponent 自定义 Inspector。
     /// </summary>
     [CustomEditor(typeof(Runtime.UIComponent))]
-    public sealed class UIComponentEditor : UnityEditor.Editor
+    public sealed class UIComponentEditor : RFrameworkComponentEditor
     {
         private SerializedProperty uiHelperTypeName;
 
@@ -26,6 +26,7 @@ namespace UnityRFramework.Editor
                 "UI Helper", uiHelperTypeName.stringValue, typeof(Runtime.UIHelperBase));
 
             serializedObject.ApplyModifiedProperties();
+            DrawRuntimeInformation();
         }
     }
 }

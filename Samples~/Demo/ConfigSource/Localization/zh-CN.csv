@@ -1,4 +1,4 @@
-﻿Key,Value
+Key,Value
 string,string
 本地化键（唯一标识）,本地化文本（对应语言）
 char_warrior,战士
@@ -70,3 +70,5 @@ UI_LogDefend,英雄进入防御姿态
 UI_LogPlayerHit,英雄造成 {0} 点伤害
 UI_LogEnemyHit,敌人造成 {0} 点伤害
 UI_Language,中文
+UI_Restart,重新启动
+UI_Quit,退出游戏

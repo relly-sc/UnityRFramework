@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// ResourceComponent 自定义 Inspector。
     /// </summary>
     [CustomEditor(typeof(Runtime.ResourceComponent))]
-    public sealed class ResourceComponentEditor : UnityEditor.Editor
+    public sealed class ResourceComponentEditor : RFrameworkComponentEditor
     {
         private SerializedProperty resourceHelperTypeName;
         private SerializedProperty playMode;
@@ -42,6 +42,7 @@ namespace UnityRFramework.Editor
             EditorGUILayout.PropertyField(fallbackHostServer);
 
             serializedObject.ApplyModifiedProperties();
+            DrawRuntimeInformation();
         }
     }
 }

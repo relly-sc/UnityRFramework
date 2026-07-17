@@ -613,12 +613,50 @@ namespace UnityRFramework.Editor
             {
                 // Log
                 moduleInfos.Add(new ModuleDebugInfo("Log",
-                    RFramework.RFrameworkLog.IsInitialized ? "Initialized" : "Not initialized", null));
+                    RFramework.RFrameworkLog.IsInitialized ? "Initialized" : "Not initialized",
+                    new Dictionary<string, string>
+                    {
+                        { "Cached Logs", Runtime.DebuggerOverlay.LogCount.ToString() }
+                    }));
+
+                // Base
+                Runtime.BaseComponent baseComponent = Runtime.GameEntry.Base;
+                if (baseComponent != null)
+                {
+                    var details = new Dictionary<string, string>
+                    {
+                        { "Frame Rate", baseComponent.FrameRate.ToString() },
+                        { "Game Speed", string.Format("{0:0.##}", baseComponent.GameSpeed) },
+                        { "Game Paused", baseComponent.IsGamePaused.ToString() },
+                        { "Run In Background", baseComponent.RunInBackground.ToString() }
+                    };
+                    moduleInfos.Add(new ModuleDebugInfo("Base", "Running", details));
+                }
+
+                // Debugger
+                Runtime.DebuggerComponent debugger = Runtime.GameEntry.Get<Runtime.DebuggerComponent>();
+                if (debugger != null)
+                {
+                    var details = new Dictionary<string, string>
+                    {
+                        { "FPS", string.Format("{0:F1}", Runtime.DebuggerOverlay.CurrentFps) },
+                        { "Cached Logs", string.Format("{0} / {1}", debugger.LogCount, debugger.MaxLogEntries) }
+                    };
+                    moduleInfos.Add(new ModuleDebugInfo("Debugger",
+                        debugger.ActiveWindow ? "Active" : "Inactive", details));
+                }
 
                 // Event
                 var eventM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IEventModule>();
                 if (eventM != null)
-                    moduleInfos.Add(new ModuleDebugInfo("Event", "Active", null));
+                {
+                    var details = new Dictionary<string, string>
+                    {
+                        { "Handlers", eventM.HandlerCount.ToString() },
+                        { "Queued Async Events", eventM.AsyncEventCount.ToString() }
+                    };
+                    moduleInfos.Add(new ModuleDebugInfo("Event", "Active", details));
+                }
 
                 // Fsm
                 var fsmM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IFsmModule>();
@@ -634,6 +672,7 @@ namespace UnityRFramework.Editor
                     string procName = current != null ? current.GetType().Name : "(none)";
                     var procDetails = new Dictionary<string, string>
                     {
+                        { "Registered", procM.ProcedureCount.ToString() },
                         { "Running Time", string.Format("{0:F1}s", procM.CurrentProcedureTime) }
                     };
                     moduleInfos.Add(new ModuleDebugInfo("Procedure", procName, procDetails));
@@ -645,10 +684,10 @@ namespace UnityRFramework.Editor
                 {
                     var details = new Dictionary<string, string>
                     {
-                        { "Active Objects", poolM.PoolCount.ToString() }
+                        { "Object Pools", poolM.PoolCount.ToString() }
                     };
                     moduleInfos.Add(new ModuleDebugInfo("Pool",
-                        string.Format("Objects: {0}", poolM.PoolCount), details));
+                        string.Format("Pools: {0}", poolM.PoolCount), details));
                 }
 
                 // Timer
@@ -737,23 +776,35 @@ namespace UnityRFramework.Editor
                 {
                     var details = new Dictionary<string, string>
                     {
+                        { "Cached Audio Assets", audioM.LoadedAudioAssetCount.ToString() },
+                        { "Current BGM", audioM.CurrentBgmAssetName ?? "(none)" },
                         { "BGM Vol", string.Format("{0:F2}", audioM.BgmVolume) },
                         { "SFX Vol", string.Format("{0:F2}", audioM.SfxVolume) },
                         { "UI Vol", string.Format("{0:F2}", audioM.UIVolume) },
                         { "Muted", audioM.Muted.ToString() }
                     };
                     moduleInfos.Add(new ModuleDebugInfo("Audio",
-                        audioM.Muted ? "Muted" : "Playing", details));
+                        audioM.Muted ? "Muted" : string.IsNullOrEmpty(audioM.CurrentBgmAssetName)
+                            ? "Idle"
+                            : audioM.IsBgmPaused ? "Paused" : "Playing", details));
                 }
 
                 // Network
                 var netM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.INetworkModule>();
                 if (netM != null)
                 {
+                    RFramework.INetworkChannel defaultChannel = netM.DefaultChannel;
                     var details = new Dictionary<string, string>
                     {
-                        { "Heartbeat", string.Format("{0:F1}s", netM.HeartbeatInterval) },
-                        { "Auto Reconnect", netM.AutoReconnect.ToString() }
+                        { "Channels", netM.ChannelCount.ToString() },
+                        { "Default Channel", defaultChannel != null ? defaultChannel.Name : "(none)" },
+                        { "Remote Endpoint", defaultChannel != null && !string.IsNullOrEmpty(defaultChannel.CurrentIP)
+                            ? string.Format("{0}:{1}", defaultChannel.CurrentIP, defaultChannel.CurrentPort)
+                            : "(none)" },
+                        { "Heartbeat", defaultChannel != null
+                            ? string.Format("{0:F1}s", defaultChannel.HeartbeatInterval)
+                            : "0.0s" },
+                        { "Auto Reconnect", (defaultChannel != null && defaultChannel.AutoReconnect).ToString() }
                     };
                     moduleInfos.Add(new ModuleDebugInfo("Network",
                         netM.IsConnected ? "Connected" : "Disconnected", details));
@@ -765,7 +816,8 @@ namespace UnityRFramework.Editor
                 {
                     var details = new Dictionary<string, string>
                     {
-                        { "Loaded Packs", locM.LoadedLanguageCount.ToString() }
+                        { "Loaded Packs", locM.LoadedLanguageCount.ToString() },
+                        { "Supported Languages", locM.SupportedLanguages.Count.ToString() }
                     };
                     moduleInfos.Add(new ModuleDebugInfo("Localization",
                         locM.CurrentLanguage ?? "(none)", details));

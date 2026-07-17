@@ -10,7 +10,7 @@ namespace UnityRFramework.Editor
     /// 提供 Text/Log/JSON 三个 Helper 类型下拉框和运行参数的可视化编辑。
     /// </summary>
     [CustomEditor(typeof(Runtime.BaseComponent))]
-    public sealed class BaseComponentEditor : UnityEditor.Editor
+    public sealed class BaseComponentEditor : RFrameworkComponentEditor
     {
         private SerializedProperty textHelperTypeName;
         private SerializedProperty logHelperTypeName;
@@ -59,6 +59,7 @@ namespace UnityRFramework.Editor
                 GUILayout.ExpandWidth(true));
 
             serializedObject.ApplyModifiedProperties();
+            DrawRuntimeInformation();
         }
     }
 }

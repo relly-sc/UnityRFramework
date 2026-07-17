@@ -65,6 +65,14 @@ namespace UnityRFramework.Runtime
             get { return networkModule?.DefaultChannel; }
         }
 
+        /// <summary>
+        /// 获取当前网络通道数量。
+        /// </summary>
+        public int ChannelCount
+        {
+            get { return networkModule != null ? networkModule.ChannelCount : 0; }
+        }
+
         /// <inheritdoc/>
         protected override void Awake()
         {

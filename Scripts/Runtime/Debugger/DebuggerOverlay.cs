@@ -37,6 +37,20 @@ namespace UnityRFramework.Runtime
         /// </summary>
         public static float CurrentFps { get; private set; }
 
+        /// <summary>
+        /// 获取当前缓存日志数量。
+        /// </summary>
+        public static int LogCount
+        {
+            get
+            {
+                lock (logLock)
+                {
+                    return logCache.Count;
+                }
+            }
+        }
+
         private static readonly List<LogEntry> logCache = new List<LogEntry>();
         private static readonly object logLock = new object();
 
@@ -59,6 +73,7 @@ namespace UnityRFramework.Runtime
         private float fpsTimer;
         private float fpsLastRealtime;
         private float avgFps;
+        private float moduleRefreshTimer;
 
         // ---- FPS 浮窗（可拖动） ----
         private Rect fpsBadgeRect = new Rect(10, 10, 130, 40);
@@ -157,6 +172,7 @@ namespace UnityRFramework.Runtime
                     logCache.RemoveAt(0);
                 }
             }
+
         }
 
         private void Update()
@@ -180,6 +196,16 @@ namespace UnityRFramework.Runtime
                     fpsFrameCount = 0;
                     fpsAccum = 0f;
                     fpsTimer = 0f;
+                }
+            }
+
+            if (showFullWindow)
+            {
+                moduleRefreshTimer += delta;
+                if (moduleRefreshTimer >= 0.5f)
+                {
+                    moduleRefreshTimer = 0f;
+                    RefreshModuleInfos();
                 }
             }
 
@@ -543,18 +569,49 @@ namespace UnityRFramework.Runtime
         private void RefreshModuleInfos()
         {
             moduleInfos.Clear();
-            moduleFoldouts.Clear();
 
             try
             {
                 // Log
                 moduleInfos.Add(new ModuleDebugInfo("Log",
-                    RFramework.RFrameworkLog.IsInitialized ? "Initialized" : "Not initialized", null));
+                    RFramework.RFrameworkLog.IsInitialized ? "Initialized" : "Not initialized",
+                    new Dictionary<string, string>
+                    {
+                        { "Cached Logs", LogCount.ToString() }
+                    }));
+
+                // Base
+                BaseComponent baseComponent = GameEntry.Base;
+                if (baseComponent != null)
+                    moduleInfos.Add(new ModuleDebugInfo("Base", "Running",
+                        new Dictionary<string, string>
+                        {
+                            { "Frame Rate", baseComponent.FrameRate.ToString() },
+                            { "Game Speed", string.Format("{0:0.##}", baseComponent.GameSpeed) },
+                            { "Game Paused", baseComponent.IsGamePaused.ToString() },
+                            { "Run In Background", baseComponent.RunInBackground.ToString() }
+                        }));
+
+                // Debugger
+                DebuggerComponent debugger = GameEntry.Get<DebuggerComponent>();
+                if (debugger != null)
+                    moduleInfos.Add(new ModuleDebugInfo("Debugger",
+                        debugger.ActiveWindow ? "Active" : "Inactive",
+                        new Dictionary<string, string>
+                        {
+                            { "FPS", string.Format("{0:F1}", CurrentFps) },
+                            { "Cached Logs", string.Format("{0} / {1}", debugger.LogCount, debugger.MaxLogEntries) }
+                        }));
 
                 // Event
                 var eventM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IEventModule>();
                 if (eventM != null)
-                    moduleInfos.Add(new ModuleDebugInfo("Event", "Active", null));
+                    moduleInfos.Add(new ModuleDebugInfo("Event", "Active",
+                        new Dictionary<string, string>
+                        {
+                            { "Handlers", eventM.HandlerCount.ToString() },
+                            { "Queued Async Events", eventM.AsyncEventCount.ToString() }
+                        }));
 
                 // Fsm
                 var fsmM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IFsmModule>();
@@ -574,6 +631,7 @@ namespace UnityRFramework.Runtime
                         procName,
                         new Dictionary<string, string>
                         {
+                            { "Registered", procM.ProcedureCount.ToString() },
                             { "Running Time", string.Format("{0:F1}s", procM.CurrentProcedureTime) }
                         }));
                 }
@@ -582,7 +640,11 @@ namespace UnityRFramework.Runtime
                 var poolM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IPoolModule>();
                 if (poolM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Pool",
-                        string.Format("Objects: {0}", poolM.PoolCount), null));
+                        string.Format("Pools: {0}", poolM.PoolCount),
+                        new Dictionary<string, string>
+                        {
+                            { "Object Pools", poolM.PoolCount.ToString() }
+                        }));
 
                 // Timer
                 var timerM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ITimerModule>();
@@ -636,9 +698,13 @@ namespace UnityRFramework.Runtime
                 var audioM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IAudioModule>();
                 if (audioM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Audio",
-                        audioM.Muted ? "Muted" : "Playing",
+                        audioM.Muted ? "Muted" : string.IsNullOrEmpty(audioM.CurrentBgmAssetName)
+                            ? "Idle"
+                            : audioM.IsBgmPaused ? "Paused" : "Playing",
                         new Dictionary<string, string>
                         {
+                            { "Cached Audio Assets", audioM.LoadedAudioAssetCount.ToString() },
+                            { "Current BGM", audioM.CurrentBgmAssetName ?? "(none)" },
                             { "BGM Vol", string.Format("{0:F2}", audioM.BgmVolume) },
                             { "SFX Vol", string.Format("{0:F2}", audioM.SfxVolume) },
                             { "UI Vol", string.Format("{0:F2}", audioM.UIVolume) },
@@ -648,13 +714,23 @@ namespace UnityRFramework.Runtime
                 // Network
                 var netM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.INetworkModule>();
                 if (netM != null)
+                {
+                    RFramework.INetworkChannel defaultChannel = netM.DefaultChannel;
                     moduleInfos.Add(new ModuleDebugInfo("Network",
                         netM.IsConnected ? "Connected" : "Disconnected",
                         new Dictionary<string, string>
                         {
-                            { "Heartbeat", string.Format("{0:F1}s", netM.HeartbeatInterval) },
-                            { "Auto Reconnect", netM.AutoReconnect.ToString() }
+                            { "Channels", netM.ChannelCount.ToString() },
+                            { "Default Channel", defaultChannel != null ? defaultChannel.Name : "(none)" },
+                            { "Remote Endpoint", defaultChannel != null && !string.IsNullOrEmpty(defaultChannel.CurrentIP)
+                                ? string.Format("{0}:{1}", defaultChannel.CurrentIP, defaultChannel.CurrentPort)
+                                : "(none)" },
+                            { "Heartbeat", defaultChannel != null
+                                ? string.Format("{0:F1}s", defaultChannel.HeartbeatInterval)
+                                : "0.0s" },
+                            { "Auto Reconnect", (defaultChannel != null && defaultChannel.AutoReconnect).ToString() }
                         }));
+                }
 
                 // Localization
                 var locM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ILocalizationModule>();
@@ -663,7 +739,8 @@ namespace UnityRFramework.Runtime
                         locM.CurrentLanguage ?? "(none)",
                         new Dictionary<string, string>
                         {
-                            { "Loaded Packs", locM.LoadedLanguageCount.ToString() }
+                            { "Loaded Packs", locM.LoadedLanguageCount.ToString() },
+                            { "Supported Languages", locM.SupportedLanguages.Count.ToString() }
                         }));
 
                 // WebRequest

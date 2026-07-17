@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// NetworkComponent 自定义 Inspector。
     /// </summary>
     [CustomEditor(typeof(Runtime.NetworkComponent))]
-    public sealed class NetworkComponentEditor : UnityEditor.Editor
+    public sealed class NetworkComponentEditor : RFrameworkComponentEditor
     {
         private SerializedProperty networkHelperTypeName;
         private SerializedProperty heartbeatInterval;
@@ -39,6 +39,7 @@ namespace UnityRFramework.Editor
             EditorGUILayout.PropertyField(reconnectInterval);
 
             serializedObject.ApplyModifiedProperties();
+            DrawRuntimeInformation();
         }
     }
 }

@@ -68,6 +68,8 @@
     { "Key": "UI_LogDefend", "Value": "英雄进入防御姿态" },
     { "Key": "UI_LogPlayerHit", "Value": "英雄造成 {0} 点伤害" },
     { "Key": "UI_LogEnemyHit", "Value": "敌人造成 {0} 点伤害" },
-    { "Key": "UI_Language", "Value": "中文" }
+    { "Key": "UI_Language", "Value": "中文" },
+    { "Key": "UI_Restart", "Value": "重新启动" },
+    { "Key": "UI_Quit", "Value": "退出游戏" }
   ]
 }

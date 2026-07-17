@@ -69,7 +69,9 @@
       { "Key": "UI_LogDefend", "Value": "Hero takes a defensive stance" },
       { "Key": "UI_LogPlayerHit", "Value": "Hero deals {0} damage" },
       { "Key": "UI_LogEnemyHit", "Value": "Enemy deals {0} damage" },
-      { "Key": "UI_Language", "Value": "English" }
+      { "Key": "UI_Language", "Value": "English" },
+      { "Key": "UI_Restart", "Value": "Restart" },
+      { "Key": "UI_Quit", "Value": "Quit" }
     ] },
     { "Language": "zh-CN", "Items": [
       { "Key": "char_warrior", "Value": "战士" },
@@ -140,7 +142,9 @@
       { "Key": "UI_LogDefend", "Value": "英雄进入防御姿态" },
       { "Key": "UI_LogPlayerHit", "Value": "英雄造成 {0} 点伤害" },
       { "Key": "UI_LogEnemyHit", "Value": "敌人造成 {0} 点伤害" },
-      { "Key": "UI_Language", "Value": "中文" }
+      { "Key": "UI_Language", "Value": "中文" },
+      { "Key": "UI_Restart", "Value": "重新启动" },
+      { "Key": "UI_Quit", "Value": "退出游戏" }
     ] }
   ]
 }

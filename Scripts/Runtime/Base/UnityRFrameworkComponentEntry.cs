@@ -22,6 +22,11 @@ namespace UnityRFramework.Runtime
         private static readonly LinkedList<UnityRFrameworkComponent> unityRFrameworkComponents = new LinkedList<UnityRFrameworkComponent>();
 
         /// <summary>
+        /// 是否正在等待重启后的新框架完成启动。
+        /// </summary>
+        private static bool restartPending;
+
+        /// <summary>
         /// 游戏框架所在的场景编号。
         /// </summary>
         internal const int UnityRFrameworkSceneId = 0;
@@ -85,15 +90,37 @@ namespace UnityRFramework.Runtime
         /// <param name="shutdownType">关闭游戏框架类型。</param>
         public static void Shutdown(ShutdownType shutdownType)
         {
-            Log.Info("Shutdown UnityRFramework ({0})...", shutdownType);
+            if (RFrameworkLog.IsInitialized)
+            {
+                switch (shutdownType)
+                {
+                    case ShutdownType.Restart:
+                        Log.Info("[UnityRFramework] Framework restart requested.");
+                        break;
+                    case ShutdownType.Quit:
+                        Log.Info("[UnityRFramework] Framework quit requested.");
+                        break;
+                    default:
+                        Log.Info("[UnityRFramework] Framework shutdown requested.");
+                        break;
+                }
+            }
+
+            if (shutdownType == ShutdownType.Restart)
+            {
+                restartPending = true;
+            }
+
             BaseComponent baseComponent = GetComponent<BaseComponent>();
             if (baseComponent != null)
             {
-                baseComponent.Shutdown();
+                // 先同步关闭模块，再销毁根节点，避免新启动场景与旧模块交叉运行。
+                baseComponent.Shutdown(shutdownType);
                 baseComponent = null;
             }
 
             unityRFrameworkComponents.Clear();
+            GameEntry.ClearCachedComponents();
 
             if (shutdownType == ShutdownType.None)
             {
@@ -114,6 +141,21 @@ namespace UnityRFramework.Runtime
 #endif
                 return;
             }
+        }
+
+        /// <summary>
+        /// 报告框架启动完成，并闭合可能存在的软重启生命周期日志。
+        /// </summary>
+        internal static void NotifyStartupCompleted()
+        {
+            Log.Info("[UnityRFramework] Framework startup completed. Registered components: {0}.", unityRFrameworkComponents.Count);
+            if (!restartPending)
+            {
+                return;
+            }
+
+            restartPending = false;
+            Log.Info("[UnityRFramework] Framework restart completed.");
         }
 
         /// <summary>

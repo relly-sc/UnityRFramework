@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// AudioComponent 自定义 Inspector。
     /// </summary>
     [CustomEditor(typeof(Runtime.AudioComponent))]
-    public sealed class AudioComponentEditor : UnityEditor.Editor
+    public sealed class AudioComponentEditor : RFrameworkComponentEditor
     {
         private SerializedProperty audioHelperTypeName;
 
@@ -26,6 +26,7 @@ namespace UnityRFramework.Editor
                 "Audio Helper", audioHelperTypeName.stringValue, typeof(Runtime.AudioHelperBase));
 
             serializedObject.ApplyModifiedProperties();
+            DrawRuntimeInformation();
         }
     }
 }

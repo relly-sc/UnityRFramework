@@ -25,6 +25,11 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private float gameSpeedBeforePause = 1f;
 
+        /// <summary>
+        /// 是否已经执行过框架关闭流程。
+        /// </summary>
+        private bool isShutdown;
+
 
 
         [SerializeField]
@@ -146,6 +151,7 @@ namespace UnityRFramework.Runtime
             base.Awake();
 
             InitLogHelper();
+            Log.Info("[UnityRFramework] Framework startup started.");
             InitTextHelper();
 
             Log.Info("Unity Version: {0}", Application.unityVersion);
@@ -175,10 +181,11 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>
-        /// 生命周期：Start（空实现，供未来扩展）。
+        /// 生命周期：所有组件完成 Awake 后报告框架启动完成。
         /// </summary>
         private void Start()
         {
+            UnityRFrameworkComponentEntry.NotifyStartupCompleted();
         }
 
         /// <summary>
@@ -202,10 +209,7 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private void OnApplicationQuit()
         {
-#if UNITY_5_6_OR_NEWER
-            Application.lowMemory -= OnLowMemory;
-#endif
-            StopAllCoroutines();
+            ShutdownModules(ShutdownType.Quit);
         }
 
         /// <summary>
@@ -213,12 +217,34 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private void OnDestroy()
         {
+            ShutdownModules(ShutdownType.None);
+        }
+
+        /// <summary>
+        /// 同步关闭所有框架模块和全局回调。重复调用不会再次执行清理。
+        /// </summary>
+        private void ShutdownModules(ShutdownType shutdownType)
+        {
+            if (isShutdown)
+            {
+                return;
+            }
+
+            isShutdown = true;
+            Log.Info("[UnityRFramework] Framework shutdown started. Type: {0}.", shutdownType);
+#if UNITY_5_6_OR_NEWER
+            Application.lowMemory -= OnLowMemory;
+#endif
+            StopAllCoroutines();
+
+            bool hasShutdownError = false;
             try
             {
                 RFrameworkModuleEntry.Shutdown(false);
             }
             catch (RFrameworkException ex)
             {
+                hasShutdownError = true;
                 if (RFrameworkLog.IsInitialized)
                 {
                     try
@@ -233,6 +259,25 @@ namespace UnityRFramework.Runtime
             }
             finally
             {
+                if (RFrameworkLog.IsInitialized)
+                {
+                    try
+                    {
+                        if (hasShutdownError)
+                        {
+                            Log.Warning("[UnityRFramework] Framework shutdown completed with module errors. Type: {0}.", shutdownType);
+                        }
+                        else
+                        {
+                            Log.Info("[UnityRFramework] Framework shutdown completed. Type: {0}.", shutdownType);
+                        }
+                    }
+                    catch
+                    {
+                        // 关闭阶段日志后端异常不能阻止框架完成清理。
+                    }
+                }
+
                 RFrameworkLog.SetLogHelper(null);
             }
         }
@@ -277,8 +322,10 @@ namespace UnityRFramework.Runtime
             GameSpeed = 1f;
         }
 
-        internal void Shutdown()
+        internal void Shutdown(ShutdownType shutdownType)
         {
+            gameObject.SetActive(false);
+            ShutdownModules(shutdownType);
             Destroy(gameObject);
         }
 

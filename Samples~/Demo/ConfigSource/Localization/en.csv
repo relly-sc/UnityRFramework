@@ -1,4 +1,4 @@
-﻿Key,Value
+Key,Value
 string,string
 本地化键（唯一标识）,本地化文本（对应语言）
 char_warrior,Warrior
@@ -70,3 +70,5 @@ UI_LogDefend,Hero takes a defensive stance
 UI_LogPlayerHit,Hero deals {0} damage
 UI_LogEnemyHit,Enemy deals {0} damage
 UI_Language,English
+UI_Restart,Restart
+UI_Quit,Quit
