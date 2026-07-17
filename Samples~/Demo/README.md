@@ -100,8 +100,8 @@ Samples/Demo/
 ├── Generated/                  # 配置表工具生成的行类型和 Codec
 ├── GameAssets/
 │   ├── Resources/
-│   │   ├── Config/Json/        # Demo 运行时加载的单表 JSON
-│   │   ├── Localization/Json/  # Demo 运行时加载的语言 JSON
+│   │   ├── Config/Json/        # Demo 示例产物副本
+│   │   ├── Localization/Json/  # Demo 示例产物副本
 │   │   └── Prefabs/UI/         # 大厅 UI 预制体
 │   └── Scenes/                 # DemoBoot、DemoHall、DemoExpedition
 └── Scripts/
@@ -111,11 +111,17 @@ Samples/Demo/
 
 ## 更新数据
 
-默认管线不直接读取 Excel/XLSX。先手工将源表导出为 UTF-8 CSV，再通过 `UnityRFramework/配置表工具` 导出 JSON 与二进制产物。
+默认管线不直接读取 Excel/XLSX。先手工将源表导出为 UTF-8 CSV，再执行
+`UnityRFramework/Demo/Export Config and Localization`。该入口会导出 JSON、二进制、
+Bundle 和 manifest，并按内容增量同步到 `Assets/StreamingAssets/Config` 与
+`Assets/StreamingAssets/Localization`；源目录中已删除的旧产物也会同步清理。
 
-本 Demo 运行的是 JSON 路径：
+本 Demo 使用 `LocalFileResourceHelper`，运行时读取同步到 StreamingAssets 的 JSON 路径：
 
 - Config：`Config/Json/<表名>`
 - Localization：`Localization/Json/<语言代码>`
 
 二进制产物会一并导出，用于 Config/Localization 管线验收或后续切换 `BinaryConfigHelper`、`BinaryLocalizationHelper` 的独立场景；不要在默认 Demo 场景中混用 JSON Helper 与 `.bytes` 文件。
+
+重复调用 `LoadConfigAsync<T>` 会替换该类型已有缓存；只有同一个 ConfigBundle 内部的
+`表名@分片名` 数据会在提交前合并，Bundle 不会与此前单独加载的表增量合并。

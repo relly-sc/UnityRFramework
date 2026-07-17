@@ -289,6 +289,10 @@ JSON 与 URFC v2 均支持显式历史 Schema 迁移。二进制实现 `IBinaryC
 整个导出/加载失败。`ConfigCount` 按行类型计数。若两张表只是结构相同但业务语义独立，
 应使用不同逻辑表名和不同生成类型，而不是同类型分片。
 
+重复调用 `LoadConfig<T>` 或 `LoadConfigFromString<T>` 会按行类型替换旧表，不会追加数据。
+`LoadConfigBundleAsync` 只合并当前 Bundle 内部的同类型分片，并整体替换该类型的已有缓存；
+它不会与此前单独加载的表增量合并。Bundle 解析或提交失败时仍保留原缓存。
+
 “共用一个输出目录”指共用一个可选择的根目录；工具会自动生成 `Json/` 和
 `Binary/` 子目录，避免 `Resources.Load` 无法区分同名 `.json`/`.bytes`。
 

@@ -280,6 +280,89 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        /// <summary>验证相同行类型的单表重复加载会替换旧缓存，而不是追加合并。</summary>
+        [Test]
+        public void ConfigModuleSingleLoadReplacesSameTypeTable()
+        {
+            ConfigTableSchema first = CreatePartitionSchema(
+                "TestConfigRow@First", new CsvRow(4, new[] { "1", "Sword", "12.5" }));
+            ConfigTableSchema second = CreatePartitionSchema(
+                "TestConfigRow@Second", new CsvRow(4, new[] { "2", "Shield", "20" }));
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), first.TableId, first.SchemaHash);
+            GameObject owner = new GameObject("Config Module Replace Tests");
+            IConfigModule module = RFrameworkModuleEntry.GetModule<IConfigModule>();
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                module.UnloadAllConfigs();
+                module.SetHelper(helper);
+
+                module.LoadConfig<TestConfigRow>(
+                    Encoding.UTF8.GetBytes(ConfigJsonExporter.Build(first)));
+                Assert.AreEqual("Sword", module.GetConfig<TestConfigRow>(1).Name);
+
+                module.LoadConfig<TestConfigRow>(
+                    Encoding.UTF8.GetBytes(ConfigJsonExporter.Build(second)));
+                Assert.IsNull(module.GetConfig<TestConfigRow>(1));
+                Assert.AreEqual("Shield", module.GetConfig<TestConfigRow>(2).Name);
+                Assert.AreEqual(1, module.ConfigCount);
+            }
+            finally
+            {
+                module.UnloadAllConfigs();
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
+                Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>
+        /// 验证 Bundle 会合并自身同类型分片并整体替换旧表，失败 Bundle 不修改当前缓存。
+        /// </summary>
+        [Test]
+        public void ConfigModuleBundleReplacesOldTableAndRollsBackOnFailure()
+        {
+            ConfigTableSchema old = CreatePartitionSchema(
+                "TestConfigRow@Old", new CsvRow(4, new[] { "9", "Old", "1" }));
+            ConfigTableSchema low = CreatePartitionSchema(
+                "TestConfigRow@Low", new CsvRow(4, new[] { "1", "Sword", "12.5" }));
+            ConfigTableSchema high = CreatePartitionSchema(
+                "TestConfigRow@High", new CsvRow(4, new[] { "2", "Shield", "20" }));
+            ConfigTableSchema duplicate = CreatePartitionSchema(
+                "TestConfigRow@Duplicate", new CsvRow(4, new[] { "1", "Duplicate", "30" }));
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), old.TableId, old.SchemaHash);
+            GameObject owner = new GameObject("Config Module Bundle Commit Tests");
+            IConfigModule module = RFrameworkModuleEntry.GetModule<IConfigModule>();
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                module.UnloadAllConfigs();
+                module.SetHelper(helper);
+                module.LoadConfig<TestConfigRow>(
+                    Encoding.UTF8.GetBytes(ConfigJsonExporter.Build(old)));
+
+                module.LoadConfigBundle(Encoding.UTF8.GetBytes(
+                    ConfigJsonExporter.BuildBundle(new[] { low, high })));
+                Assert.IsNull(module.GetConfig<TestConfigRow>(9));
+                Assert.AreEqual("Sword", module.GetConfig<TestConfigRow>(1).Name);
+                Assert.AreEqual("Shield", module.GetConfig<TestConfigRow>(2).Name);
+
+                Assert.Throws<RFrameworkException>(() => module.LoadConfigBundle(
+                    Encoding.UTF8.GetBytes(
+                        ConfigJsonExporter.BuildBundle(new[] { low, duplicate }))));
+                Assert.AreEqual("Sword", module.GetConfig<TestConfigRow>(1).Name);
+                Assert.AreEqual("Shield", module.GetConfig<TestConfigRow>(2).Name);
+                Assert.AreEqual(1, module.ConfigCount);
+            }
+            finally
+            {
+                module.UnloadAllConfigs();
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
+                Object.DestroyImmediate(owner);
+            }
+        }
+
         /// <summary>验证 Localization JSON 导出、转义和 JsonLocalizationHelper 回读。</summary>
         [Test]
         public void LocalizationJsonRoundTripsThroughJsonHelper()
