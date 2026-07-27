@@ -33,10 +33,7 @@ public sealed class ExpansionDemoController : MonoBehaviour
     private string additiveSceneLocation = "ExpansionContent";
 
     [SerializeField]
-    private string successUrl = "http://127.0.0.1:8091/health";
-
-    [SerializeField]
-    private string cancellationUrl = "https://httpbin.org/delay/10";
+    private string webProbeRelativePath = "ExpansionDemo/WebProbe.txt";
 
     [SerializeField]
     private bool runOnStart = true;
@@ -148,8 +145,9 @@ public sealed class ExpansionDemoController : MonoBehaviour
             AppendStatus("场景加载与卸载通过。");
 
             AppendStatus("4/5 执行 UniTask Web 请求...");
+            string webProbeUrl = BuildWebProbeUrl();
             WebResponse response = await GameEntry.WebRequest.GetAsync(
-                successUrl,
+                webProbeUrl,
                 null,
                 null,
                 "ExpansionDemo",
@@ -223,14 +221,13 @@ public sealed class ExpansionDemoController : MonoBehaviour
                CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken))
         {
             Task<WebResponse> requestTask = GameEntry.WebRequest.GetAsync(
-                cancellationUrl,
+                BuildWebProbeUrl(),
                 null,
                 null,
                 "ExpansionDemoCancellation",
                 0,
                 requestCts.Token);
 
-            await Task.Delay(200, lifetimeToken);
             requestCts.Cancel();
 
             WebResponse response = await requestTask;
@@ -240,6 +237,18 @@ public sealed class ExpansionDemoController : MonoBehaviour
                     $"取消结果不符合预期：{response?.StatusCode} {response?.Error} {response?.ErrorMessage}");
             }
         }
+    }
+
+    private string BuildWebProbeUrl()
+    {
+        string path = Application.streamingAssetsPath.TrimEnd('/', '\\')
+            + "/" + webProbeRelativePath.TrimStart('/', '\\');
+        if (path.Contains("://") || path.StartsWith("jar:", StringComparison.OrdinalIgnoreCase))
+        {
+            return path;
+        }
+
+        return new Uri(path).AbsoluteUri;
     }
 
     private void AppendStatus(string message)

@@ -135,6 +135,21 @@ HybridCLR 涉及程序集划分、AOT 泛型补充、热更新 DLL、资源交�
 当前开发工程已安装 YooAsset 与 UniTask。MemoryPack 当前未安装，仅保留为阶段 4
 的可选规划；每个 Helper 只应依赖自己实际使用的插件。
 
+### YooAsset Host 内置目录工具
+
+菜单 `UnityRFramework/Expansion/YooAsset Builtin Catalog` 会从
+`BundleCollectorSetting` 动态读取 Package，并输出到 YooAsset 当前配置的
+StreamingAssets 根目录。
+
+- `生成空 Catalog（全部资源远程）`：只生成 Host 初始化所需的空
+  `BuiltinCatalog.bytes`，不把任何 Bundle 标记为内置资源。
+- `根据内置目录生成 Catalog（包含首包资源）`：读取所选 Package 的版本、
+  Manifest 和现有 Bundle，重新生成与实际首包文件一致的 Catalog。
+
+构建时使用 `ClearAndCopyAll` 或 `ClearAndCopyByTags`，YooAsset 会自动处理首包
+文件；手动移除或调整内置 Bundle 后，应使用本工具重新生成 Catalog，避免目录
+记录与实际文件不一致。
+
 YooAsset v3 的 EditorSimulate 单包只能使用一种虚拟 Bundle 类型。当前
 `YooAssetResourceHelper` 面向同时包含 Prefab、场景、JSON 和二进制配置的普通
 资源包，因此 `byte[]` 与 `string` 从普通 Bundle 内的 `TextAsset` 转换，不按

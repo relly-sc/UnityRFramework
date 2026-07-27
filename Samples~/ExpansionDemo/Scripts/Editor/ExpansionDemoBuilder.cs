@@ -29,6 +29,8 @@ namespace UnityRFramework.Editor
         private const string RawDirectory = Root + "/GameAssets/YooAsset/Raw";
         private const string SceneDirectory = Root + "/GameAssets/YooAsset/Scenes";
         private const string ProbeFile = RawDirectory + "/ExpansionProbe.bytes";
+        private const string WebProbeDirectory = "Assets/StreamingAssets/ExpansionDemo";
+        private const string WebProbeFile = WebProbeDirectory + "/WebProbe.txt";
         private const string BootScene = Root + "/GameAssets/Scenes/ExpansionDemo.unity";
         private const string ContentScene = SceneDirectory + "/ExpansionContent.unity";
 
@@ -40,6 +42,7 @@ namespace UnityRFramework.Editor
         {
             EnsureDirectories();
             WriteProbeFile();
+            WriteWebProbeFile();
             CreateContentScene();
             CreateFrameworkPrefab();
             ConfigureYooAssetCollectors();
@@ -54,13 +57,13 @@ namespace UnityRFramework.Editor
         private static void EnsureDirectories()
         {
             EnsureFolder(Root + "/Scripts");
-            EnsureFolder(Root + "/Editor");
             EnsureFolder(Root + "/GameAssets");
             EnsureFolder(Root + "/GameAssets/Prefabs");
             EnsureFolder(Root + "/GameAssets/Scenes");
             EnsureFolder(Root + "/GameAssets/YooAsset");
             EnsureFolder(RawDirectory);
             EnsureFolder(SceneDirectory);
+            EnsureFolder(WebProbeDirectory);
         }
 
         private static void EnsureFolder(string path)
@@ -87,6 +90,16 @@ namespace UnityRFramework.Editor
                 "UnityRFramework Expansion RawFile acceptance payload.\n",
                 new UTF8Encoding(false));
             AssetDatabase.ImportAsset(ProbeFile, ImportAssetOptions.ForceUpdate);
+        }
+
+        private static void WriteWebProbeFile()
+        {
+            string absolutePath = Path.GetFullPath(WebProbeFile);
+            File.WriteAllText(
+                absolutePath,
+                "UnityRFramework Expansion WebRequest acceptance payload.\n",
+                new UTF8Encoding(false));
+            AssetDatabase.ImportAsset(WebProbeFile, ImportAssetOptions.ForceUpdate);
         }
 
         private static void CreateContentScene()

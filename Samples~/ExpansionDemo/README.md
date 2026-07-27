@@ -37,8 +37,8 @@ MemoryPack、NPOI 和 EPPlus 当前均不是本示例依赖。
 1. 初始化 YooAsset EditorSimulate 资源包并激活包清单。
 2. 以 `byte[]` 加载、校验和卸载普通 Bundle 内的二进制 `TextAsset`。
 3. 加载并卸载 `ExpansionContent` Additive 场景。
-4. 通过 UniTask Helper 请求本机 UnitySkills `/health`。
-5. 对一个在飞 Web 请求主动取消，并校验结果为 `WebRequestError.Aborted`。
+4. 通过 UniTask Helper 读取构建器生成的本地 StreamingAssets 探针文件。
+5. 对探针请求主动取消，并校验结果为 `WebRequestError.Aborted`。
 6. 请求框架软重启，等待旧 YooAsset 包异步销毁后重新初始化。
 7. 重启后再次执行上述全部链路。
 
@@ -57,6 +57,29 @@ MemoryPack、NPOI 和 EPPlus 当前均不是本示例依赖。
 本轮只验证 EditorSimulate。Offline 需要先生成并部署内置 YooAsset 包；Host 需要
 准备远端清单、资源服务器及主/备用地址，完成后应分别补做目标平台验收。
 
+## Host 模式准备
+
+纯远端 Host 模式不能直接删除整个内置包目录。YooAsset v3 的
+`BuiltinFileSystem` 即使不包含任何内置 Bundle，也仍需读取本地
+`BuiltinCatalog.bytes`。
+
+先执行：
+
+`UnityRFramework/Expansion/YooAsset Builtin Catalog`
+
+在工具中选择 `ExpansionDemoPackage`，然后点击：
+
+`生成空 Catalog（全部资源远程）`
+
+工具会在以下目录生成空的内置目录文件：
+
+`Assets/StreamingAssets/yoo/ExpansionDemoPackage/BuiltinCatalog.bytes`
+
+空目录文件只用于初始化 Builtin 文件系统，不会将任何 Bundle 标记为内置资源。
+版本文件、Manifest 和 Bundle 仍会从 `defaultHostServer` 下载。服务器根目录应
+直接包含 `ExpansionDemoPackage.version`、对应版本的 Manifest 和所有 Bundle，
+不要在 URL 与这些文件之间额外嵌套平台、包名或版本目录。
+
 ## 目录
 
 ```text
@@ -74,3 +97,6 @@ ExpansionDemo/
 
 `Raw` 是示例目录的历史命名；当前文件按普通 `TextAsset` 收集，不是 YooAsset
 RawFile 包。
+
+构建器还会生成 `Assets/StreamingAssets/ExpansionDemo/WebProbe.txt`，因此 Web
+验收不依赖 UnitySkills REST、外部网站或公网连接。
