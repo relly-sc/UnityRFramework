@@ -14,8 +14,13 @@ Samples~/Demo/                  ← 官方示例（仅用内置 Helper，串通�
 
 > `Samples~` 以 `~` 结尾，Unity 不自动编译；经 Package Manager 的 **Import Sample** 才会进入项目编译。
 
-三层命名空间固定为：Library 使用 `RFramework`，Runtime 使用 `UnityRFramework.Runtime`，
-Editor 使用 `UnityRFramework.Editor`。模块子文件夹只负责组织文件，不继续扩展命名空间。
+命名空间按代码层固定：Library 使用 `RFramework`，Runtime 使用
+`UnityRFramework.Runtime`，Editor 使用 `UnityRFramework.Editor`，Expansion
+使用 `UnityRFramework.Expansion`。模块子文件夹只负责组织文件，不继续扩展命名空间。
+所有 Sample 的手写脚本统一放在 `Scripts/Runtime`；仅当存在编辑器脚本时创建
+`Scripts/Editor`，不保留空的 Editor 文件夹。
+Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，所有 `public/internal`
+类型与成员必须提供 XML 注释；生成代码由生成器负责，不手工补改。
 
 所有共享数据通过 Helper 桥接模式解耦：Library 定义 `IXxxHelper` 纯 C# 接口 → Runtime 提供默认实现 → Expansion 提供第三方实现。
 
@@ -281,7 +286,7 @@ JSON 与 URFC v2 均支持显式历史 Schema 迁移。二进制实现 `IBinaryC
 均拒绝。JSON 新格式为 `Tables -> 表名 -> { TableId, SchemaHash, Rows }`；旧的
 `Tables -> 数组`、`Items` 和顶层数组仍可读取，但无 SchemaHash，不能参与显式迁移。
 
-框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具同时生成 JSON、配置行、静态 Codec、URFC v2、URFM v1 多表容器、带 CRC32 的 URFL v2 和 URLM v1 多语言容器，并仅在内容变化时写入。默认流程由 Excel 手动导出 UTF-8 CSV，再由工具生成 JSON/`.bytes`；直接读取 XLSX 的方案放在第三方 Expansion。Config 的 JSON/`.bytes` 共用一个输出目录，Localization 也共用一个输出目录，两类模块的输出目录必须分开。生成命名空间留空时，配置行和 Codec 生成到全局命名空间。Runtime 仍兼容读取无 CRC 的 URFL v1。独立验收场景位于 `Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance`，固定源数据位于 `Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline`；测试只使用 `Acceptance_*` 数据，不依赖 Samples/Demo。Demo 的 `Demo_*` 源文件、生成代码和运行时产物分别位于 `Samples/Demo/ConfigSource`、`Samples/Demo/Generated`、`Samples/Demo/GameAssets/Resources`。可通过 `UnityRFramework/Tests` 下的菜单导出测试数据、重建场景、运行 Play Mode 验收或构建包含 Test Assemblies 的专用 Player。
+框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Config 第一行任意位置以 `!` 开头的字段名表示整列策划备注，该列不会进入校验、代码、SchemaHash、JSON 或二进制产物。Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具同时生成 JSON、配置行、静态 Codec、URFC v2、URFM v1 多表容器、带 CRC32 的 URFL v2 和 URLM v1 多语言容器，并仅在内容变化时写入。默认流程由 Excel 手动导出 UTF-8 CSV，再由工具生成 JSON/`.bytes`；直接读取 XLSX 的方案放在第三方 Expansion。Config 的 JSON/`.bytes` 共用一个输出目录，Localization 也共用一个输出目录，两类模块的输出目录必须分开。生成命名空间留空时，配置行和 Codec 生成到全局命名空间。Runtime 仍兼容读取无 CRC 的 URFL v1。独立验收场景位于 `Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance`，固定源数据位于 `Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline`；测试只使用 `Acceptance_*` 数据，不依赖 Samples/Demo。Demo 的 `Demo_*` 源文件、生成代码和运行时产物分别位于 `Samples/Demo/ConfigSource`、`Samples/Demo/Generated`、`Samples/Demo/GameAssets/Resources`。可通过 `UnityRFramework/Tests` 下的菜单导出测试数据、重建场景、运行 Play Mode 验收或构建包含 Test Assemblies 的专用 Player。
 
 同一业务集合需要拆成多个源文件时，使用 `逻辑表名@分片名.csv`，例如
 `Warrior@1000_1999.csv` 与 `Warrior@2000_2999.csv`。两者只生成一个 `WarriorConfig`，

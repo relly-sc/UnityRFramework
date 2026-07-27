@@ -105,6 +105,8 @@ Samples/Demo/
 │   │   └── Prefabs/UI/         # 大厅 UI 预制体
 │   └── Scenes/                 # DemoBoot、DemoHall、DemoExpedition
 └── Scripts/
+    ├── Editor/                  # Demo 专用导出菜单
+    └── Runtime/                 # 启动、Procedure、UI 与业务演示脚本
 ```
 
 `Config/Json`、`Localization/Json` 下同时保留 bundle 产物，供多表合一能力验收；当前 Demo 启动为清晰展示“单表一个文件”的默认用法，逐表加载 `Demo_Character`、`Demo_Quest`、`Demo_Action` 和 `Demo_Reward`。

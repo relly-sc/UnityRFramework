@@ -39,6 +39,73 @@ namespace UnityRFramework.Editor.Tests
                 ConfigSchemaParser.ParseConfig(document, "Game.Config"));
         }
 
+        /// <summary>
+        /// 验证以感叹号开头的列不会进入代码、JSON 和 URFC 二进制产物。
+        /// </summary>
+        [Test]
+        public void ConfigPipelineIgnoresBangPrefixedColumns()
+        {
+            const string csv =
+                "!DesignerNote,Id,Name,!InvalidType,Price\n"
+                + ",int,string,unsupported,float\n"
+                + "策划备注,编号,名称,无效类型,价格\n"
+                + "internal only,1,Sword,not parsed,12.5";
+            ConfigTableSchema schema = ConfigSchemaParser.ParseConfig(
+                CsvDocumentReader.Parse("TestConfigRow.csv", csv),
+                "UnityRFramework.Editor.Tests");
+
+            Assert.AreEqual(3, schema.Fields.Count);
+            CollectionAssert.AreEqual(
+                new[] { "Id", "Name", "Price" },
+                new[]
+                {
+                    schema.Fields[0].Name,
+                    schema.Fields[1].Name,
+                    schema.Fields[2].Name
+                });
+            CollectionAssert.AreEqual(
+                new[] { "1", "Sword", "12.5" },
+                schema.Rows[0].Values);
+
+            string code = ConfigCodeGenerator.Generate(schema);
+            string json = ConfigJsonExporter.Build(schema);
+            StringAssert.DoesNotContain("DesignerNote", code);
+            StringAssert.DoesNotContain("InvalidType", code);
+            StringAssert.DoesNotContain("DesignerNote", json);
+            StringAssert.DoesNotContain("internal only", json);
+
+            Utility.Json.SetJsonHelper(new DefaultJsonHelper());
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), schema.TableId, schema.SchemaHash);
+            BinaryConfigCodecRegistry.Register(
+                new TestConfigRowCodec(schema.TableId, schema.SchemaHash));
+            GameObject owner = new GameObject("Ignored Config Columns Tests");
+            try
+            {
+                JsonConfigHelper jsonHelper = owner.AddComponent<JsonConfigHelper>();
+                object jsonTable = jsonHelper.ParseConfig(
+                    typeof(TestConfigRow), Encoding.UTF8.GetBytes(json));
+                TestConfigRow jsonRow =
+                    jsonHelper.GetConfig<TestConfigRow>(jsonTable, 1);
+                Assert.AreEqual("Sword", jsonRow.Name);
+                Assert.AreEqual(12.5f, jsonRow.Price);
+
+                BinaryConfigHelper binaryHelper = owner.AddComponent<BinaryConfigHelper>();
+                object binaryTable = binaryHelper.ParseConfig(
+                    typeof(TestConfigRow), ConfigBinaryExporter.BuildV2(schema));
+                TestConfigRow binaryRow =
+                    binaryHelper.GetConfig<TestConfigRow>(binaryTable, 1);
+                Assert.AreEqual("Sword", binaryRow.Name);
+                Assert.AreEqual(12.5f, binaryRow.Price);
+            }
+            finally
+            {
+                BinaryConfigCodecRegistry.Unregister(typeof(TestConfigRow));
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
+                Object.DestroyImmediate(owner);
+            }
+        }
+
         /// <summary>Verifies that Localization uses the shared three-row header format.</summary>
         [Test]
         public void LocalizationCsvUsesThreeHeaderRows()

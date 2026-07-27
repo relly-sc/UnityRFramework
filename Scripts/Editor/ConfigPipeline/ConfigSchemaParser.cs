@@ -75,11 +75,27 @@ namespace UnityRFramework.Editor
             CsvRow nameRow = document.Rows[0];
             CsvRow typeRow = document.Rows[1];
             CsvRow commentRow = document.Rows[2];
-            int fieldCount = nameRow.Values.Count;
-            if (fieldCount == 0 || typeRow.Values.Count != fieldCount)
+            int sourceColumnCount = nameRow.Values.Count;
+            if (sourceColumnCount == 0 || typeRow.Values.Count != sourceColumnCount)
             {
                 throw Error(document.SourcePath, typeRow.LineNumber,
                     "Field and type rows must contain the same non-zero number of columns.");
+            }
+
+            List<int> retainedColumnIndices = new List<int>(sourceColumnCount);
+            for (int i = 0; i < sourceColumnCount; i++)
+            {
+                string sourceHeader = nameRow.Values[i].Trim();
+                if (!sourceHeader.StartsWith("!", StringComparison.Ordinal))
+                {
+                    retainedColumnIndices.Add(i);
+                }
+            }
+
+            if (retainedColumnIndices.Count == 0)
+            {
+                throw Error(document.SourcePath, nameRow.LineNumber,
+                    "Config schema contains no exported columns after ignoring '!' headers.");
             }
 
             string segmentName = Path.GetFileNameWithoutExtension(document.SourcePath);
@@ -104,11 +120,13 @@ namespace UnityRFramework.Editor
                 ? tableName
                 : tableName + "Config";
 
-            List<ConfigFieldSchema> fields = new List<ConfigFieldSchema>(fieldCount);
+            List<ConfigFieldSchema> fields =
+                new List<ConfigFieldSchema>(retainedColumnIndices.Count);
             HashSet<string> fieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < fieldCount; i++)
+            for (int i = 0; i < retainedColumnIndices.Count; i++)
             {
-                string fieldName = nameRow.Values[i].Trim();
+                int sourceColumnIndex = retainedColumnIndices[i];
+                string fieldName = nameRow.Values[sourceColumnIndex].Trim();
                 ValidateIdentifier(fieldName, "field", document.SourcePath, nameRow.LineNumber);
                 if (!fieldNames.Add(fieldName))
                 {
@@ -117,11 +135,11 @@ namespace UnityRFramework.Editor
                 }
 
                 ConfigFieldSchema field = ParseFieldType(
-                    typeRow.Values[i].Trim(), rowTypeName, fieldName,
+                    typeRow.Values[sourceColumnIndex].Trim(), rowTypeName, fieldName,
                     document.SourcePath, typeRow.LineNumber);
                 field.Name = fieldName;
-                field.Comment = i < commentRow.Values.Count
-                    ? commentRow.Values[i].Trim()
+                field.Comment = sourceColumnIndex < commentRow.Values.Count
+                    ? commentRow.Values[sourceColumnIndex].Trim()
                     : string.Empty;
                 fields.Add(field);
             }
@@ -144,26 +162,42 @@ namespace UnityRFramework.Editor
                     continue;
                 }
 
-                if (row.Values.Count != fieldCount)
+                if (row.Values.Count != sourceColumnCount)
                 {
                     throw Error(document.SourcePath, row.LineNumber,
-                        $"Expected {fieldCount} columns, found {row.Values.Count}.");
+                        $"Expected {sourceColumnCount} columns, found {row.Values.Count}.");
+                }
+
+                string[] retainedValues = new string[retainedColumnIndices.Count];
+                for (int i = 0; i < retainedColumnIndices.Count; i++)
+                {
+                    retainedValues[i] = row.Values[retainedColumnIndices[i]];
+                }
+
+                CsvRow retainedRow = new CsvRow(row.LineNumber, retainedValues);
+                if (IsBlank(retainedRow))
+                {
+                    continue;
                 }
 
                 for (int fieldIndex = 0; fieldIndex < fields.Count; fieldIndex++)
                 {
                     ConfigValueParser.Validate(
-                        fields[fieldIndex], row.Values[fieldIndex], document.SourcePath, row.LineNumber);
+                        fields[fieldIndex], retainedRow.Values[fieldIndex],
+                        document.SourcePath, row.LineNumber);
                 }
 
                 int idIndex = fields.IndexOf(idField);
-                int id = int.Parse(row.Values[idIndex].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture);
+                int id = int.Parse(
+                    retainedRow.Values[idIndex].Trim(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture);
                 if (!ids.Add(id))
                 {
                     throw Error(document.SourcePath, row.LineNumber, $"Duplicate Id '{id}'.");
                 }
 
-                rows.Add(row);
+                rows.Add(retainedRow);
             }
 
             string fullTypeName = string.IsNullOrEmpty(namespaceName)

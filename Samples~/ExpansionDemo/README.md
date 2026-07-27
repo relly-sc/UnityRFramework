@@ -1,105 +1,76 @@
-# UnityRFramework · ExpansionDemo Sample（计划清单）
+# UnityRFramework · ExpansionDemo
 
-使用 **Expansion 第三方辅助器**（YooAsset、UniTask 等）的完整可运行 Demo。
-与 Demo（内置 Helper 版）形成对照：同样串通全部框架模块，但底层走第三方链。
+`ExpansionDemo` 是第三方 Helper 的最小端到端验收场景，不复制正式 Demo 的业务
+玩法。当前覆盖 YooAsset 3.0.3-beta 与 UniTask WebRequest Helper。
 
-> 本 Sample 按阶段推进，不一次性写完。本文档即进度清单，每完成一项勾掉一行。
-> **前置条件**：必须先 Import Expansion Sample 并安装对应第三方包（YooAsset、UniTask 等），详见 `Samples/Expansion/README.md`。
+## 前置依赖
 
----
+- `com.tuyoogame.yooasset` 3.0.3-beta
+- `com.cysharp.unitask`
+- `Samples/Expansion` 中的第三方 Helper
 
-## 设计原则
+MemoryPack、NPOI 和 EPPlus 当前均不是本示例依赖。
 
-- **对接第三方**：Resource → YooAssetHelper，WebRequest → UniTaskWebRequestHelper，后续扩展 Luban/HybridCLR。
-- **与 Demo 共享骨架**：复用 Demo 的 `DemoGameEntry` / `DemoProcedure` 架构，区别仅在 prefab 的 `xxxHelperTypeName` 配置项。
-- **自包含**：ExpansionDemo 的资源、场景、脚本全部在本目录内，不污染核心包和 Demo。
-- **可跳过**：开发者若只用内置 Helper，可以不 Import 本 Sample。
+## 生成验收资产
 
----
+在 Unity 菜单执行：
 
-## 阶段一：前置准备
+`UnityRFramework/ExpansionDemo/Rebuild Acceptance Assets`
 
-> 目标：确认 Expansion + 第三方环境可用。
+构建器会在编辑器中完成以下工作：
 
-- [ ] **安装第三方包**
-  - [ ] Import Expansion Sample
-  - [ ] 安装 YooAsset（如 `com.tuyoogame.yooasset`）
-  - [ ] 安装 UniTask（如 `com.cysharp.unitask`）
-  - [ ] 编译通过，确认 YooAsset / UniTask asmdef 可被引用
-- [ ] **验证 Helper 可用**
-  - [ ] YooAsset 包初始化成功（Editor Simulation 模式）
-  - [ ] UniTask WebRequest 能发起网络请求
+1. 生成二进制 `TextAsset` 测试文件和 Additive 内容场景。
+2. 复制框架预制体，并配置 `YooAssetResourceHelper` 与
+   `UniTaskWebRequestHelper`。
+3. 生成序列化 UGUI 启动场景；运行时代码只更新文本和绑定事件，不控制布局。
+4. 创建 `ExpansionDemoPackage` 收集规则。
+5. 将启动场景设为 Build Settings 第 0 项，以便验证框架软重启。
 
----
+## 自动验收流程
 
-## 阶段二：ExpansionDemo 骨架
+打开并运行：
 
-> 目标：比照 Demo 骨架，配好第三方 Helper 后框架能启动。
+`GameAssets/Scenes/ExpansionDemo.unity`
 
-- [ ] **目录结构**
-  - [ ] `Samples/ExpansionDemo/Scripts/` **不建 `.asmdef`**：随宿主编入 `Assembly-CSharp`
-  - [ ] `Samples/ExpansionDemo/Scenes/ExpansionDemo.unity`
-  - [ ] `Samples/ExpansionDemo/Prefabs/`
-- [ ] **ExpansionDemoGameEntry.cs**
-  - [ ] 复用 DemoGameEntry 引导逻辑，加载 UnityRFramework 预制体
-- [ ] **UnityRFramework 预制体（本 Sample 专用副本）**
-  - [ ] `resourceHelperTypeName` → `UnityRFramework.Expansion.YooAssetResourceHelper`
-  - [ ] `webRequestHelperTypeName` → `UnityRFramework.Expansion.UniTaskWebRequestHelper`
-  - [ ] 其余 Helper 保持默认（核心内置）
-- [ ] **ExpansionDemoProcedure 流程**
-  - [ ] `ExpansionLaunchProcedure` → `ExpansionMenuProcedure` → `ExpansionGameProcedure`
-  - [ ] 状态切换日志验证流程通
+默认会自动执行：
 
----
+1. 初始化 YooAsset EditorSimulate 资源包并激活包清单。
+2. 以 `byte[]` 加载、校验和卸载普通 Bundle 内的二进制 `TextAsset`。
+3. 加载并卸载 `ExpansionContent` Additive 场景。
+4. 通过 UniTask Helper 请求本机 UnitySkills `/health`。
+5. 对一个在飞 Web 请求主动取消，并校验结果为 `WebRequestError.Aborted`。
+6. 请求框架软重启，等待旧 YooAsset 包异步销毁后重新初始化。
+7. 重启后再次执行上述全部链路。
 
-## 阶段三：逐模块演示（跟 Demo 对照）
+最终状态区应出现：
 
-> 目标：跟 Demo 同样的模块清单，但走第三方 Helper 路径，证明"切换一个配置就换一套底层实现"。
+`PASS：框架重启后全部第三方链路再次通过。`
 
-| 模块 | Demo（内置 Helper） | ExpansionDemo（第三方 Helper） |
-|------|---------------------|-------------------------------|
-| Resource | `DefaultResourceHelper`（Resources） | `YooAssetResourceHelper`（YooAsset） |
-| WebRequest | `DefaultWebRequestHelper`（HttpClient） | `UniTaskWebRequestHelper`（UniTask） |
-| Config | `DefaultConfigHelper`（JSON） | 待接入 Luban（后续） |
-| 其余 13 模块 | 内置 Helper | 与 Demo 完全相同 |
+## 2026-07-27 验收结果
 
-- [ ] **Resource 演示**：用 YooAsset 加载一个测试资源并显示
-- [ ] **WebRequest 演示**：用 UniTask 发起一次网络请求
-- [ ] **其余模块**：直接复用 Demo 的演示组件（所有模块接口一致，Helper 换掉对上层透明）
-- [ ] **验证**：与 Demo 同样的操作流程，底层 Helper 不同但行为一致
+- Unity C# 编译错误：0。
+- 首次启动、资源、场景、Web 成功请求与取消：通过。
+- Restart 关闭、重新启动和第二轮完整链路：通过。
+- Play Mode 运行捕获新增未处理错误：0。
+- Quit 关闭流程：通过。
 
----
+本轮只验证 EditorSimulate。Offline 需要先生成并部署内置 YooAsset 包；Host 需要
+准备远端清单、资源服务器及主/备用地址，完成后应分别补做目标平台验收。
 
-## 阶段四：内置资源
+## 目录
 
-- [ ] **YooAsset 测试资源**：一个最小 AssetBundle 测试包（或 Editor Simulation 模式下的虚拟资源）
-- [ ] **UniTask 演示场景**：一个 `async void` / `UniTask` 风格调用的展示脚本
-- [ ] **验证**：单独导入 ExpansionDemo 后场景可运行（前提：Expansion + 第三方包已安装）
-
----
-
-## 与 Demo / Expansion 的关系
-
-```
-Samples/
-├── Expansion/         ← 纯代码：第三方 Helper 实现（YooAsset、UniTask 等）
-├── Demo/              ← 完整 Demo：内置 Helper，零第三方
-└── ExpansionDemo/     ← 完整 Demo：复用 Expansion Helper，对接第三方 ← 本目录
+```text
+ExpansionDemo/
+├── Scripts/
+│   ├── Editor/ExpansionDemoBuilder.cs
+│   └── Runtime/ExpansionDemoController.cs
+└── GameAssets/
+    ├── Prefabs/UnityRFramework.prefab
+    ├── Scenes/ExpansionDemo.unity
+    └── YooAsset/
+        ├── Raw/ExpansionProbe.bytes
+        └── Scenes/ExpansionContent.unity
 ```
 
-- **ExpansionDemo 依赖 Expansion**：必须先 Import Expansion + 安装第三方包。
-- **ExpansionDemo 与 Demo 骨架相通**：同一套 Procedure/GameEntry 模式，不同 prefab 配置。
-- **Expansion 自己不跑**：它是纯 Helper 代码，不包含场景/流程。
-
----
-
-## 进度总览
-
-| 阶段 | 内容 | 状态 |
-|------|------|:--:|
-| 一 · 前置准备 | 安装第三方包 + 验证 | ⬜ 待开始 |
-| 二 · 骨架 | ExpansionDemo 场景 + prefab 副本 + Procedure | ⬜ 待开始 |
-| 三 · 逐模块演示 | Resource/WebRequest 走第三方，其余复用 Demo | ⬜ 待开始 |
-| 四 · 内置资源 | YooAsset 测试资源 | ⬜ 待开始 |
-
-> 下一步：等 Demo 完成第一阶段后，复制骨架改造为 ExpansionDemo（改 prefab 的 HelperTypeName 配置即可）。
+`Raw` 是示例目录的历史命名；当前文件按普通 `TextAsset` 收集，不是 YooAsset
+RawFile 包。
