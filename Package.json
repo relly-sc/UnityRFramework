@@ -25,12 +25,12 @@
     },
     {
       "displayName": "Demo",
-      "description": "官方可运行 Demo，使用内置辅助器串通全部框架模块。不依赖任何第三方包。",
+      "description": "官方可运行 Demo，使用内置辅助器串通全部框架模块。不依赖第三方包；导入后需执行 Export Config and Localization，将配置、本地化、音频和公告同步到项目级 StreamingAssets。",
       "path": "Samples~/Demo"
     },
     {
       "displayName": "ExpansionDemo",
-      "description": "使用 Expansion 第三方辅助器（YooAsset、UniTask 等）的完整 Demo。需先安装对应第三方包并导入 Expansion Sample。",
+      "description": "使用 Expansion 第三方辅助器（YooAsset、UniTask 等）的完整 Demo。导入后必须执行 Rebuild Acceptance Assets 生成项目级 StreamingAssets 文件；需先安装对应第三方包并导入 Expansion Sample。",
       "path": "Samples~/ExpansionDemo"
     }
   ]

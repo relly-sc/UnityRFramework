@@ -36,6 +36,14 @@ MonoBehaviour:
         AddressRuleName: AddressByFileName
         PackRuleName: PackSeparately
         FilterRuleName: CollectAll
+        AssetTags: builtin
+        UserData: 
+      - CollectPath: Assets/UnityRFramework/Samples/ExpansionDemo/GameAssets/YooAsset/Remote
+        CollectorGUID: 7fb638879d100e44a87c0b72ace2d785
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackSeparately
+        FilterRuleName: CollectAll
         AssetTags: 
         UserData: 
       - CollectPath: Assets/UnityRFramework/Samples/ExpansionDemo/GameAssets/YooAsset/Scenes
@@ -44,5 +52,5 @@ MonoBehaviour:
         AddressRuleName: AddressByFileName
         PackRuleName: PackSeparately
         FilterRuleName: CollectScene
-        AssetTags: 
+        AssetTags: builtin
         UserData: 

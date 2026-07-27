@@ -20,19 +20,29 @@ namespace UnityRFramework.Editor
     /// </summary>
     public static class ExpansionDemoBuilder
     {
-        private const string Root = "Assets/UnityRFramework/Samples/ExpansionDemo";
         private const string PackageName = "ExpansionDemoPackage";
-        private const string SourceFrameworkPrefab =
-            "Assets/UnityRFramework/Prefabs/UnityRFramework.prefab";
-        private const string DemoFrameworkPrefab =
-            Root + "/GameAssets/Prefabs/UnityRFramework.prefab";
-        private const string RawDirectory = Root + "/GameAssets/YooAsset/Raw";
-        private const string SceneDirectory = Root + "/GameAssets/YooAsset/Scenes";
-        private const string ProbeFile = RawDirectory + "/ExpansionProbe.bytes";
         private const string WebProbeDirectory = "Assets/StreamingAssets/ExpansionDemo";
         private const string WebProbeFile = WebProbeDirectory + "/WebProbe.txt";
-        private const string BootScene = Root + "/GameAssets/Scenes/ExpansionDemo.unity";
-        private const string ContentScene = SceneDirectory + "/ExpansionContent.unity";
+        private static string sampleRoot;
+
+        private static string Root => sampleRoot ?? (sampleRoot = FindSampleRoot());
+
+        private static string DemoFrameworkPrefab =>
+            Root + "/GameAssets/Prefabs/UnityRFramework.prefab";
+
+        private static string RawDirectory => Root + "/GameAssets/YooAsset/Raw";
+
+        private static string RemoteDirectory => Root + "/GameAssets/YooAsset/Remote";
+
+        private static string SceneDirectory => Root + "/GameAssets/YooAsset/Scenes";
+
+        private static string ProbeFile => RawDirectory + "/ExpansionProbe.bytes";
+
+        private static string RemoteProbeFile => RemoteDirectory + "/RemoteProbe.json";
+
+        private static string BootScene => Root + "/GameAssets/Scenes/ExpansionDemo.unity";
+
+        private static string ContentScene => SceneDirectory + "/ExpansionContent.unity";
 
         /// <summary>
         /// 重建 ExpansionDemo 验收资产并将启动场景放到 Build Settings 第 0 项。
@@ -42,6 +52,7 @@ namespace UnityRFramework.Editor
         {
             EnsureDirectories();
             WriteProbeFile();
+            WriteRemoteProbeFile();
             WriteWebProbeFile();
             CreateContentScene();
             CreateFrameworkPrefab();
@@ -62,8 +73,35 @@ namespace UnityRFramework.Editor
             EnsureFolder(Root + "/GameAssets/Scenes");
             EnsureFolder(Root + "/GameAssets/YooAsset");
             EnsureFolder(RawDirectory);
+            EnsureFolder(RemoteDirectory);
             EnsureFolder(SceneDirectory);
             EnsureFolder(WebProbeDirectory);
+        }
+
+        private static string FindSampleRoot()
+        {
+            string[] guids = AssetDatabase.FindAssets("ExpansionDemoBuilder t:MonoScript");
+            foreach (string guid in guids)
+            {
+                string scriptPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (!scriptPath.EndsWith(
+                        "/Scripts/Editor/ExpansionDemoBuilder.cs",
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string editorDirectory = Path.GetDirectoryName(scriptPath);
+                string scriptsDirectory = Path.GetDirectoryName(editorDirectory);
+                string root = Path.GetDirectoryName(scriptsDirectory);
+                if (!string.IsNullOrEmpty(root))
+                {
+                    return root.Replace('\\', '/');
+                }
+            }
+
+            throw new InvalidOperationException(
+                "ExpansionDemoBuilder: 无法从脚本位置定位 ExpansionDemo Sample 根目录。");
         }
 
         private static void EnsureFolder(string path)
@@ -102,6 +140,23 @@ namespace UnityRFramework.Editor
             AssetDatabase.ImportAsset(WebProbeFile, ImportAssetOptions.ForceUpdate);
         }
 
+        private static void WriteRemoteProbeFile()
+        {
+            string absolutePath = Path.GetFullPath(RemoteProbeFile);
+            if (!File.Exists(absolutePath))
+            {
+                File.WriteAllText(
+                    absolutePath,
+                    "{\n"
+                    + "  \"version\": 1,\n"
+                    + "  \"message\": \"UnityRFramework remote package probe\"\n"
+                    + "}\n",
+                    new UTF8Encoding(false));
+            }
+
+            AssetDatabase.ImportAsset(RemoteProbeFile, ImportAssetOptions.ForceUpdate);
+        }
+
         private static void CreateContentScene()
         {
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -116,11 +171,12 @@ namespace UnityRFramework.Editor
 
         private static void CreateFrameworkPrefab()
         {
-            if (!AssetDatabase.CopyAsset(SourceFrameworkPrefab, DemoFrameworkPrefab)
+            string sourceFrameworkPrefab = FindFrameworkPrefab();
+            if (!AssetDatabase.CopyAsset(sourceFrameworkPrefab, DemoFrameworkPrefab)
                 && AssetDatabase.LoadAssetAtPath<GameObject>(DemoFrameworkPrefab) == null)
             {
                 throw new InvalidOperationException(
-                    $"Can not copy framework prefab from '{SourceFrameworkPrefab}'.");
+                    $"Can not copy framework prefab from '{sourceFrameworkPrefab}'.");
             }
 
             GameObject root = PrefabUtility.LoadPrefabContents(DemoFrameworkPrefab);
@@ -149,6 +205,39 @@ namespace UnityRFramework.Editor
             {
                 PrefabUtility.UnloadPrefabContents(root);
             }
+        }
+
+        private static string FindFrameworkPrefab()
+        {
+            string[] candidates =
+            {
+                "Packages/com.relly-sc.unityrframework/Prefabs/UnityRFramework.prefab",
+                "Assets/UnityRFramework/Prefabs/UnityRFramework.prefab"
+            };
+
+            foreach (string candidate in candidates)
+            {
+                if (AssetDatabase.LoadAssetAtPath<GameObject>(candidate) != null)
+                {
+                    return candidate;
+                }
+            }
+
+            string[] guids = AssetDatabase.FindAssets("UnityRFramework t:Prefab");
+            foreach (string guid in guids)
+            {
+                string prefabPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (prefabPath.EndsWith(
+                        "/Prefabs/UnityRFramework.prefab",
+                        StringComparison.Ordinal)
+                    && !prefabPath.StartsWith(Root + "/", StringComparison.Ordinal))
+                {
+                    return prefabPath;
+                }
+            }
+
+            throw new InvalidOperationException(
+                "ExpansionDemoBuilder: 无法定位框架 UnityRFramework.prefab。");
         }
 
         private static void SetSerializedValue(
@@ -218,11 +307,18 @@ namespace UnityRFramework.Editor
             group.Collectors.Add(CreateCollector(
                 RawDirectory,
                 nameof(PackSeparately),
-                nameof(CollectAll)));
+                nameof(CollectAll),
+                "builtin"));
+            group.Collectors.Add(CreateCollector(
+                RemoteDirectory,
+                nameof(PackSeparately),
+                nameof(CollectAll),
+                string.Empty));
             group.Collectors.Add(CreateCollector(
                 SceneDirectory,
                 nameof(PackSeparately),
-                nameof(CollectScene)));
+                nameof(CollectScene),
+                "builtin"));
 
             BundleCollectorSettingData.ModifyPackage(package);
             BundleCollectorSettingData.ModifyGroup(package, group);
@@ -233,7 +329,8 @@ namespace UnityRFramework.Editor
         private static BundleCollector CreateCollector(
             string collectPath,
             string packRuleName,
-            string filterRuleName)
+            string filterRuleName,
+            string assetTags)
         {
             return new BundleCollector
             {
@@ -242,7 +339,8 @@ namespace UnityRFramework.Editor
                 CollectorType = ECollectorType.MainAssetCollector,
                 AddressRuleName = nameof(AddressByFileName),
                 PackRuleName = packRuleName,
-                FilterRuleName = filterRuleName
+                FilterRuleName = filterRuleName,
+                AssetTags = assetTags
             };
         }
 

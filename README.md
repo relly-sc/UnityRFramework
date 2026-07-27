@@ -50,7 +50,15 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 **Samples（可选）**：在 Package Manager 中选中本包 → **Samples** → 点击 `Expansion` 或 `Demo` 的 **Import**。
 
 - `Expansion`：第三方集成（YooAsset 资源、UniTask Web 请求等）。UPM 不为 Sample 解析依赖，需手动安装其引用的包（YooAsset / UniTask / Luban / HybridCLR，按所用 Helper 而定）。详见 `Samples~/Expansion/README.md`。
-- `Demo`：官方可运行示例，**仅依赖内置 Helper、零第三方**；含演示用美术/音频资源，开发者可不导入。
+- `ExpansionDemo`：第三方 Helper 的可运行验收示例。必须先导入 `Expansion`、安装
+  YooAsset 与 UniTask，再执行菜单
+  `UnityRFramework/ExpansionDemo/Rebuild Acceptance Assets`。UPM 只复制 Sample
+  目录，不会自动生成 `Assets/StreamingAssets` 下的 Web 探针和 YooAsset
+  内置包文件；完整准备步骤见 ExpansionDemo 自带 README。
+- `Demo`：官方可运行示例，**仅依赖内置 Helper、零第三方**。导入后先执行
+  `UnityRFramework/Demo/Export Config and Localization`，该菜单会将配置、
+  本地化、音频和公告同步到宿主工程的 `Assets/StreamingAssets`，完成后再打开
+  `GameAssets/Scenes/DemoBoot.unity`。仅导入 Sample 后直接运行会缺少这些文件。
 
 > 核心包 `dependencies` 为空：框架本身不强制任何第三方库，按需引入即可。
 

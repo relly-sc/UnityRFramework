@@ -1,5 +1,24 @@
 # UnityRFramework Demo
 
+## Package Manager 导入后必做
+
+Package Manager 只会将本 Sample 复制到 `Assets/Samples/<包名>/<版本>/Demo`，
+不会自动向宿主工程的 `Assets/StreamingAssets` 写入运行时文件。导入后不要直接
+进入 Play Mode，请先：
+
+1. 等待 Unity 完成脚本编译。
+2. 在非 Play Mode 下执行
+   `UnityRFramework/Demo/Export Config and Localization`。
+3. 确认宿主工程中已生成：
+   - `Assets/StreamingAssets/Config`
+   - `Assets/StreamingAssets/Localization`
+   - `Assets/StreamingAssets/Audio`
+   - `Assets/StreamingAssets/Demo/Demo_Notice.json`
+4. 打开本 Sample 下的 `GameAssets/Scenes/DemoBoot.unity`，再进入 Play Mode。
+
+导出工具根据自身脚本位置动态定位 Demo，因此同时兼容框架开发目录与 Package
+Manager 导入后的目录。配置、本地化、音频或公告发生变化后，应重新执行该菜单。
+
 `Samples/Demo` 是 UnityRFramework 的默认实现示例。它不依赖 Expansion 或任何第三方插件，使用：
 
 - `DefaultResourceHelper`：通过 `Resources.Load` 加载资源。
@@ -115,8 +134,8 @@ Samples/Demo/
 
 默认管线不直接读取 Excel/XLSX。先手工将源表导出为 UTF-8 CSV，再执行
 `UnityRFramework/Demo/Export Config and Localization`。该入口会导出 JSON、二进制、
-Bundle 和 manifest，并按内容增量同步到 `Assets/StreamingAssets/Config` 与
-`Assets/StreamingAssets/Localization`；源目录中已删除的旧产物也会同步清理。
+Bundle 和 manifest，并按内容增量同步配置、本地化、音频和公告到
+`Assets/StreamingAssets`；源目录中已删除的旧产物也会同步清理。
 
 本 Demo 使用 `LocalFileResourceHelper`，运行时读取同步到 StreamingAssets 的 JSON 路径：
 

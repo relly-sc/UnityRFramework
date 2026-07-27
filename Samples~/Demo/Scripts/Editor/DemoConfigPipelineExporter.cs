@@ -12,12 +12,24 @@ namespace UnityRFramework.Editor
     /// </summary>
     public static class DemoConfigPipelineExporter
     {
+        private static string sampleRoot;
+
+        /// <summary>Demo Sample 的实际导入根目录。</summary>
+        private static string SampleRoot =>
+            sampleRoot ?? (sampleRoot = FindSampleRoot());
+
         /// <summary>Demo Config 在 StreamingAssets 中的运行时目录。</summary>
         private const string StreamingConfigDirectory = "Assets/StreamingAssets/Config";
 
         /// <summary>Demo Localization 在 StreamingAssets 中的运行时目录。</summary>
         private const string StreamingLocalizationDirectory =
             "Assets/StreamingAssets/Localization";
+
+        /// <summary>Demo Audio 在 StreamingAssets 中的运行时目录。</summary>
+        private const string StreamingAudioDirectory = "Assets/StreamingAssets/Audio";
+
+        /// <summary>Demo 公告在 StreamingAssets 中的运行时目录。</summary>
+        private const string StreamingDemoDirectory = "Assets/StreamingAssets/Demo";
 
         /// <summary>Demo 一键导出菜单路径。</summary>
         private const string MenuPath = "UnityRFramework/Demo/Export Config and Localization";
@@ -31,15 +43,15 @@ namespace UnityRFramework.Editor
             ConfigPipelineOptions options = new ConfigPipelineOptions
             {
                 ConfigSourceDirectory =
-                    "Assets/UnityRFramework/Samples/Demo/ConfigSource/Config",
+                    SampleRoot + "/ConfigSource/Config",
                 LocalizationSourceDirectory =
-                    "Assets/UnityRFramework/Samples/Demo/ConfigSource/Localization",
+                    SampleRoot + "/ConfigSource/Localization",
                 GeneratedCodeDirectory =
-                    "Assets/UnityRFramework/Samples/Demo/Generated/UnityRFramework/Config",
+                    SampleRoot + "/Generated/UnityRFramework/Config",
                 ConfigOutputDirectory =
-                    "Assets/UnityRFramework/Samples/Demo/GameAssets/Resources/Config",
+                    SampleRoot + "/GameAssets/Resources/Config",
                 LocalizationOutputDirectory =
-                    "Assets/UnityRFramework/Samples/Demo/GameAssets/Resources/Localization",
+                    SampleRoot + "/GameAssets/Resources/Localization",
                 GeneratedNamespace = "Game.Config"
             };
 
@@ -48,9 +60,45 @@ namespace UnityRFramework.Editor
                 options.ConfigOutputDirectory, StreamingConfigDirectory, report);
             SynchronizeDirectory(
                 options.LocalizationOutputDirectory, StreamingLocalizationDirectory, report);
+            SynchronizeDirectory(
+                SampleRoot + "/GameAssets/Resources/Audio",
+                StreamingAudioDirectory,
+                report);
+            SynchronizeDirectory(
+                SampleRoot + "/GameAssets/StreamingAssets/Demo",
+                StreamingDemoDirectory,
+                report);
             report.AddMessage("StreamingAssets synchronization completed.");
             AssetDatabase.Refresh();
             Debug.Log(BuildReportText(report));
+        }
+
+        /// <summary>根据导出脚本所在位置定位开发目录或 UPM 导入后的 Sample 根目录。</summary>
+        /// <returns>Demo Sample 的项目相对路径。</returns>
+        private static string FindSampleRoot()
+        {
+            string[] guids = AssetDatabase.FindAssets("DemoConfigPipelineExporter t:MonoScript");
+            for (int i = 0; i < guids.Length; i++)
+            {
+                string scriptPath = AssetDatabase.GUIDToAssetPath(guids[i]);
+                if (!scriptPath.EndsWith(
+                        "/Scripts/Editor/DemoConfigPipelineExporter.cs",
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string editorDirectory = Path.GetDirectoryName(scriptPath);
+                string scriptsDirectory = Path.GetDirectoryName(editorDirectory);
+                string root = Path.GetDirectoryName(scriptsDirectory);
+                if (!string.IsNullOrEmpty(root))
+                {
+                    return root.Replace('\\', '/');
+                }
+            }
+
+            throw new InvalidOperationException(
+                "DemoConfigPipelineExporter: 无法从脚本位置定位 Demo Sample 根目录。");
         }
 
         /// <summary>构建适合 Unity Console 阅读的 Demo 导出报告。</summary>
@@ -59,7 +107,7 @@ namespace UnityRFramework.Editor
         private static string BuildReportText(ConfigPipelineReport report)
         {
             StringBuilder builder = new StringBuilder();
-            builder.AppendLine("[Demo] Config and Localization export completed.");
+            builder.AppendLine("[Demo] Runtime assets export completed.");
             builder.Append("Processed source files: ")
                 .AppendLine(report.ProcessedFileCount.ToString());
             builder.Append("Written output files (including StreamingAssets): ")

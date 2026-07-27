@@ -33,6 +33,9 @@ public sealed class ExpansionDemoController : MonoBehaviour
     private string additiveSceneLocation = "ExpansionContent";
 
     [SerializeField]
+    private string remoteProbeLocation = "RemoteProbe";
+
+    [SerializeField]
     private string webProbeRelativePath = "ExpansionDemo/WebProbe.txt";
 
     [SerializeField]
@@ -120,11 +123,11 @@ public sealed class ExpansionDemoController : MonoBehaviour
 
         try
         {
-            AppendStatus("1/5 初始化 YooAsset Resource Helper...");
+            AppendStatus("1/6 初始化 YooAsset Resource Helper...");
             await GameEntry.Resource.InitializeAsync();
             ct.ThrowIfCancellationRequested();
 
-            AppendStatus("2/5 加载 YooAsset 二进制 TextAsset...");
+            AppendStatus("2/6 加载 YooAsset 二进制 TextAsset...");
             byte[] data = await GameEntry.Resource.LoadAssetAsync<byte[]>(rawFileLocation, 0, ct);
             string text = data != null ? Encoding.UTF8.GetString(data) : string.Empty;
             if (!text.Contains("UnityRFramework Expansion"))
@@ -135,7 +138,7 @@ public sealed class ExpansionDemoController : MonoBehaviour
             GameEntry.Resource.UnloadAsset<byte[]>(rawFileLocation);
             AppendStatus($"二进制 TextAsset 通过，{data.Length} bytes。");
 
-            AppendStatus("3/5 加载并卸载 YooAsset Additive 场景...");
+            AppendStatus("3/6 加载并卸载 YooAsset Additive 场景...");
             await GameEntry.Resource.LoadSceneAsync(
                 additiveSceneLocation,
                 (int)LoadSceneMode.Additive,
@@ -144,7 +147,28 @@ public sealed class ExpansionDemoController : MonoBehaviour
             await GameEntry.Resource.UnloadSceneAsync(additiveSceneLocation);
             AppendStatus("场景加载与卸载通过。");
 
-            AppendStatus("4/5 执行 UniTask Web 请求...");
+            AppendStatus("4/6 加载 YooAsset 远程 JSON 探针...");
+            byte[] remoteData = await GameEntry.Resource.LoadAssetAsync<byte[]>(
+                remoteProbeLocation,
+                0,
+                ct);
+            string remoteJson = remoteData != null
+                ? Encoding.UTF8.GetString(remoteData)
+                : string.Empty;
+            RemoteProbePayload remoteProbe =
+                JsonUtility.FromJson<RemoteProbePayload>(remoteJson);
+            if (remoteProbe == null
+                || remoteProbe.Version <= 0
+                || string.IsNullOrWhiteSpace(remoteProbe.Message))
+            {
+                throw new RFrameworkException("YooAsset 远程 JSON 探针内容校验失败。");
+            }
+
+            GameEntry.Resource.UnloadAsset<byte[]>(remoteProbeLocation);
+            AppendStatus(
+                $"远程探针通过：v{remoteProbe.Version}，{remoteProbe.Message}");
+
+            AppendStatus("5/6 执行 UniTask Web 请求...");
             string webProbeUrl = BuildWebProbeUrl();
             WebResponse response = await GameEntry.WebRequest.GetAsync(
                 webProbeUrl,
@@ -161,7 +185,7 @@ public sealed class ExpansionDemoController : MonoBehaviour
 
             AppendStatus($"Web 请求通过，HTTP {response.StatusCode}。");
 
-            AppendStatus("5/5 执行 Web 请求取消...");
+            AppendStatus("6/6 执行 Web 请求取消...");
             await VerifyCancellationAsync(ct);
             AppendStatus("Web 请求取消通过。");
 
@@ -265,5 +289,19 @@ public sealed class ExpansionDemoController : MonoBehaviour
         runButton.interactable = interactable;
         cancelButton.interactable = interactable;
         restartButton.interactable = interactable;
+    }
+
+    [Serializable]
+    private sealed class RemoteProbePayload
+    {
+        [SerializeField]
+        private int version;
+
+        [SerializeField]
+        private string message;
+
+        public int Version => version;
+
+        public string Message => message;
     }
 }

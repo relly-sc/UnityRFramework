@@ -16,17 +16,19 @@ Expansion 只负责适配，不把第三方插件的类型或生命周期反向�
 
 | 集成 | 当前实现 | 状态 |
 |---|---|---|
-| YooAsset | `Scripts/Runtime/Resource/YooAssetResourceHelper.cs` | 阶段 1 EditorSimulate 验收完成 |
+| YooAsset | `Scripts/Runtime/Resource/YooAssetResourceHelper.cs` | 阶段 1 EditorSimulate / Offline / Host 验收完成 |
 | UniTask | `Scripts/Runtime/WebRequest/UniTaskWebRequestHelper.cs` | 阶段 1 验收完成 |
 | Excel 解析扩展 | 尚未实现 | 阶段 2 |
 | Luban | 尚未实现 | 阶段 3 |
 | MemoryPack | 尚未实现 | 阶段 4 |
 | HybridCLR | 尚未实现 | 阶段 5 |
 
-2026-07-27 已通过 ExpansionDemo 完成 EditorSimulate 端到端验收：二进制
-`TextAsset` 加载与卸载、Additive 场景加载与卸载、Web 成功请求、主动取消，
-以及不退出进程的框架关闭和重启后重复执行。Offline 与 Host 已实现初始化配置，
-仍需在生成实际 YooAsset 包、配置内置文件或远端地址后做对应环境验收。
+2026-07-27 已通过 ExpansionDemo 完成 EditorSimulate、Offline 与 Host
+端到端验收：二进制 `TextAsset` 加载与卸载、Additive 场景加载与卸载、
+Web 成功请求、主动取消，以及不退出进程的框架关闭和重启后重复执行。Host
+进一步验证了部分内置、部分远程资源，并在保留旧 `BuiltinCatalog.bytes` 时
+从服务器 Package 加载更新后的 `RemoteProbe.json` v2；框架软重启后再次加载
+v2 并显示最终 `PASS`。Windows Player 与 Android 真机仍需在发布前验收。
 
 ## 推荐实施顺序
 
@@ -131,6 +133,17 @@ HybridCLR 涉及程序集划分、AOT 泛型补充、热更新 DLL、资源交�
    - Resource Helper：`UnityRFramework.Expansion.YooAssetResourceHelper`
    - Web Request Helper：`UnityRFramework.Expansion.UniTaskWebRequestHelper`
 4. 按 Helper 的 Inspector 配置初始化参数，再通过 ExpansionDemo 验证，不要直接用正式业务场景代替首次验收。
+
+仅导入 `ExpansionDemo` 还不能直接运行。Package Manager 只会把 Sample 自身复制到
+`Assets/Samples/...`，不会把文件写入宿主工程的 `Assets/StreamingAssets`。
+导入 `Expansion` 和 `ExpansionDemo` 后，必须先执行：
+
+`UnityRFramework/ExpansionDemo/Rebuild Acceptance Assets`
+
+该菜单会按脚本实际所在位置定位导入后的 Sample，生成 WebRequest 探针、验收场景、
+YooAsset Collector 和示例框架预制体。Offline/Host 所需的 YooAsset
+`StreamingAssets/yoo/<PackageName>` 内容仍需通过 YooAsset 构建窗口或内置目录
+工具生成。详细模式步骤见 `ExpansionDemo/README.md`。
 
 当前开发工程已安装 YooAsset 与 UniTask。MemoryPack 当前未安装，仅保留为阶段 4
 的可选规划；每个 Helper 只应依赖自己实际使用的插件。
