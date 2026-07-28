@@ -1,0 +1,49 @@
+name: Publish UPM Branch
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# This workflow force-updates only the generated `upm` branch.
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Generate UPM package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out main source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and publish UPM branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          release_dir="$(mktemp -d)"
+          git archive --format=tar "$GITHUB_SHA" | tar -xf - -C "$release_dir"
+
+          if [[ ! -d "$release_dir/Samples" ]]; then
+            echo "Expected the source package to contain Samples/." >&2
+            exit 1
+          fi
+
+          mv "$release_dir/Samples" "$release_dir/Samples~"
+
+          cd "$release_dir"
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -m "Publish UPM package from ${GITHUB_SHA}"
+          git branch -M upm
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin upm
