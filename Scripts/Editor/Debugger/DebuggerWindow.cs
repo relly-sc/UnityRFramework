@@ -706,13 +706,24 @@ namespace UnityRFramework.Editor
                 var resM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IResourceModule>();
                 if (resM != null)
                 {
+                    Runtime.ResourceComponent resourceComponent =
+                        Runtime.UnityRFrameworkComponentEntry.GetComponent<Runtime.ResourceComponent>();
+                    double diskCacheMb = resourceComponent != null
+                        ? resourceComponent.DiskCacheSizeBytes / (1024d * 1024d)
+                        : 0d;
                     var details = new Dictionary<string, string>
                     {
                         { "Loaded Assets", resM.LoadedAssetCount.ToString() },
-                        { "Loading Assets", resM.LoadingAssetCount.ToString() }
+                        { "Loading Assets", resM.LoadingAssetCount.ToString() },
+                        { "Disk Cache", string.Format("{0:0.00} MB", diskCacheMb) }
                     };
                     moduleInfos.Add(new ModuleDebugInfo("Resource",
-                        string.Format("Loaded: {0}  Loading: {1}", resM.LoadedAssetCount, resM.LoadingAssetCount), details));
+                        string.Format(
+                            "Loaded: {0}  Loading: {1}  Cache: {2:0.00} MB",
+                            resM.LoadedAssetCount,
+                            resM.LoadingAssetCount,
+                            diskCacheMb),
+                        details));
                 }
 
                 // Config

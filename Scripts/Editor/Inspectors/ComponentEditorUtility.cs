@@ -184,6 +184,11 @@ namespace UnityRFramework.Editor
             {
                 DrawValue("Loaded Assets", resourceComponent.LoadedAssetCount.ToString());
                 DrawValue("Loading Assets", resourceComponent.LoadingAssetCount.ToString());
+                DrawValue(
+                    "Disk Cache",
+                    string.Format(
+                        "{0:0.00} MB",
+                        resourceComponent.DiskCacheSizeBytes / (1024d * 1024d)));
             }
             else if (component is Runtime.SceneComponent sceneComponent)
             {

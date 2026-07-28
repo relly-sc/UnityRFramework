@@ -655,8 +655,26 @@ namespace UnityRFramework.Runtime
                 // Resource
                 var resM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IResourceModule>();
                 if (resM != null)
-                    moduleInfos.Add(new ModuleDebugInfo("Resource",
-                        string.Format("Loaded: {0}  Loading: {1}", resM.LoadedAssetCount, resM.LoadingAssetCount), null));
+                {
+                    ResourceComponent resourceComponent =
+                        UnityRFrameworkComponentEntry.GetComponent<ResourceComponent>();
+                    double diskCacheMb = resourceComponent != null
+                        ? resourceComponent.DiskCacheSizeBytes / (1024d * 1024d)
+                        : 0d;
+                    moduleInfos.Add(new ModuleDebugInfo(
+                        "Resource",
+                        string.Format(
+                            "Loaded: {0}  Loading: {1}  Cache: {2:0.00} MB",
+                            resM.LoadedAssetCount,
+                            resM.LoadingAssetCount,
+                            diskCacheMb),
+                        new Dictionary<string, string>
+                        {
+                            { "Loaded Assets", resM.LoadedAssetCount.ToString() },
+                            { "Loading Assets", resM.LoadingAssetCount.ToString() },
+                            { "Disk Cache", string.Format("{0:0.00} MB", diskCacheMb) }
+                        }));
+                }
 
                 // Config
                 var cfgM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IConfigModule>();

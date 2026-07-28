@@ -60,7 +60,8 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   本地化、音频和公告同步到宿主工程的 `Assets/StreamingAssets`，完成后再打开
   `GameAssets/Scenes/DemoBoot.unity`。仅导入 Sample 后直接运行会缺少这些文件。
 
-> 核心包 `dependencies` 为空：框架本身不强制任何第三方库，按需引入即可。
+> 核心包仅依赖 Unity 官方维护的 `com.unity.nuget.newtonsoft-json`；YooAsset、
+> UniTask、Luban、HybridCLR 等非 Unity 第三方库仍全部按需引入。
 
 ## 模块
 
@@ -111,6 +112,22 @@ GameEntry.Base.ResumeGame();
 GameEntry.Base.RunInBackground = true;
 GameEntry.Base.NeverSleep = true;
 ```
+
+`BaseComponent` 的 `JSON Helper` 默认使用 `DefaultJsonHelper`（`JsonUtility`），
+保证最小配置即可启动。需要属性、字典、顶层数组或更完整的 JSON 兼容性时，可在
+Inspector 下拉框切换为 `UnityRFramework.Runtime.NewtonsoftJsonHelper`：
+
+```csharp
+Utility.Json.SetJsonHelper(new NewtonsoftJsonHelper());
+
+string json = Utility.Json.ToJson(data);
+MyData result = Utility.Json.ToObject<MyData>(json);
+```
+
+`NewtonsoftJsonHelper` 使用 Unity 官方维护的
+`com.unity.nuget.newtonsoft-json`，并明确关闭 `TypeNameHandling`，不会根据输入
+JSON 中的 `$type` 创建任意运行时类型。它只替换通用 `Utility.Json` 序列化器，
+不改变 `JsonConfigHelper` 或 `JsonLocalizationHelper` 的文件格式与加载路径。
 
 ### Log
 
@@ -238,6 +255,13 @@ Resources/Build Settings。Android 与 WebGL 的 StreamingAssets 位于 URL 中�
 音频在所有平台也只支持异步文件加载。外部下载器应把更新写入 `persistentDataPath` 的同名相对路径，
 已缓存资源需先 `UnloadAsset<T>(location)`，再重新加载才能看到新文件；Audio 模块使用
 `ClearCache()` 停止播放并清空其内部音频缓存。
+
+实现 `IResourceCacheHelper` 的第三方资源 Helper 还可接收磁盘缓存容量配置。
+Resource Inspector 默认开启自动清理，上限为 4 GB；内置 Resources 与 LocalFile Helper
+不使用磁盘下载缓存，因此会忽略该配置。Expansion 的 YooAsset 3.0.5 Helper 只在 Host
+模式初始化时执行清理，先移除当前清单不再使用的 Bundle，再按框架记录的资源访问时间
+通过 YooAsset 官方接口进行 Location 级近似 LRU 淘汰。多个资源共享同一 Bundle 时仍以
+整个 Bundle 为删除粒度，后续访问可能重新下载，但框架不会直接删除 YooAsset 缓存文件。
 
 ### WebRequest
 

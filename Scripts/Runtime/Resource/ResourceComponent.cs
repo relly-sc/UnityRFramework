@@ -45,6 +45,15 @@ namespace UnityRFramework.Runtime
         [Tooltip("备用远程 CDN 地址")]
         private string fallbackHostServer = "";
 
+        [SerializeField]
+        [Tooltip("支持磁盘缓存的 Resource Helper 初始化时是否自动检查并清理超限缓存")]
+        private bool autoClearDiskCache = true;
+
+        [SerializeField]
+        [Min(0.1f)]
+        [Tooltip("磁盘缓存容量上限，单位 GB。仅对实现 IResourceCacheHelper 的 Helper 生效")]
+        private float maxDiskCacheSizeGB = 4f;
+
         /// <summary>
         /// 资源模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
         /// </summary>
@@ -71,6 +80,19 @@ namespace UnityRFramework.Runtime
             get { return resourceModule != null ? resourceModule.LoadingAssetCount : 0; }
         }
 
+        /// <summary>
+        /// 获取支持磁盘缓存的辅助器最近一次统计到的缓存大小。
+        /// </summary>
+        public long DiskCacheSizeBytes
+        {
+            get
+            {
+                return resourceHelper is IResourceCacheHelper cacheHelper
+                    ? cacheHelper.CacheSizeBytes
+                    : 0L;
+            }
+        }
+
         protected override void Awake()
         {
             base.Awake();
@@ -80,9 +102,10 @@ namespace UnityRFramework.Runtime
             ResourceHelperBase helper = Helper.CreateHelper<ResourceHelperBase>(resourceHelperTypeName, null);
             if (helper != null)
             {
-                helper.name = $"{helper.GetType().Name} (Resource Helper)";
+                helper.name = $"{helper.GetType().Name}";
                 helper.transform.SetParent(transform);
                 resourceHelper = helper;
+                ConfigureResourceCache(helper);
                 resourceModule.SetHelper(helper);
             }
             else
@@ -112,7 +135,23 @@ namespace UnityRFramework.Runtime
             }
 
             resourceHelper = helper;
+            ConfigureResourceCache(helper);
             resourceModule.SetHelper(helper);
+        }
+
+        private void ConfigureResourceCache(IResourceHelper helper)
+        {
+            if (!(helper is IResourceCacheHelper cacheHelper))
+            {
+                return;
+            }
+
+            double bytes = Math.Max(0.1d, maxDiskCacheSizeGB)
+                * 1024d * 1024d * 1024d;
+            long maxBytes = bytes >= long.MaxValue
+                ? long.MaxValue
+                : (long)bytes;
+            cacheHelper.ConfigureCache(autoClearDiskCache, maxBytes);
         }
 
         /// <summary>

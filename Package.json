@@ -2,7 +2,7 @@
   "name": "com.relly-sc.unityrframework",
   "version": "1.0.0",
   "displayName": "UnityRFramework",
-  "description": "基于 GameFramework 分层架构的数据驱动、模块化 Unity 游戏框架。核心零第三方依赖；第三方集成（YooAsset、UniTask、HybridCLR 等）以可选 Samples 形式提供。",
+  "description": "基于 GameFramework 分层架构的数据驱动、模块化 Unity 游戏框架。Library 层零第三方依赖；Runtime 仅依赖 Unity 官方包，第三方集成以可选 Samples 形式提供。",
   "documentationUrl": "https://github.com/relly-sc/UnityRFramework/blob/main/README.md",
   "licensesUrl": "https://github.com/relly-sc/UnityRFramework/blob/main/LICENSE",
   "author": {
@@ -16,7 +16,9 @@
     "game-framework",
     "gameframework"
   ],
-  "dependencies": {},
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
   "samples": [
     {
       "displayName": "Expansion",
