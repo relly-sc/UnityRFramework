@@ -21,10 +21,10 @@ namespace UnityRFramework.Editor
 
         private Vector2 scrollPosition;
 
-        [MenuItem("UnityRFramework/配置表工具")]
+        [MenuItem("UnityRFramework/CSV 配置表工具")]
         private static void Open()
         {
-            ConfigPipelineWindow window = GetWindow<ConfigPipelineWindow>("配置表工具");
+            ConfigPipelineWindow window = GetWindow<ConfigPipelineWindow>("CSV 配置表工具");
             window.minSize = new Vector2(620f, 430f);
             window.Show();
         }

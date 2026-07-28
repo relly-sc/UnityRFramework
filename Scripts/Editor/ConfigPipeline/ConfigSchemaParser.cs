@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using RFramework;
 using UnityRFramework.Runtime;
@@ -98,7 +97,7 @@ namespace UnityRFramework.Editor
                     "Config schema contains no exported columns after ignoring '!' headers.");
             }
 
-            string segmentName = Path.GetFileNameWithoutExtension(document.SourcePath);
+            string segmentName = document.DocumentName;
             string tableName = segmentName;
             int separatorIndex = segmentName.IndexOf('@');
             if (separatorIndex >= 0)

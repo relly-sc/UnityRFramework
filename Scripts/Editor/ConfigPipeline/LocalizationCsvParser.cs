@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using RFramework;
 
@@ -93,7 +92,7 @@ namespace UnityRFramework.Editor
             return new LocalizationTable
             {
                 SourcePath = document.SourcePath,
-                Language = Path.GetFileNameWithoutExtension(document.SourcePath),
+                Language = document.DocumentName,
                 Entries = entries
             };
         }

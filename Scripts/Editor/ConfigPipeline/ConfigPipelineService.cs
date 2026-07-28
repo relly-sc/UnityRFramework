@@ -193,7 +193,33 @@ namespace UnityRFramework.Editor
                     $"No config CSV files found in '{options.ConfigSourceDirectory}'.");
             }
 
-            List<ConfigTableSchema> result = new List<ConfigTableSchema>(files.Length);
+            List<CsvDocument> documents = new List<CsvDocument>(files.Length);
+            for (int i = 0; i < files.Length; i++)
+            {
+                documents.Add(CsvDocumentReader.ReadFile(files[i]));
+                report.FileProcessed();
+            }
+
+            return ParseConfigDocuments(
+                documents, options.GeneratedNamespace?.Trim()).ToList();
+        }
+
+        /// <summary>
+        /// 解析并校验来自 CSV、Excel 或自定义数据源的 Config 文档集合。
+        /// </summary>
+        /// <param name="documents">待解析的内存文档。</param>
+        /// <param name="namespaceName">生成代码使用的命名空间，可留空。</param>
+        /// <returns>完成跨表校验的配置表定义。</returns>
+        public static IReadOnlyList<ConfigTableSchema> ParseConfigDocuments(
+            IReadOnlyList<CsvDocument> documents, string namespaceName)
+        {
+            if (documents == null || documents.Count == 0)
+            {
+                throw new RFrameworkException("Config source documents are empty.");
+            }
+
+            List<ConfigTableSchema> result =
+                new List<ConfigTableSchema>(documents.Count);
             HashSet<string> generatedTypeNames =
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             Dictionary<uint, string> tableIds = new Dictionary<uint, string>();
@@ -201,10 +227,16 @@ namespace UnityRFramework.Editor
                 new Dictionary<string, ConfigTableSchema>(StringComparer.OrdinalIgnoreCase);
             HashSet<string> segmentNames =
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < files.Length; i++)
+            for (int i = 0; i < documents.Count; i++)
             {
+                if (documents[i] == null)
+                {
+                    throw new RFrameworkException(
+                        $"Config source document at index {i} is invalid.");
+                }
+
                 ConfigTableSchema schema = ConfigSchemaParser.ParseConfig(
-                    CsvDocumentReader.ReadFile(files[i]), options.GeneratedNamespace?.Trim());
+                    documents[i], namespaceName?.Trim());
                 if (!segmentNames.Add(schema.SegmentName))
                 {
                     throw new RFrameworkException(
@@ -260,7 +292,6 @@ namespace UnityRFramework.Editor
                 }
 
                 result.Add(schema);
-                report.FileProcessed();
             }
 
             ValidatePartitionIds(result);
@@ -319,12 +350,44 @@ namespace UnityRFramework.Editor
                     $"No localization CSV files found in '{options.LocalizationSourceDirectory}'.");
             }
 
-            List<LocalizationTable> result = new List<LocalizationTable>(files.Length);
-            HashSet<string> languages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            List<CsvDocument> documents = new List<CsvDocument>(files.Length);
             for (int i = 0; i < files.Length; i++)
             {
-                LocalizationTable localization = LocalizationCsvParser.Parse(
-                    CsvDocumentReader.ReadFile(files[i]));
+                documents.Add(CsvDocumentReader.ReadFile(files[i]));
+                report.FileProcessed();
+            }
+
+            return ParseLocalizationDocuments(documents).ToList();
+        }
+
+        /// <summary>
+        /// 解析并校验来自 CSV、Excel 或自定义数据源的 Localization 文档集合。
+        /// </summary>
+        /// <param name="documents">待解析的内存文档。</param>
+        /// <returns>语言代码唯一的本地化表集合。</returns>
+        public static IReadOnlyList<LocalizationTable> ParseLocalizationDocuments(
+            IReadOnlyList<CsvDocument> documents)
+        {
+            if (documents == null || documents.Count == 0)
+            {
+                throw new RFrameworkException(
+                    "Localization source documents are empty.");
+            }
+
+            List<LocalizationTable> result =
+                new List<LocalizationTable>(documents.Count);
+            HashSet<string> languages =
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < documents.Count; i++)
+            {
+                if (documents[i] == null)
+                {
+                    throw new RFrameworkException(
+                        $"Localization source document at index {i} is invalid.");
+                }
+
+                LocalizationTable localization =
+                    LocalizationCsvParser.Parse(documents[i]);
                 if (!languages.Add(localization.Language))
                 {
                     throw new RFrameworkException(
@@ -332,7 +395,6 @@ namespace UnityRFramework.Editor
                 }
 
                 result.Add(localization);
-                report.FileProcessed();
             }
 
             return result;

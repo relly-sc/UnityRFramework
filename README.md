@@ -294,7 +294,7 @@ JSON 与 URFC v2 均支持显式历史 Schema 迁移。二进制实现 `IBinaryC
 均拒绝。JSON 新格式为 `Tables -> 表名 -> { TableId, SchemaHash, Rows }`；旧的
 `Tables -> 数组`、`Items` 和顶层数组仍可读取，但无 SchemaHash，不能参与显式迁移。
 
-框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Config 第一行任意位置以 `!` 开头的字段名表示整列策划备注，该列不会进入校验、代码、SchemaHash、JSON 或二进制产物。Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具同时生成 JSON、配置行、静态 Codec、URFC v2、URFM v1 多表容器、带 CRC32 的 URFL v2 和 URLM v1 多语言容器，并仅在内容变化时写入。默认流程由 Excel 手动导出 UTF-8 CSV，再由工具生成 JSON/`.bytes`；直接读取 XLSX 的方案放在第三方 Expansion。Config 的 JSON/`.bytes` 共用一个输出目录，Localization 也共用一个输出目录，两类模块的输出目录必须分开。生成命名空间留空时，配置行和 Codec 生成到全局命名空间。Runtime 仍兼容读取无 CRC 的 URFL v1。独立验收场景位于 `Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance`，固定源数据位于 `Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline`；测试只使用 `Acceptance_*` 数据，不依赖 Samples/Demo。Demo 的 `Demo_*` 源文件、生成代码和运行时产物分别位于 `Samples/Demo/ConfigSource`、`Samples/Demo/Generated`、`Samples/Demo/GameAssets/Resources`。可通过 `UnityRFramework/Tests` 下的菜单导出测试数据、重建场景、运行 Play Mode 验收或构建包含 Test Assemblies 的专用 Player。
+框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Config 第一行任意位置以 `!` 开头的字段名表示整列策划备注，该列不会进入校验、代码、SchemaHash、JSON 或二进制产物。Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具同时生成 JSON、配置行、静态 Codec、URFC v2、URFM v1 多表容器、带 CRC32 的 URFL v2 和 URLM v1 多语言容器，并仅在内容变化时写入。默认流程由 Excel 手动导出 UTF-8 CSV，再由工具生成 JSON/`.bytes`。可选 Expansion 提供 ExcelDataReader Editor 工具，以明确分区直接把 `.xlsx` / `.xls` Config 导出为 JSON、URFC v2 和配置代码，把 Localization 导出为 JSON、URFL v2 和 URLM v1，不让 Excel 依赖进入 Runtime。Config 的 JSON/`.bytes` 共用一个输出目录，Localization 也共用一个输出目录，两类模块的输出目录必须分开。生成命名空间留空时，配置行和 Codec 生成到全局命名空间。Runtime 仍兼容读取无 CRC 的 URFL v1。独立验收场景位于 `Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance`，固定源数据位于 `Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline`；测试只使用 `Acceptance_*` 数据，不依赖 Samples/Demo。Demo 的 `Demo_*` 源文件、生成代码和运行时产物分别位于 `Samples/Demo/ConfigSource`、`Samples/Demo/Generated`、`Samples/Demo/GameAssets/Resources`。可通过 `UnityRFramework/Tests` 下的菜单导出测试数据、重建场景、运行 Play Mode 验收或构建包含 Test Assemblies 的专用 Player。
 
 同一业务集合需要拆成多个源文件时，使用 `逻辑表名@分片名.csv`，例如
 `Warrior@1000_1999.csv` 与 `Warrior@2000_2999.csv`。两者只生成一个 `WarriorConfig`，
@@ -320,7 +320,8 @@ Config 复杂字段第一批支持内联枚举、基础类型一维数组和 `Li
 Config JSON 使用框架内置的受限解析器按公开字段类型精确转换，无第三方依赖，
 并避免 `JsonUtility` 对 `decimal` 和 `char` 的静默丢值。
 Config JSON 根结构为 `Tables -> 分片名 -> { TableId, SchemaHash, Rows }`；手动 CSV
-流程以文件名作为分片名，`@` 前部分作为逻辑表名。未来 Excel 扩展可使用 Sheet 名。
+流程以文件名作为分片名，`@` 前部分作为逻辑表名。Expansion Excel 工具在单 Sheet
+工作簿中使用文件名，在多 Sheet 工作簿中使用 Sheet 名。
 Runtime 仍兼容旧 `Items`、顶层数组和旧多表数组结构。
 
 ConfigPipeline 支持项目注册自定义标量字段 Codec。实现 `IConfigFieldCodec` 后，需要提供

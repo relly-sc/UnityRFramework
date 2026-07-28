@@ -18,7 +18,7 @@ Expansion 只负责适配，不把第三方插件的类型或生命周期反向�
 |---|---|---|
 | YooAsset | `Scripts/Runtime/Resource/YooAssetResourceHelper.cs` | 阶段 1 EditorSimulate / Offline / Host 验收完成 |
 | UniTask | `Scripts/Runtime/WebRequest/UniTaskWebRequestHelper.cs` | 阶段 1 验收完成 |
-| Excel 解析扩展 | 尚未实现 | 阶段 2 |
+| Excel 解析扩展 | `Scripts/Editor/Config` | 阶段 2 首版完成 |
 | Luban | 尚未实现 | 阶段 3 |
 | MemoryPack | 尚未实现 | 阶段 4 |
 | HybridCLR | 尚未实现 | 阶段 5 |
@@ -52,25 +52,55 @@ v2 并显示最终 `PASS`。Windows Player 与 Android 真机仍需在发布前�
 
 ### 阶段 2：接入轻量 Excel 解析扩展
 
-在 Luban 前先提供一条更容易理解和维护的 Excel 直出管线。该扩展只负责在 Editor 中读取 `.xlsx`，然后复用现有 ConfigPipeline 生成 JSON、URFC/URFM、URFL/URLM 和配置代码；Runtime 不直接读取 Excel，也不依赖 EPPlus、NPOI 等库。
+在 Luban 前先提供一条更容易理解和维护的 Excel 直出管线。该扩展只负责在
+Editor 中通过 ExcelDataReader 读取 `.xlsx` / `.xls`，然后复用现有
+ConfigPipeline 生成 Config JSON、URFC v2、配置代码，以及 Localization JSON、
+URFL v2 和 URLM v1；Runtime 不直接读取 Excel，也不依赖 ExcelDataReader。
 
 Excel 内容继续遵循 Demo 现有约定，不另建一套规则：
 
 - Config 第一行为字段名，第二行为字段类型，第三行为字段注释，第四行开始为数据，并包含唯一的 `int Id` 字段。
 - Localization 第一行为 `Key,Value`，第二行为 `string,string`，第三行为字段注释，第四行开始为数据。
 - 字段类型、枚举、数组、`List<T>`、自定义 Codec、同类型分片和重复 ID/Key 校验均沿用现有 ConfigPipeline 规则。
-- 工作表名称用于确定逻辑表或分片；具体映射必须保持与现有 `表名@分片名` 语义一致。
+- 一个工作簿只有一个非空 Sheet 时使用 Excel 文件名作为表名，兼容现有一个文件一张表。
+- 一个工作簿包含多个非空 Sheet 时使用 Sheet 名作为表名；同类型分片继续使用
+  `表名@分片名` 命名，并沿用重复 ID 校验和运行时合并规则。
 
 工作内容：
 
-1. 在 Expansion 的 Editor 侧定义最小 Excel 工作簿读取抽象，使 EPPlus、NPOI 或其他解析器可以替换。
-2. 先选择一个解析器实现 `.xlsx` 读取，不让其类型进入 Runtime 或 Library。
-3. 将单元格转换成现有 CSV 等价中间模型，复用 Schema 解析、校验、代码生成、JSON 和二进制导出逻辑。
-4. 支持 Config、Localization、多 Sheet、同类型分片及明确的空单元格处理。
-5. 公式单元格第一版只读取文件中已保存的计算结果，不自行实现 Excel 公式计算引擎；缺少缓存结果时应明确报错。
-6. 在 ExpansionDemo 中验证 Excel 直出产物与 CSV 管线的运行时读取结果一致。
+当前入口：
 
-完成标准：用户无需先手动转 CSV，即可从符合现有规则的 `.xlsx` 生成同等 JSON/二进制产物；移除该 Expansion 后，默认 CSV 管线仍可独立工作。
+1. 菜单 `UnityRFramework/Expansion/Excel 配置表工具`：Config 与 Localization
+   使用独立的 Excel 目录、产物目录和导出器选择；Config 额外配置代码目录及命名空间，
+   Localization 额外配置多语言容器及容器名。
+2. 在 Project 视图右键选中的 `.xlsx` / `.xls` 文件或文件夹，使用
+   `UnityRFramework/Excel/Config` 或 `UnityRFramework/Excel/Localization`
+   子菜单直接导出。该入口递归处理所选文件夹；Config 固定输出到
+   `Assets/Resources/Config`，代码固定输出到
+   `Assets/Generated/UnityRFramework/Config`；Localization 固定输出到
+   `Assets/Resources/Localization`。
+3. JSON 输出位于所选产物目录的 `Json` 子目录；URFC v2 输出位于 `Binary`
+   子目录。公式单元格只读取工作簿已保存的计算结果，不实现公式计算引擎。
+4. `ExcelDataReader.dll` 和 `ExcelDataReader.DataSet.dll` 只允许 Editor
+   平台加载，不得进入 Player；当前实现使用底层 Reader API，不依赖 DataSet API。
+
+Config 自定义格式实现 `IExcelConfigExporter`，再在 Editor 初始化时注册：
+
+```csharp
+[InitializeOnLoadMethod]
+private static void RegisterExporter()
+{
+    ExcelConfigExporterRegistry.Register(new ProjectConfigExporter());
+}
+```
+
+Localization 自定义格式独立实现 `IExcelLocalizationExporter`，通过
+`ExcelLocalizationExporterRegistry.Register()` 注册。两类导出器都会收到已经完成
+对应 Schema、语言代码、重复 ID 或 Key 校验的数据，返回相对输出路径与字节内容。
+相对路径不得逃逸所选产物目录，不同导出器也不能写入同一目标文件。
+
+公式缺少缓存值的精确诊断和 ExpansionDemo 运行时等价验收留在阶段 2 后续项。移除
+Expansion 后，默认 CSV 管线仍可独立工作。
 
 这条轻量管线适合规则固定、表结构简单的项目。需要多种表定义方式、复杂引用、自动代码生成规则或大型配置生产体系时，再使用 Luban。
 
