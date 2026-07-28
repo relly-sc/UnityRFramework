@@ -44,8 +44,11 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 支持通过 Package Manager 的 **git URL** 导入：
 
 1. `Window → Package Manager → + → Add package from git URL`
-2. 填入仓库地址（如 `https://github.com/relly-sc/UnityRFramework.git`）
+2. 填入 UPM 发布分支地址：`https://github.com/relly-sc/UnityRFramework.git#upm`
 3. 等待编译完成。
+
+> 请使用 `#upm` 分支安装。该分支会由 GitHub Actions 根据 `main` 自动生成，
+> 并将示例目录发布为 UPM 标准的 `Samples~`；请勿直接使用 `main` 分支安装。
 
 **Samples（可选）**：在 Package Manager 中选中本包 → **Samples** → 点击 `Expansion` 或 `Demo` 的 **Import**。
 
