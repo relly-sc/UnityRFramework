@@ -15,11 +15,15 @@
 | 名称同步到 UGUI Text | `GameObject/UnityRFramework/名称同步到子级 Text` | 所选场景对象及其子级；Button 文本采用按钮 GameObject 名称，支持 Undo |
 | 批量创建文件夹 | `Assets/UnityRFramework/批量创建文件夹` | 选中文件夹时在其内部创建；选中文件时在同级目录创建；无选择时回退到 `Assets` |
 | BoxCollider 适配 | `GameObject/UnityRFramework/适配 BoxCollider 到 Renderer` | 所选对象及其全部子 Renderer |
+| UTF-8 C# 脚本生成 | `Assets/UnityRFramework/创建 UTF-8 C# 脚本` | 在选中文件夹或文件同级目录创建 UTF-8 无 BOM、LF 的 class/struct/interface/enum；窗口实时跟随 Project 选择，class 可选继承 MonoBehaviour 或自定义父类 |
 
 依赖 Project 或 Hierarchy 当前选择的工具只放在各自的
 `Assets/UnityRFramework` 或 `GameObject/UnityRFramework` 右键菜单中。
 只有全局扫描、编辑器设置、功能设置或不属于这两个区域的工具才放在顶部
 `UnityRFramework` 菜单。
+
+每个编辑器工具默认只保留一个最贴合其操作范围的菜单入口。只有工具确实需要分别消费
+Project 与 Hierarchy 两套选择上下文，或维护者明确要求时，才允许为同一工具提供多个入口。
 
 ## 安全边界
 

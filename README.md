@@ -38,6 +38,7 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 - WebRequest 的并发队列按优先级调度，同优先级 FIFO；只有拿到并发槽位的请求计入 Active。
 - YooAsset 扩展会把 Library 的 `object` 资源类型桥接为 `UnityEngine.Object`，以兼容 YooAsset 的资源类型校验。
 - Library 层不直接输出日志，错误以 `RFrameworkException` 上报；Runtime 层统一使用 `Log`，Editor 工具可使用 Unity Editor Console。
+- Editor 工具默认只保留一个最贴合其操作范围的入口：依赖 Project 选择时放在 `Assets/UnityRFramework`，依赖 Hierarchy 选择时放在 `GameObject/UnityRFramework`；只有明确需要两套选择上下文或维护者特别要求时才提供多个入口。
 
 ## 安装
 
@@ -463,6 +464,19 @@ GameEntry.UI.CloseUIForm("Assets/UI/Dialog.prefab");
 IUIForm battleHud = GameEntry.UI.RegisterSceneUIForm(
     battleHudObject, "BattleHUD", UILayer.HUD);
 GameEntry.UI.UnregisterSceneUIForm("BattleHUD");
+```
+
+`ButtonState` 是独立的 UGUI 按钮状态组件，可配置普通/选中背景、图片、文字、
+颜色和对应事件。未指定 `ButtonStateGroup` 时点击会在普通与选中状态间切换；
+指定组后由组维持单选关系。`ButtonStateGroup` 支持指定初始项、允许空选和运行时
+换组，不会在每次点击时扫描层级。组切换的通知顺序固定为旧项取消、新项选中、
+最后触发组事件。
+
+```csharp
+buttonState.SetSelected(true);
+buttonState.SetGroup(tabGroup);
+tabGroup.Select(buttonState);
+tabGroup.ClearSelection();
 ```
 
 ### Audio
