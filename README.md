@@ -1,4 +1,4 @@
-# UnityRFramework
+# UnityRFramework  [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/relly-sc/UnityRFramework)
 
 轻量级 Unity 游戏框架。**Library 层纯 C#（零 UnityEngine 依赖）+ Runtime 层 Helper 桥接**，默认实现可直接启动、关闭和重启，第三方能力通过 Sample 按需接入。
 
