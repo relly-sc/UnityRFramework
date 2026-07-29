@@ -30,6 +30,7 @@ jobs:
           set -euo pipefail
 
           release_dir="$(mktemp -d)"
+          commit_message_file="$RUNNER_TEMP/upm-commit-message.txt"
           git archive --format=tar "$GITHUB_SHA" | tar -xf - -C "$release_dir"
 
           if [[ ! -f "Library/RFramework/RFramework.Library.asmdef" ]]; then
@@ -41,6 +42,11 @@ jobs:
             echo "RFramework submodule does not track Unity .meta files." >&2
             exit 1
           fi
+
+          library_sha="$(git -C Library/RFramework rev-parse HEAD)"
+          git show -s --format='%B' "$GITHUB_SHA" > "$commit_message_file"
+          printf '\nPublished from main: %s\nRFramework: %s\n' \
+            "$GITHUB_SHA" "$library_sha" >> "$commit_message_file"
 
           mkdir -p "$release_dir/Library/RFramework"
           git -C Library/RFramework archive --format=tar HEAD \
@@ -62,7 +68,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
-          git commit -m "Publish UPM package from ${GITHUB_SHA}"
+          git commit -F "$commit_message_file"
           git branch -M upm
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin upm
