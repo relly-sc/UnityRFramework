@@ -35,6 +35,19 @@ longPressButton.LongPressDuration = 0.6f;
 longPressButton.OnLongPress.AddListener(ShowDetails);
 ```
 
+### DoubleClickButton
+
+`DoubleClickButton` 继承 UGUI `Button`，使用原生 `onClick` 表示单击，并提供
+`OnDoubleClick` 表示双击。首次点击会等待双击判定时间；时间内完成第二次点击时
+只触发双击，超时后只触发单击。移出按钮、取消操作、禁用组件或对象失活会清除
+待判定点击。
+
+```csharp
+doubleClickButton.DoubleClickInterval = 0.3f;
+doubleClickButton.onClick.AddListener(SelectItem);
+doubleClickButton.OnDoubleClick.AddListener(OpenItem);
+```
+
 ### TextGradient
 
 `TextGradient` 用于 UGUI `Text` 的垂直颜色渐变。渐变色与原始顶点 RGBA
