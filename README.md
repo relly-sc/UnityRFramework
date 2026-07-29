@@ -1,6 +1,6 @@
 # UnityRFramework
 
-轻量级 Unity 游戏框架。**Library 层纯 C#（零 UnityEngine 依赖）+ Runtime 层 Helper 桥接**，面向 HybridCLR 热更 + YooAsset 资源管理的现代技术栈。
+轻量级 Unity 游戏框架。**Library 层纯 C#（零 UnityEngine 依赖）+ Runtime 层 Helper 桥接**，默认实现可直接启动、关闭和重启，第三方能力通过 Sample 按需接入。
 
 ## 架构
 
@@ -8,15 +8,19 @@
 Library/RFramework/RFramework/  ← 纯 C# 核心（.NET Standard 2.0，零 Unity/第三方依赖）
 Scripts/Runtime/                ← Unity 运行时（Component + Helper 默认实现）
 Scripts/Editor/                 ← 编辑器工具（Inspector、菜单项）
-Samples~/Expansion/             ← 第三方集成（YooAsset/Luban/HybridCLR，按需 Import）
-Samples~/Demo/                  ← 官方示例（仅用内置 Helper，串通全部模块）
+Samples/Utility/                ← 与框架模块无关的可选通用组件
+Samples/Expansion/              ← 已实现的第三方集成（YooAsset/UniTask/ExcelDataReader）
+Samples/Demo/                   ← 官方示例（仅用内置 Helper，串通全部模块）
 ```
 
-> `Samples~` 以 `~` 结尾，Unity 不自动编译；经 Package Manager 的 **Import Sample** 才会进入项目编译。
+`main` 开发分支使用 `Samples/` 便于直接编译和维护；GitHub Actions 发布 UPM
+分支时会转换为标准 `Samples~/`，安装用户通过 Package Manager 的
+**Import Sample** 按需导入。
 
 命名空间按代码层固定：Library 使用 `RFramework`，Runtime 使用
 `UnityRFramework.Runtime`，Editor 使用 `UnityRFramework.Editor`，Expansion
-使用 `UnityRFramework.Expansion`。模块子文件夹只负责组织文件，不继续扩展命名空间。
+使用 `UnityRFramework.Expansion`，Utility Sample 使用
+`UnityRFramework.Samples`。模块子文件夹只负责组织文件，不继续扩展命名空间。
 所有 Sample 的手写脚本统一放在 `Scripts/Runtime`；仅当存在编辑器脚本时创建
 `Scripts/Editor`，不保留空的 Editor 文件夹。
 Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，所有 `public/internal`
@@ -32,6 +36,7 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 - `LoadAssetSync` 不会与相同资源的在途异步加载并行执行；此时应改为等待 `LoadAssetAsync`。`Scene.LoadSceneAsync` 的取消令牌只在操作开始前有效，底层场景加载一旦开始不承诺中途取消或回滚；`Single` 成功后只保留新场景账本。
 - `Event.FireAsync` 可跨线程入队、主线程分发；一个事件处理器异常不会丢弃同帧其余排队事件。框架内部生命周期通知使用 `FireSafely`，订阅者异常包装为 `RFrameworkException` 后经 `IEventModule.OnError` 交给 Runtime 记录，不会回滚已经成功的模块操作。
 - 网络 Helper 的回调会切回 `NetworkChannel.Update` 所在主线程处理。TCP 默认 Helper 的建连不会同步阻塞 Unity 主线程，WebSocket 不使用公开 `async void` 或同步等待关闭；主动 `Disconnect` 会发布一次断开事件。接收队列与单帧分发均有上限，过载时丢弃后续数据包而非无限占用内存。
+- Runtime 提供的 TCP、UDP、WebSocket Helper 只用于保证基础连接、收发和关闭链路可运行，尚未经过生产环境的严格验证。正式项目必须按自身协议、安全、弱网、移动平台后台和并发需求扩展 `INetworkHelper`，并完成目标平台压力与异常测试。
 - `LoadSceneAsync` 的内置 Resource Helper 当前只支持 `activateOnLoad: true`；延迟激活没有配套激活句柄，因此会显式抛出不支持异常而不会永久等待。
 - AudioClip 统一由 `ResourceModule` 加载和精确归还，Audio Helper 只负责 AudioSource 播放、淡入淡出和协程回调。
 - 模块优先级同时约束更新和关闭：共同依赖 `ResourceModule` 优先更新、最后关闭；网络优先关闭，以便断连清理期间 Event/Timer 仍可用。
@@ -51,9 +56,12 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 > 请使用 `#upm` 分支安装。该分支会由 GitHub Actions 根据 `main` 自动生成，
 > 并将示例目录发布为 UPM 标准的 `Samples~`；请勿直接使用 `main` 分支安装。
 
-**Samples（可选）**：在 Package Manager 中选中本包 → **Samples** → 点击 `Expansion` 或 `Demo` 的 **Import**。
+**Samples（可选）**：在 Package Manager 中选中本包 → **Samples** → 按需点击 **Import**。
 
-- `Expansion`：第三方集成（YooAsset 资源、UniTask Web 请求等）。UPM 不为 Sample 解析依赖，需手动安装其引用的包（YooAsset / UniTask / Luban / HybridCLR，按所用 Helper 而定）。详见 `Samples~/Expansion/README.md`。
+- `Utility`：与框架模块无关的通用组件和开发辅助能力。
+- `Expansion`：当前已实现 YooAsset 资源、UniTask Web 请求和 ExcelDataReader
+  配置表工具。UPM 不为 Sample 解析依赖，需手动安装对应包。详见
+  `Samples~/Expansion/README.md`。
 - `ExpansionDemo`：第三方 Helper 的可运行验收示例。必须先导入 `Expansion`、安装
   YooAsset 与 UniTask，再执行菜单
   `UnityRFramework/ExpansionDemo/Rebuild Acceptance Assets`。UPM 只复制 Sample
@@ -64,8 +72,8 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   本地化、音频和公告同步到宿主工程的 `Assets/StreamingAssets`，完成后再打开
   `GameAssets/Scenes/DemoBoot.unity`。仅导入 Sample 后直接运行会缺少这些文件。
 
-> 核心包仅依赖 Unity 官方维护的 `com.unity.nuget.newtonsoft-json`；YooAsset、
-> UniTask、Luban、HybridCLR 等非 Unity 第三方库仍全部按需引入。
+> 核心包仅依赖 Unity 官方维护的 `com.unity.nuget.newtonsoft-json`；当前已接入的
+> YooAsset、UniTask 和 ExcelDataReader 均位于可选 Expansion Sample。
 
 ## 模块
 
@@ -310,7 +318,7 @@ foreach (ItemConfig item in all) { Log.Info($"{item.Id}: {item.Name}"); }
 // 安全检查
 if (GameEntry.Config.HasConfigRow<ItemConfig>(1001)) { ... }
 
-// 自定义模式：继承 ConfigHelperBase，适配 Luban 或项目私有二进制格式
+// 自定义模式：继承 ConfigHelperBase，适配项目私有二进制或文本格式
 ```
 
 `ParseConfig(Type, byte[])` 的字节格式由当前 `IConfigHelper` 决定。框架默认 JSON；`BinaryConfigHelper` 兼容反射映射的 URFC v1，并使用生成 Codec 读取带 TableId、SchemaHash 和 CRC32 的 URFC v2。JSON/二进制默认 Helper 还实现可选 `IConfigBundleHelper`，分别读取 JSON 多表容器与 URFM v1。项目私有格式可直接继承 `ConfigHelperBase`。
@@ -340,7 +348,7 @@ JSON 与 URFC v2 均支持显式历史 Schema 迁移。二进制实现 `IBinaryC
 配置表工具提供“分析体积/导出耗时”按钮，只在内存中生成各格式并报告 JSON、URFC、
 URFM、URFL、URLM 大小、Deflate 估算和耗时，不写入资源。默认实现只保证无明显重复复制
 和查询分配，不内置压缩、字符串池、变长整数或差量协议；需要极限性能时应在 Expansion
-中接入 Luban、MemoryPack 或项目专用 Helper。
+中接入项目专用 Helper。
 
 Config 复杂字段第一批支持内联枚举、基础类型一维数组和 `List<T>`。类型示例为
 `enum<Idle=0|Run=1>`、`int[]`、`List<string>`；集合值使用 `|` 分隔，`\|` 表示
@@ -466,19 +474,6 @@ IUIForm battleHud = GameEntry.UI.RegisterSceneUIForm(
 GameEntry.UI.UnregisterSceneUIForm("BattleHUD");
 ```
 
-`ButtonState` 是独立的 UGUI 按钮状态组件，可配置普通/选中背景、图片、文字、
-颜色和对应事件。未指定 `ButtonStateGroup` 时点击会在普通与选中状态间切换；
-指定组后由组维持单选关系。`ButtonStateGroup` 支持指定初始项、允许空选和运行时
-换组，不会在每次点击时扫描层级。组切换的通知顺序固定为旧项取消、新项选中、
-最后触发组事件。
-
-```csharp
-buttonState.SetSelected(true);
-buttonState.SetGroup(tabGroup);
-tabGroup.Select(buttonState);
-tabGroup.ClearSelection();
-```
-
 ### Audio
 
 ```csharp
@@ -501,6 +496,11 @@ GameEntry.Audio.SfxVolume = 1f;
 ```
 
 ### Network
+
+> **使用限制**：内置 `TcpNetworkHelper`、`UdpNetworkHelper` 和
+> `WebSocketNetworkHelper` 是基础参考实现，尚未经过严格生产验证。它们不能替代
+> 项目针对自有协议、加密认证、弱网、移动端后台恢复、代理/TLS、攻击流量和高并发
+> 场景的实现与测试。正式项目应扩展 `INetworkHelper`，并在目标平台完成专项验收。
 
 ```csharp
 // 单服务器
@@ -526,7 +526,8 @@ login.ReconnectInterval = 3f;
 GameEntry.Event.Subscribe<NetworkConnectedEvent>(e =>
     Log.Info("通道 [{0}] 已连接", e.ChannelName));
 
-// Helper 切换：Inspector 可选 Tcp / Udp / WebSocket
+// 基础 Helper 可在 Inspector 选择 Tcp / Udp / WebSocket
+// 正式项目建议注入经过专项测试的自定义 INetworkHelper
 ```
 
 ### Localization
@@ -560,23 +561,23 @@ await GameEntry.Localization.LoadLanguageBundleAsync(
 // BinaryLocalizationHelper 对应加载 Localization/Binary/LocalizationBundle.bytes
 ```
 
-## 技术栈
+## 当前技术栈
 
-Runtime 层默认实现，通过 Helper 桥接可自由替换。Library 层不依赖任何第三方库。
+只列出仓库中已经实现并可配置使用的技术。
 
-| 领域 | 默认实现 | 可替换方案 |
-|------|---------|-----------|
-| 资源管理 | `DefaultResourceHelper`（Resources.Load）、`LocalFileResourceHelper`（Persistent/Streaming/Resources） | YooAsset、Addressables |
-| 配置表 | `JsonConfigHelper`（JSON）/ `BinaryConfigHelper`（URFC v1/v2） | Luban、自定义二进制/文本格式 |
-| 本地化 | `JsonLocalizationHelper`（JSON）/ `BinaryLocalizationHelper`（URFL v2、URLM v1） | 自定义二进制/文本格式 |
-| 网络传输 | `TcpNetworkHelper` | Udp / WebSocket / KCP（Expansion） |
-| 代码热更 | HybridCLR | ILRuntime |
-| 异步 | Task（Library / Runtime 统一） | Awaitable、Coroutine |
-| 序列化 | MemoryPack | Protobuf |
-| UI | UGUI | UI Toolkit、FairyGUI |
+| 领域 | 核心默认实现 | 已接入的可选扩展 |
+|------|-------------|-----------------|
+| 资源管理 | `Resources.Load`、Persistent/Streaming 本地文件 | YooAsset 3.0.5 |
+| 配置表 | JSON、URFC/URFM 二进制 | ExcelDataReader Editor 导表 |
+| 本地化 | JSON、URFL/URLM 二进制 | ExcelDataReader Editor 导表 |
+| Web 请求 | UnityWebRequest + Task | UniTask WebRequest Helper |
+| 网络传输 | TCP、UDP、WebSocket 基础 Helper | 项目自定义 `INetworkHelper` |
+| 异步 | `System.Threading.Tasks.Task`、Unity Coroutine | UniTask 仅用于 Expansion Helper |
+| JSON | JsonUtility、Unity Newtonsoft Json | 项目自定义 `IJsonHelper` |
+| UI | UGUI | 无 |
 
 ## 参考项目
 
 - [GameFramework](https://github.com/EllanJiang/GameFramework) — 架构蓝本
 - [UniFramework](https://github.com/gmhevinci/UniFramework) — 轻量工具集参考
-- [TEngine](https://github.com/Alex-Rachel/TEngine) — YooAsset + HybridCLR 集成参考
+- [TEngine](https://github.com/Alex-Rachel/TEngine) — 资源与模块组织参考

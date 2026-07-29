@@ -21,6 +21,11 @@
   },
   "samples": [
     {
+      "displayName": "Utility",
+      "description": "与框架模块无关的可选通用组件和开发辅助能力，按需导入。",
+      "path": "Samples~/Utility"
+    },
+    {
       "displayName": "Expansion",
       "description": "可选的第三方集成：YooAsset 资源辅助器、UniTask Web 请求辅助器等。需手动安装对应第三方包（详见 Samples~/Expansion/README.md）。",
       "path": "Samples~/Expansion"

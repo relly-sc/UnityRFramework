@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
-namespace UnityRFramework.Runtime
+namespace UnityRFramework.Samples
 {
     /// <summary>
     /// ButtonState 选中项变化事件。

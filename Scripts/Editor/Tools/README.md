@@ -14,7 +14,6 @@
 | UGUI 字体替换 | `Assets/UnityRFramework/UGUI 字体替换`、`GameObject/UnityRFramework/UGUI 字体替换` | 当前选择的场景层级、Prefab 或文件夹中的 Prefab |
 | 名称同步到 UGUI Text | `GameObject/UnityRFramework/名称同步到子级 Text` | 所选场景对象及其子级；Button 文本采用按钮 GameObject 名称，支持 Undo |
 | 批量创建文件夹 | `Assets/UnityRFramework/批量创建文件夹` | 选中文件夹时在其内部创建；选中文件时在同级目录创建；无选择时回退到 `Assets` |
-| BoxCollider 适配 | `GameObject/UnityRFramework/适配 BoxCollider 到 Renderer` | 所选对象及其全部子 Renderer |
 | UTF-8 C# 脚本生成 | `Assets/UnityRFramework/创建 UTF-8 C# 脚本` | 在选中文件夹或文件同级目录创建 UTF-8 无 BOM、LF 的 class/struct/interface/enum；窗口实时跟随 Project 选择，class 可选继承 MonoBehaviour 或自定义父类 |
 
 依赖 Project 或 Hierarchy 当前选择的工具只放在各自的

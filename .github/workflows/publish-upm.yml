@@ -20,6 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       - name: Create and publish UPM branch
         env:
@@ -31,12 +32,25 @@ jobs:
           release_dir="$(mktemp -d)"
           git archive --format=tar "$GITHUB_SHA" | tar -xf - -C "$release_dir"
 
+          if [[ ! -f "Library/RFramework/RFramework.Library.asmdef" ]]; then
+            echo "RFramework submodule was not checked out." >&2
+            exit 1
+          fi
+
+          mkdir -p "$release_dir/Library/RFramework"
+          git -C Library/RFramework archive --format=tar HEAD \
+            | tar -xf - -C "$release_dir/Library/RFramework"
+          # 发布分支已包含 Library 源码，不再保留需要递归克隆的子模块定义。
+          rm -f "$release_dir/.gitmodules"
+
           if [[ ! -d "$release_dir/Samples" ]]; then
             echo "Expected the source package to contain Samples/." >&2
             exit 1
           fi
 
           mv "$release_dir/Samples" "$release_dir/Samples~"
+          # Samples.meta 仍指向重命名前的目录；保留它会让 Unity 显示空 Samples 文件夹。
+          rm -f "$release_dir/Samples.meta"
 
           cd "$release_dir"
           git init

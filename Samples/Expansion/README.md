@@ -19,9 +19,6 @@ Expansion 只负责适配，不把第三方插件的类型或生命周期反向�
 | YooAsset | `Scripts/Runtime/Resource/YooAssetResourceHelper.cs` | 阶段 1 EditorSimulate / Offline / Host 验收完成 |
 | UniTask | `Scripts/Runtime/WebRequest/UniTaskWebRequestHelper.cs` | 阶段 1 验收完成 |
 | Excel 解析扩展 | `Scripts/Editor/Config` | 阶段 2 首版完成 |
-| Luban | 尚未实现 | 阶段 3 |
-| MemoryPack | 尚未实现 | 阶段 4 |
-| HybridCLR | 尚未实现 | 阶段 5 |
 
 2026-07-27 已通过 ExpansionDemo 完成 EditorSimulate、Offline 与 Host
 端到端验收：二进制 `TextAsset` 加载与卸载、Additive 场景加载与卸载、
@@ -52,7 +49,7 @@ v2 并显示最终 `PASS`。Windows Player 与 Android 真机仍需在发布前�
 
 ### 阶段 2：接入轻量 Excel 解析扩展
 
-在 Luban 前先提供一条更容易理解和维护的 Excel 直出管线。该扩展只负责在
+提供一条容易理解和维护的 Excel 直出管线。该扩展只负责在
 Editor 中通过 ExcelDataReader 读取 `.xlsx` / `.xls`，然后复用现有
 ConfigPipeline 生成 Config JSON、URFC v2、配置代码，以及 Localization JSON、
 URFL v2 和 URLM v1；Runtime 不直接读取 Excel，也不依赖 ExcelDataReader。
@@ -102,47 +99,8 @@ Localization 自定义格式独立实现 `IExcelLocalizationExporter`，通过
 公式缺少缓存值的精确诊断和 ExpansionDemo 运行时等价验收留在阶段 2 后续项。移除
 Expansion 后，默认 CSV 管线仍可独立工作。
 
-这条轻量管线适合规则固定、表结构简单的项目。需要多种表定义方式、复杂引用、自动代码生成规则或大型配置生产体系时，再使用 Luban。
-
-### 阶段 3：接入 Luban
-
-Luban 作为配置生产管线扩展，不替换框架默认的 JSON/URFC 二进制实现。
-
-工作内容：
-
-1. 建立 Excel 到 Luban 输出文件的 Editor 侧转换流程。
-2. 实现 Luban 配置 Helper 或适配层，映射到现有 Config 模块接口。
-3. 支持 Luban 的 JSON 和二进制输出，并验证单表、分表合并及 Bundle 加载。
-4. 补齐 IL2CPP、泛型保留和 `link.xml` 需求。
-5. 在 ExpansionDemo 中独立验证加载、查询、重复 ID、格式错误、关闭和重启。
-
-完成标准：Luban 生成、加载、解析、缓存和重启链路均可运行，且不修改核心 Config 接口来迁就 Luban 私有类型。
-
-### 阶段 4：接入 MemoryPack
-
-MemoryPack 作为可选的高性能序列化方案，用于配置或网络数据；不替换框架默认 URFC 格式，也不成为核心框架必需依赖。
-
-工作内容：
-
-1. 明确 MemoryPack 在 Config、Network 中各自的适用边界。
-2. 实现独立序列化适配器及必要的代码生成流程。
-3. 验证版本兼容、无效数据、AOT/IL2CPP、取消、关闭和重启。
-4. 用 ExpansionDemo 对比默认实现与 MemoryPack 实现的行为一致性。
-
-完成标准：未安装 MemoryPack 时核心框架不受影响；安装后可通过显式配置启用，并通过目标平台构建验证。
-
-### 阶段 5：接入 HybridCLR
-
-HybridCLR 涉及程序集划分、AOT 泛型补充、热更新 DLL、资源交付和平台构建，放在其他适配稳定后实施。
-
-工作内容：
-
-1. 确定热更新程序集边界和依赖方向。
-2. 接入补充元数据、热更新 DLL 加载及版本校验。
-3. 通过 Resource Helper 获取 DLL，不让核心框架直接依赖具体资源后端。
-4. 验证 Editor、目标真机、IL2CPP、更新失败回退、关闭和重启。
-
-完成标准：热更新链路在目标平台可构建、可运行、可失败回退，且不破坏未启用 HybridCLR 的默认运行路径。
+这条轻量管线适合规则固定、表结构简单的项目。尚未实际接入的第三方技术不在本文档
+中预先声明；完成代码接入和验收后，再补充对应 Helper、依赖和使用说明。
 
 ## 通用验收规则
 
@@ -175,8 +133,8 @@ YooAsset Collector 和示例框架预制体。Offline/Host 所需的 YooAsset
 `StreamingAssets/yoo/<PackageName>` 内容仍需通过 YooAsset 构建窗口或内置目录
 工具生成。详细模式步骤见 `ExpansionDemo/README.md`。
 
-当前开发工程已安装 YooAsset 与 UniTask。MemoryPack 当前未安装，仅保留为阶段 4
-的可选规划；每个 Helper 只应依赖自己实际使用的插件。
+当前开发工程已安装 YooAsset 与 UniTask，Excel 扩展携带 EditorOnly 的
+ExcelDataReader DLL。每个 Helper 只依赖自己实际使用的插件。
 
 ### YooAsset Host 磁盘缓存
 

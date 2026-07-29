@@ -4,7 +4,7 @@ using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace UnityRFramework.Runtime
+namespace UnityRFramework.Samples
 {
     /// <summary>
     /// 管理单个 UGUI Button 的普通、悬停预览和选中显示状态。
