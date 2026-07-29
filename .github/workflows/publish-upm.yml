@@ -37,12 +37,14 @@ jobs:
             exit 1
           fi
 
-          # Unity 会忽略 UPM 包中的 Library 目录；发布时改放在 Runtime 下以参与编译。
-          rm -f "$release_dir/Library/RFramework.meta"
-          rmdir "$release_dir/Library" 2>/dev/null || true
-          mkdir -p "$release_dir/Runtime/RFramework"
+          if [[ ! -f "Library/RFramework/RFramework.Library.asmdef.meta" ]]; then
+            echo "RFramework submodule does not track Unity .meta files." >&2
+            exit 1
+          fi
+
+          mkdir -p "$release_dir/Library/RFramework"
           git -C Library/RFramework archive --format=tar HEAD \
-            | tar -xf - -C "$release_dir/Runtime/RFramework"
+            | tar -xf - -C "$release_dir/Library/RFramework"
           # 发布分支已包含 Library 源码，不再保留需要递归克隆的子模块定义。
           rm -f "$release_dir/.gitmodules"
 
