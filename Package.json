@@ -1,0 +1,44 @@
+{
+  "name": "com.relly-sc.unityrframework",
+  "version": "1.0.0",
+  "displayName": "UnityRFramework",
+  "description": "基于 GameFramework 分层架构的数据驱动、模块化 Unity 游戏框架。Library 层零第三方依赖；Runtime 仅依赖 Unity 官方包，第三方集成以可选 Samples 形式提供。",
+  "documentationUrl": "https://github.com/relly-sc/UnityRFramework/blob/main/README.md",
+  "licensesUrl": "https://github.com/relly-sc/UnityRFramework/blob/main/LICENSE",
+  "author": {
+    "name": "relly",
+    "email": "1187493252@qq.com",
+    "url": ""
+  },
+  "keywords": [
+    "unityrframework",
+    "UnityRFramework",
+    "game-framework",
+    "gameframework"
+  ],
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
+  "samples": [
+    {
+      "displayName": "Utility",
+      "description": "与框架模块无关的可选通用组件和开发辅助能力，按需导入。",
+      "path": "Samples~/Utility"
+    },
+    {
+      "displayName": "Expansion",
+      "description": "可选的第三方集成：YooAsset 资源辅助器、UniTask Web 请求辅助器等。需手动安装对应第三方包（详见 Samples~/Expansion/README.md）。",
+      "path": "Samples~/Expansion"
+    },
+    {
+      "displayName": "Demo",
+      "description": "官方可运行 Demo，使用内置辅助器串通全部框架模块。不依赖第三方包；导入后需执行 Export Config and Localization，将配置、本地化、音频和公告同步到项目级 StreamingAssets。",
+      "path": "Samples~/Demo"
+    },
+    {
+      "displayName": "ExpansionDemo",
+      "description": "使用 Expansion 第三方辅助器（YooAsset、UniTask 等）的完整 Demo。导入后必须执行 Rebuild Acceptance Assets 生成项目级 StreamingAssets 文件；需先安装对应第三方包并导入 Expansion Sample。",
+      "path": "Samples~/ExpansionDemo"
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "Tables": {
+    "Demo_Action": {
+      "TableId": "76BEC56B",
+      "SchemaHash": "44948E06C33E4552",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "action_attack",
+          "Type": "attack",
+          "Power": 1,
+          "Cooldown": 0
+        },
+        {
+          "Id": 2,
+          "NameKey": "action_defend",
+          "Type": "defend",
+          "Power": 0.5,
+          "Cooldown": 0
+        },
+        {
+          "Id": 3,
+          "NameKey": "action_skill",
+          "Type": "skill",
+          "Power": 1.8,
+          "Cooldown": 2
+        }
+      ]
+    },
+    "Demo_Character": {
+      "TableId": "590B7654",
+      "SchemaHash": "40FBFED9348F7264",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "char_warrior",
+          "ClassKey": "class_warrior",
+          "BaseAtk": 12,
+          "BaseDef": 8,
+          "BaseHp": 100,
+          "UpgradeCost": 50
+        },
+        {
+          "Id": 2,
+          "NameKey": "char_mage",
+          "ClassKey": "class_mage",
+          "BaseAtk": 18,
+          "BaseDef": 3,
+          "BaseHp": 60,
+          "UpgradeCost": 50
+        },
+        {
+          "Id": 3,
+          "NameKey": "char_priest",
+          "ClassKey": "class_priest",
+          "BaseAtk": 5,
+          "BaseDef": 6,
+          "BaseHp": 80,
+          "UpgradeCost": 50
+        }
+      ]
+    },
+    "Demo_Enemy": {
+      "TableId": "956B2D43",
+      "SchemaHash": "63693568BD5D8A93",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "enemy_slime",
+          "BaseAtk": 13,
+          "BaseDef": 4,
+          "BaseHp": 72
+        },
+        {
+          "Id": 2,
+          "NameKey": "enemy_abyss_guardian",
+          "BaseAtk": 23,
+          "BaseDef": 8,
+          "BaseHp": 124
+        }
+      ]
+    },
+    "Demo_Quest": {
+      "TableId": "010AA9B9",
+      "SchemaHash": "BED2B063AEB3EDE5",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "quest_1_name",
+          "DescKey": "quest_1_desc",
+          "EnemyId": 1,
+          "Rounds": 3,
+          "Difficulty": 1,
+          "RewardExp": 30,
+          "RewardGold": 100
+        },
+        {
+          "Id": 2,
+          "NameKey": "quest_2_name",
+          "DescKey": "quest_2_desc",
+          "EnemyId": 2,
+          "Rounds": 5,
+          "Difficulty": 3,
+          "RewardExp": 80,
+          "RewardGold": 250
+        }
+      ]
+    },
+    "Demo_Reward": {
+      "TableId": "18BB9C3A",
+      "SchemaHash": "A2D85FBED9F88C6E",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "item_potion",
+          "DropRate": 0.4
+        },
+        {
+          "Id": 2,
+          "NameKey": "item_scroll",
+          "DropRate": 0.15
+        }
+      ]
+    }
+  }
+}

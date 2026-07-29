@@ -1,0 +1,20 @@
+{
+  "Tables": {
+    "Demo_Reward": {
+      "TableId": "18BB9C3A",
+      "SchemaHash": "A2D85FBED9F88C6E",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "item_potion",
+          "DropRate": 0.4
+        },
+        {
+          "Id": 2,
+          "NameKey": "item_scroll",
+          "DropRate": 0.15
+        }
+      ]
+    }
+  }
+}

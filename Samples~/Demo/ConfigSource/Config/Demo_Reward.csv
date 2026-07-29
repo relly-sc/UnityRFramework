@@ -1,0 +1,5 @@
+Id,NameKey,DropRate
+int,string,float
+主键ID（唯一标识）,名称本地化键,掉落概率（0~1）
+1,item_potion,0.4
+2,item_scroll,0.15
