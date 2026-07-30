@@ -1,210 +1,130 @@
 # UnityRFramework · ExpansionDemo
 
-`ExpansionDemo` 是第三方 Helper 的最小端到端验收场景，不复制正式 Demo 的业务
-玩法。当前覆盖 YooAsset 3.0.5 与 UniTask WebRequest Helper。
+`ExpansionDemo` 是官方 Demo 的第三方资源实现和完整资源更新启动示例。它不复制大厅、
+配置、UI、战斗或 Procedure 代码，而是复用已导入的 Demo Sample，并在进入 Demo
+流程前执行 YooAsset 资源更新闭环。
 
-## 前置依赖
+启动顺序如下：
 
-- `com.tuyoogame.yooasset` 3.0.5
-- `com.cysharp.unitask`
-- `Samples/Expansion` 中的第三方 Helper
+1. 初始化 YooAsset Package。
+2. Host 模式向服务器请求最新 Package Version，并加载对应 Manifest。
+3. 只为 `preload` 标签创建启动差量下载计划；内置文件和磁盘缓存中已有的 Bundle 自动跳过。
+4. 没有更新时直接进入官方 Demo。
+5. 有更新时显示 UGUI 更新界面，等待用户确认下载。
+6. 下载时显示文件数量、已下载/总大小、平均网速和百分比进度。
+7. 下载成功后进入官方 Demo；失败时可重新计算差量列表并重试。
+8. `ondemand` 标签资源不参与启动下载，进入 Demo 后可通过按需加载验证面板触发静默下载并实例化。
 
-MemoryPack、NPOI 和 EPPlus 当前均不是本示例依赖。
+本示例不包含代码热更新。第三方运行模式、取消、软重启和最小资源探针仍由
+`ExpansionAcceptance` 负责。
 
-## Package Manager 导入后必做
+## 前置条件
 
-`ExpansionDemo` 不能在刚导入后直接进入 Play Mode。UPM 的 Import Sample 只复制
-Sample 目录，不允许 Sample 在导入过程中自动向宿主工程
-`Assets/StreamingAssets` 写文件，因此必须完成以下准备：
+1. 导入 `Demo` Sample。
+2. 导入 `Expansion` Sample。
+3. 导入本 `ExpansionDemo` Sample。
+4. 安装 YooAsset 3.0.5 与 UniTask。
+5. 先执行 `UnityRFramework/Demo/Export Config and Localization`，生成 Demo 公告等
+   项目级 StreamingAssets 文件。
 
-1. 先导入 `Expansion` Sample，再导入 `ExpansionDemo` Sample。
-2. 手动安装 YooAsset 3.0.5 与 UniTask；UPM 不会根据 Sample 代码自动安装
-   这些可选依赖。
-3. 等待 Unity 完成编译。
-4. 在非 Play Mode 下执行
-   `UnityRFramework/ExpansionDemo/Rebuild Acceptance Assets`。
-5. 确认已生成
-   `Assets/StreamingAssets/ExpansionDemo/WebProbe.txt`。
-6. 打开当前导入目录中的
-   `GameAssets/Scenes/ExpansionDemo.unity`，再按下 Play。
+## 生成覆盖层
 
-构建器通过自身脚本路径动态定位 Sample，因此同时兼容开发工程中的
-`Assets/UnityRFramework/Samples/ExpansionDemo` 和 Package Manager 导入后的
-`Assets/Samples/<包名>/<版本>/ExpansionDemo`，不要求用户移动 Sample。
+在非 Play Mode 下执行：
 
-`Rebuild Acceptance Assets` 会重新复制示例框架预制体，并将 Resource 模式恢复为
-`EditorSimulate`、清空 Host 地址。需要测试 Offline 或 Host 时，应先执行 Rebuild，
-再修改示例预制体上的模式和服务器地址。
+`UnityRFramework/ExpansionDemo/Rebuild Demo Overlay`
 
-## 生成验收资产
+构建器会：
 
-在 Unity 菜单执行：
+1. 自动定位已导入的 Demo，不复制其业务脚本和资源。
+2. 生成配置了 `YooAssetResourceHelper` 与 `UniTaskWebRequestHelper` 的框架预制体。
+3. 从 DemoBoot 生成 `Generated/Scenes/ExpansionDemoBoot.unity`，替换框架预制体和
+   启动入口，并生成序列化 UGUI 更新界面。
+4. 创建 `ExpansionDemoPackage`，收集 Demo 的 Resources、业务场景与本 Sample
+   `GameAssets/OnDemand/Elastigirl/Elastigirl.fbx` 按需验证模型。
+5. 将 ExpansionDemoBoot、DemoHall、DemoExpedition 放入 Build Settings 前三项。
 
-`UnityRFramework/ExpansionDemo/Rebuild Acceptance Assets`
+生成完成后，在 YooAsset 构建窗口选择 `ExpansionDemoPackage`：
 
-构建器会在编辑器中完成以下工作：
+- EditorSimulate：生成模拟清单后直接运行 ExpansionDemoBoot；差量列表为空，正常进入 Demo。
+- Offline：构建并复制全部内置文件后运行；差量列表为空，正常进入 Demo。
+- Host：按下文准备内置目录和远程服务器，用于验证完整更新流程。
 
-1. 生成内置二进制探针、远程 JSON 探针和 Additive 内容场景。
-2. 复制框架预制体，并配置 `YooAssetResourceHelper` 与
-   `UniTaskWebRequestHelper`。
-3. 生成序列化 UGUI 启动场景；运行时代码只更新文本和绑定事件，不控制布局。
-4. 创建 `ExpansionDemoPackage` 收集规则。
-5. 将启动场景设为 Build Settings 第 0 项，以便验证框架软重启。
+## Host 完整更新流程
 
-其中 `Assets/StreamingAssets/ExpansionDemo/WebProbe.txt` 位于 Sample 目录之外，
-删除 Sample 时 Unity 不会自动删除它；重新导入或文件缺失时再次执行 Rebuild 即可。
+### 首次发布
 
-## 各模式最短运行步骤
+1. 执行 `UnityRFramework/ExpansionDemo/Build Host Package`。该菜单会为当前平台
+   构建新的 `ExpansionDemoPackage` 版本，并增量发布到
+   `<工程根目录>/Bundles/ExpansionDemoServer`，不会改写 StreamingAssets。
+2. 在 HFS 或其他静态文件服务器中把 `Bundles/ExpansionDemoServer` 设为服务根目录。
+   服务器 URL 必须直接对应包含
+   `.version`、Manifest、Hash 和 Bundle 的目录。
+3. 准备客户端内置目录：
+   - 全部内置：构建时使用 `ClearAndCopyAll`。
+   - 部分内置：使用 `ClearAndCopyByTags`，并确保
+     `BuiltinCatalog.bytes` 与实际内置 Bundle 一致。
+   - 全部远程：通过
+     `UnityRFramework/Expansion/YooAsset Builtin Catalog`
+     为 `ExpansionDemoPackage` 生成空 Catalog。
+4. 在生成的 `UnityRFramework.prefab` 上把 Resource 模式改为 `Host`，
+   填写 `defaultHostServer`，需要时填写 `fallbackHostServer`。
+5. 打开并运行 `Generated/Scenes/ExpansionDemoBoot.unity`。
 
-### EditorSimulate
+### 发布资源更新
 
-1. 执行 `Rebuild Acceptance Assets`。
-2. 保持示例框架预制体的 Resource 模式为 `EditorSimulate`。
-3. 直接运行验收场景。
+1. 修改 Demo 使用的配置、语言、音频、Prefab 或场景资源。
+2. 再次执行 `UnityRFramework/ExpansionDemo/Build Host Package`。
+3. 构建器会把新 Manifest、Hash、Bundle 和 `.version` 发布到同一服务目录；
+   `.version` 在构建产物复制过程中覆盖为最新版本。
+4. 不替换已发布客户端中的旧 StreamingAssets。
+5. 再次启动客户端：旧内置资源仍可使用，变更或新增的 Bundle 会出现在更新界面；
+   下载成功后写入 YooAsset 磁盘缓存并进入 Demo。
 
-EditorSimulate 不需要提前构建 Bundle，但仍需要 Rebuild 生成普通 WebRequest
-使用的 `Assets/StreamingAssets/ExpansionDemo/WebProbe.txt`。
+后续启动会继续检查服务器版本。未改变且已缓存的 Bundle 不会重复下载；资源加载时
+YooAsset 按内置文件、磁盘缓存、远程文件系统的能力选择可用来源。
 
-### Offline
+切换 Unity Build Target 后必须为目标平台重新构建 Package，不能混用 Windows、
+Android、iOS 等平台的 Bundle。
 
-1. 执行 Rebuild。
-2. 在 YooAsset 构建窗口构建 `ExpansionDemoPackage`，设置
-   `Bundled Copy Option = ClearAndCopyAll`。
-3. 确认 `Assets/StreamingAssets/yoo/ExpansionDemoPackage` 中存在
-   `BuiltinCatalog.bytes`、版本、Manifest、Hash 和全部 Bundle。
-4. 将示例框架预制体的 Resource 模式改为 `Offline` 后运行。
+## 地址映射
 
-完整验收流程会加载 `RemoteProbe.json`，因此 Offline 模式必须使用
-`ClearAndCopyAll`，不能只复制 `builtin` 标签。
+Demo 默认实现使用 Resources 相对路径。覆盖层通过
+`ExpansionDemoResourcesAddressRule` 生成相同 YooAsset Location：
 
-### Host
+- `Config/Json/Demo_Character.json`
+- `Localization/Json/zh-CN.json`
+- `Prefabs/UI/DemoHallUI`
+- `Audio/music_background.wav`
+- `DemoHall`
+- `DemoExpedition`
 
-1. 执行 Rebuild。
-2. 构建新的 Package Version，并将该版本完整产物部署到服务器。
-3. 按下文“Host 混合包验收”或“纯远程 Host 模式”准备
-   `Assets/StreamingAssets/yoo/ExpansionDemoPackage`。
-4. 将示例框架预制体的 Resource 模式改为 `Host`，填写
-   `defaultHostServer`，需要时填写 `fallbackHostServer`。
-5. 运行场景并确认最终显示 `PASS`。
+因此 Demo 业务代码不需要判断当前使用 Resources 还是 YooAsset。
 
-服务器 URL 必须直接对应包含 `.version`、Manifest、Hash 和 Bundle 的目录。
-切换 Unity Build Target 后必须为目标平台重新构建 YooAsset Package；Windows 的
-Bundle 不得直接作为 Android、iOS 等平台的内置或远程产物。
+## 按需下载验证
 
-## 自动验收流程
+构建器把资源分成两类：
 
-打开并运行：
+- `preload`：Demo 配置、本地化、UI、音频与场景，参加启动更新检查。
+- `ondemand`：本 Sample 的 `GameAssets/OnDemand/Elastigirl/Elastigirl.fbx`，地址为
+  `ExpansionDemo/OnDemandModel`，不参加启动更新检查。
 
-`GameAssets/Scenes/ExpansionDemo.unity`
+进入 Demo 后，右上角会显示“YooAsset 按需加载验证”面板。点击“加载远程模型”：
 
-默认会自动执行：
+1. 调用 `GetDownloadSize()` 判断本地是否已有该模型 Bundle。
+2. 无缓存时，`LoadAssetAsync<GameObject>()` 由 YooAsset 自动从远程服务器静默下载。
+3. 下载完成后实例化模型，并在独立预览窗口中显示。
+4. 已有磁盘缓存时直接加载，不发生重复网络下载。
 
-1. 按 ResourceComponent 当前模式初始化 YooAsset 资源包并激活包清单。
-2. 以 `byte[]` 加载、校验和卸载普通 Bundle 内的二进制 `TextAsset`。
-3. 加载并卸载 `ExpansionContent` Additive 场景。
-4. 加载并解析 `RemoteProbe.json`，输出远程探针版本和消息。
-5. 通过 UniTask Helper 读取构建器生成的本地 StreamingAssets 探针文件。
-6. 对探针请求主动取消，并校验结果为 `WebRequestError.Aborted`。
-7. 请求框架软重启，等待旧 YooAsset 包异步销毁后重新初始化。
-8. 重启后再次执行上述全部链路。
+验证首次按需下载时，需要先发布包含该模型的最新 Host Package，并确保 HFS 服务目录
+指向 `<工程根目录>/Bundles/ExpansionDemoServer`。清理 YooAsset 对应 Package 的磁盘
+缓存后重新运行，可再次观察“本地无缓存”路径。
 
-最终状态区应出现：
+## 已知边界
 
-`PASS：框架重启后全部第三方链路再次通过。`
+为了让默认 Demo 与 ExpansionDemo 复用同一份资源，资源源文件仍位于 Demo 的
+`Resources` 目录。ExpansionDemo 实际通过 YooAsset Helper 加载这些资源，但制作
+Player 时 Unity 仍可能把它们同时计入 Resources。该结构用于验证 Helper 可替换性，
+不作为正式项目的资源目录和包体优化方案。
 
-## 2026-07-27 验收结果
-
-- Unity C# 编译错误：0。
-- 首次启动、资源、场景、Web 成功请求与取消：通过。
-- Restart 关闭、重新启动和第二轮完整链路：通过。
-- Play Mode 运行捕获新增未处理错误：0。
-- Quit 关闭流程：通过。
-- EditorSimulate：通过。
-- Offline：通过。
-- Host 纯远程初始化与加载：通过。
-- Host 部分内置、部分远程：通过。
-- 保留旧 `BuiltinCatalog.bytes`，服务器 Package 更新后加载
-  `RemoteProbe.json` v2：通过。
-- 框架软重启后再次加载 v2 并显示最终 `PASS`：通过。
-
-以上为 Unity Editor 环境验收；Windows Player 与 Android 真机仍属于目标平台
-发布前验收。
-
-## Host 混合包验收
-
-当前收集规则为：
-
-- `ExpansionProbe.bytes`：`builtin` 标签，随首包内置。
-- `ExpansionContent.unity`：`builtin` 标签，随首包内置。
-- `RemoteProbe.json`：无 `builtin` 标签，只从远程服务器或本地缓存加载。
-
-首次构建客户端基线包时，在 YooAsset 构建窗口设置：
-
-```text
-Bundled Copy Option = ClearAndCopyByTags
-Bundled Copy Params = builtin
-```
-
-构建完成后，`Assets/StreamingAssets/yoo/ExpansionDemoPackage` 应包含 Catalog、
-版本、Manifest、Hash，以及 `ExpansionProbe`、`ExpansionContent` 和必要依赖的
-Bundle；不应包含 `RemoteProbe` Bundle。服务器目录部署该版本的完整构建产物。
-
-验证远程更新时：
-
-1. 先运行一次基线版本，确认状态区输出 `RemoteProbe` 的当前版本。
-2. 修改 `GameAssets/YooAsset/Remote/RemoteProbe.json` 中的 `version` 和
-   `message`。
-3. 使用新的 Package Version 重新构建，但将 `Bundled Copy Option` 设为
-   `None`，不要覆盖基线客户端的 StreamingAssets 和旧 `BuiltinCatalog.bytes`。
-4. 将新版本的完整构建产物更新到服务器，最后替换
-   `ExpansionDemoPackage.version`。
-5. 清理旧测试缓存或使用首次未下载该版本的客户端运行，确认状态区输出新的
-   `version` 和 `message`，同时两个内置资源仍能正常加载。
-
-`RemoteProbe.json` 只在文件不存在时由构建器创建，执行
-`Rebuild Acceptance Assets` 不会覆盖手动修改的版本内容。
-
-## 纯远程 Host 模式
-
-纯远端 Host 模式不能直接删除整个内置包目录。YooAsset v3 的
-`BuiltinFileSystem` 即使不包含任何内置 Bundle，也仍需读取本地
-`BuiltinCatalog.bytes`。
-
-先执行：
-
-`UnityRFramework/Expansion/YooAsset Builtin Catalog`
-
-在工具中选择 `ExpansionDemoPackage`，然后点击：
-
-`生成空 Catalog（全部资源远程）`
-
-工具会在以下目录生成空的内置目录文件：
-
-`Assets/StreamingAssets/yoo/ExpansionDemoPackage/BuiltinCatalog.bytes`
-
-空目录文件只用于初始化 Builtin 文件系统，不会将任何 Bundle 标记为内置资源。
-版本文件、Manifest 和 Bundle 仍会从 `defaultHostServer` 下载。服务器根目录应
-直接包含 `ExpansionDemoPackage.version`、对应版本的 Manifest 和所有 Bundle，
-不要在 URL 与这些文件之间额外嵌套平台、包名或版本目录。
-
-## 目录
-
-```text
-ExpansionDemo/
-├── Scripts/
-│   ├── Editor/ExpansionDemoBuilder.cs
-│   └── Runtime/ExpansionDemoController.cs
-└── GameAssets/
-    ├── Prefabs/UnityRFramework.prefab
-    ├── Scenes/ExpansionDemo.unity
-    └── YooAsset/
-        ├── Raw/ExpansionProbe.bytes
-        ├── Remote/RemoteProbe.json
-        └── Scenes/ExpansionContent.unity
-```
-
-`Raw` 是示例目录的历史命名；当前文件按普通 `TextAsset` 收集，不是 YooAsset
-RawFile 包。
-
-构建器还会生成 `Assets/StreamingAssets/ExpansionDemo/WebProbe.txt`，因此 Web
-验收不依赖 UnitySkills REST、外部网站或公网连接。
+更新界面目前采用启动期间的固定中文提示，因为本地化资源本身也可能属于待更新内容。
+进入 Demo 后继续使用官方 Demo 的中英文语言包。

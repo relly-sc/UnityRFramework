@@ -2,59 +2,72 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using UnityRFramework.Expansion;
 using UnityRFramework.Runtime;
+using YooAsset;
 using YooAsset.Editor;
 
 namespace UnityRFramework.Editor
 {
     /// <summary>
-    /// 创建和更新 ExpansionDemo 的验收资产、YooAsset 收集规则与 Build Settings。
-    /// 运行时场景只保留序列化布局，不依赖代码动态创建 UI。
+    /// 为官方 Demo 生成使用 Expansion 第三方 Helper 的覆盖层。
+    /// 业务脚本、配置、UI 和场景继续复用 Demo Sample，不在本 Sample 中复制。
     /// </summary>
     public static class ExpansionDemoBuilder
     {
         private const string PackageName = "ExpansionDemoPackage";
-        private const string WebProbeDirectory = "Assets/StreamingAssets/ExpansionDemo";
-        private const string WebProbeFile = WebProbeDirectory + "/WebProbe.txt";
+        private const string GroupName = "ExpansionDemo";
+        private const string PreloadTag = "preload";
+        private const string OnDemandTag = "ondemand";
         private static string sampleRoot;
+        private static string demoRoot;
 
-        private static string Root => sampleRoot ?? (sampleRoot = FindSampleRoot());
+        private static string Root => sampleRoot ?? (sampleRoot = FindOwnSampleRoot());
 
-        private static string DemoFrameworkPrefab =>
-            Root + "/GameAssets/Prefabs/UnityRFramework.prefab";
+        private static string DemoRoot => demoRoot ?? (demoRoot = FindDemoSampleRoot());
 
-        private static string RawDirectory => Root + "/GameAssets/YooAsset/Raw";
+        private static string GeneratedRoot => Root + "/Generated";
 
-        private static string RemoteDirectory => Root + "/GameAssets/YooAsset/Remote";
+        private static string FrameworkPrefab =>
+            GeneratedRoot + "/Prefabs/UnityRFramework.prefab";
 
-        private static string SceneDirectory => Root + "/GameAssets/YooAsset/Scenes";
+        private static string BootScene =>
+            GeneratedRoot + "/Scenes/ExpansionDemoBoot.unity";
 
-        private static string ProbeFile => RawDirectory + "/ExpansionProbe.bytes";
+        private static string DemoResources => DemoRoot + "/GameAssets/Resources";
 
-        private static string RemoteProbeFile => RemoteDirectory + "/RemoteProbe.json";
+        private static string DemoScenes => DemoRoot + "/GameAssets/Scenes";
 
-        private static string BootScene => Root + "/GameAssets/Scenes/ExpansionDemo.unity";
+        private static string OnDemandModel =>
+            Root + "/GameAssets/OnDemand/Elastigirl/Elastigirl.fbx";
 
-        private static string ContentScene => SceneDirectory + "/ExpansionContent.unity";
+        private static string SourceBootScene => DemoScenes + "/DemoBoot.unity";
+
+        private static string HallScene => DemoScenes + "/DemoHall.unity";
+
+        private static string ExpeditionScene => DemoScenes + "/DemoExpedition.unity";
 
         /// <summary>
-        /// 重建 ExpansionDemo 验收资产并将启动场景放到 Build Settings 第 0 项。
+        /// 重建第三方 Helper 覆盖层、YooAsset 收集规则和 Build Settings。
         /// </summary>
-        [MenuItem("UnityRFramework/ExpansionDemo/Rebuild Acceptance Assets")]
+        [MenuItem("UnityRFramework/ExpansionDemo/Rebuild Demo Overlay")]
         public static void Rebuild()
         {
-            EnsureDirectories();
-            WriteProbeFile();
-            WriteRemoteProbeFile();
-            WriteWebProbeFile();
-            CreateContentScene();
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            {
+                return;
+            }
+
+            ValidateDependencies();
+            EnsureFolder(GeneratedRoot);
+            EnsureFolder(GeneratedRoot + "/Prefabs");
+            EnsureFolder(GeneratedRoot + "/Scenes");
             CreateFrameworkPrefab();
             ConfigureYooAssetCollectors();
             CreateBootScene();
@@ -62,46 +75,189 @@ namespace UnityRFramework.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("[ExpansionDemo] Acceptance assets rebuilt.");
+            Debug.Log("[ExpansionDemo] Demo overlay rebuilt.");
         }
 
-        private static void EnsureDirectories()
+        /// <summary>
+        /// 为当前平台构建新的 Host Package，并发布到独立 HFS 服务目录。
+        /// 不复制任何文件到 StreamingAssets。
+        /// </summary>
+        [MenuItem("UnityRFramework/ExpansionDemo/Build Host Package")]
+        public static void BuildHostPackage()
         {
-            EnsureFolder(Root + "/Scripts");
-            EnsureFolder(Root + "/GameAssets");
-            EnsureFolder(Root + "/GameAssets/Prefabs");
-            EnsureFolder(Root + "/GameAssets/Scenes");
-            EnsureFolder(Root + "/GameAssets/YooAsset");
-            EnsureFolder(RawDirectory);
-            EnsureFolder(RemoteDirectory);
-            EnsureFolder(SceneDirectory);
-            EnsureFolder(WebProbeDirectory);
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                throw new InvalidOperationException(
+                    "ExpansionDemoBuilder: 不能在 Play Mode 中构建资源包。");
+            }
+
+            ValidateDependencies();
+            ConfigureYooAssetCollectors();
+            AssetDatabase.SaveAssets();
+
+            string version = DateTime.Now.ToString("yyyy-MM-dd-HHmmss");
+            string shaderBundleName = DefaultBundlePackRule
+                .CreateShadersPackRuleResult()
+                .GetBundleName(
+                    PackageName,
+                    BundleCollectorSettingData.Setting.UniqueBundleName);
+            ScriptableBuildParameters parameters = new ScriptableBuildParameters
+            {
+                BuildOutputRoot = BundleBuilderHelper.GetDefaultBuildOutputRoot(),
+                BundledFileRoot = BundleBuilderHelper.GetStreamingAssetsRoot(),
+                BuildPipeline = EBuildPipeline.ScriptableBuildPipeline.ToString(),
+                BuildBundleType = (int)EBundleType.AssetBundle,
+                BuildTarget = EditorUserBuildSettings.activeBuildTarget,
+                PackageName = PackageName,
+                PackageVersion = version,
+                PackageNote = "ExpansionDemo Host update package",
+                EnableSharePackRule = true,
+                VerifyBuildingResult = true,
+                FileNameStyle = EFileNameStyle.BundleName,
+                BundledCopyOption = EBundledCopyOption.None,
+                BundledCopyParams = string.Empty,
+                CompressOption = ECompressOption.LZ4,
+                ClearBuildCacheFiles = false,
+                UseAssetDependencyDB = true,
+                WriteLinkXML = true,
+                BuiltinShadersBundleName = shaderBundleName,
+                BundleEncryptor = new EncryptionNone(),
+                ManifestEncryptor = new ManifestEncryptorNone(),
+                ManifestDecryptor = new ManifestDecryptorNone()
+            };
+
+            ScriptableBuildPipeline pipeline = new ScriptableBuildPipeline();
+            BuildResult result = pipeline.Run(parameters, true);
+            if (!result.Success)
+            {
+                throw new InvalidOperationException(
+                    "ExpansionDemoBuilder: YooAsset Package 构建失败。"
+                    + $" Task: {result.FailedTask}, Error: {result.ErrorInfo}");
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
+            if (string.IsNullOrEmpty(projectRoot))
+            {
+                throw new InvalidOperationException(
+                    "ExpansionDemoBuilder: 无法定位 Unity 工程根目录。");
+            }
+
+            string serverRoot = Path.Combine(
+                projectRoot,
+                "Bundles",
+                "ExpansionDemoServer");
+            PublishPackage(result.OutputPackageDirectory, serverRoot);
+            Debug.Log(
+                $"[ExpansionDemo] Host package '{version}' published to '{serverRoot}'.");
+            EditorUtility.RevealInFinder(serverRoot);
         }
 
-        private static string FindSampleRoot()
+        private static void PublishPackage(string sourceRoot, string targetRoot)
         {
-            string[] guids = AssetDatabase.FindAssets("ExpansionDemoBuilder t:MonoScript");
+            Directory.CreateDirectory(targetRoot);
+            foreach (string sourceFile in Directory.GetFiles(
+                         sourceRoot,
+                         "*",
+                         SearchOption.AllDirectories))
+            {
+                string relativePath = sourceFile.Substring(sourceRoot.Length)
+                    .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string targetFile = Path.Combine(targetRoot, relativePath);
+                string targetDirectory = Path.GetDirectoryName(targetFile);
+                if (!string.IsNullOrEmpty(targetDirectory))
+                {
+                    Directory.CreateDirectory(targetDirectory);
+                }
+
+                File.Copy(sourceFile, targetFile, true);
+            }
+        }
+
+        private static void ValidateDependencies()
+        {
+            if (AssetDatabase.LoadAssetAtPath<MonoScript>(
+                    DemoRoot + "/Scripts/Runtime/DemoGameEntry.cs") == null)
+            {
+                throw new InvalidOperationException(
+                    "ExpansionDemoBuilder: Demo Sample 未完整导入。");
+            }
+
+            if (!AssetDatabase.IsValidFolder(DemoResources)
+                || AssetDatabase.LoadAssetAtPath<SceneAsset>(SourceBootScene) == null
+                || AssetDatabase.LoadAssetAtPath<SceneAsset>(HallScene) == null
+                || AssetDatabase.LoadAssetAtPath<SceneAsset>(ExpeditionScene) == null
+                || AssetDatabase.LoadAssetAtPath<GameObject>(OnDemandModel) == null)
+            {
+                throw new InvalidOperationException(
+                    "ExpansionDemoBuilder: Demo 资源、场景或按需验证模型不完整。");
+            }
+
+            if (FindType("UnityRFramework.Expansion.YooAssetResourceHelper") == null
+                || FindType("UnityRFramework.Expansion.UniTaskWebRequestHelper") == null)
+            {
+                throw new InvalidOperationException(
+                    "ExpansionDemoBuilder: 请先导入 Expansion Sample 并完成第三方依赖安装。");
+            }
+        }
+
+        private static Type FindType(string fullName)
+        {
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type type = assembly.GetType(fullName, false);
+                if (type != null)
+                {
+                    return type;
+                }
+            }
+
+            return null;
+        }
+
+        private static string FindOwnSampleRoot()
+        {
+            return FindSampleRoot(
+                "ExpansionDemoBuilder t:MonoScript",
+                "/Scripts/Editor/ExpansionDemoBuilder.cs",
+                "ExpansionDemoBuilder: 无法定位 ExpansionDemo Sample 根目录。");
+        }
+
+        private static string FindDemoSampleRoot()
+        {
+            return FindSampleRoot(
+                "DemoGameEntry t:MonoScript",
+                "/Scripts/Runtime/DemoGameEntry.cs",
+                "ExpansionDemoBuilder: 请先导入 Demo Sample。");
+        }
+
+        private static string FindSampleRoot(
+            string filter,
+            string scriptSuffix,
+            string errorMessage)
+        {
+            string[] guids = AssetDatabase.FindAssets(filter);
             foreach (string guid in guids)
             {
                 string scriptPath = AssetDatabase.GUIDToAssetPath(guid);
-                if (!scriptPath.EndsWith(
-                        "/Scripts/Editor/ExpansionDemoBuilder.cs",
-                        StringComparison.Ordinal))
+                if (!scriptPath.EndsWith(scriptSuffix, StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                string editorDirectory = Path.GetDirectoryName(scriptPath);
-                string scriptsDirectory = Path.GetDirectoryName(editorDirectory);
-                string root = Path.GetDirectoryName(scriptsDirectory);
-                if (!string.IsNullOrEmpty(root))
+                string directory = Path.GetDirectoryName(scriptPath);
+                int depth = scriptSuffix.Count(character => character == '/');
+                for (int i = 1; i < depth; i++)
                 {
-                    return root.Replace('\\', '/');
+                    directory = Path.GetDirectoryName(directory);
+                }
+
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    return directory.Replace('\\', '/');
                 }
             }
 
-            throw new InvalidOperationException(
-                "ExpansionDemoBuilder: 无法从脚本位置定位 ExpansionDemo Sample 根目录。");
+            throw new InvalidOperationException(errorMessage);
         }
 
         private static void EnsureFolder(string path)
@@ -120,70 +276,16 @@ namespace UnityRFramework.Editor
             }
         }
 
-        private static void WriteProbeFile()
-        {
-            string absolutePath = Path.GetFullPath(ProbeFile);
-            File.WriteAllText(
-                absolutePath,
-                "UnityRFramework Expansion RawFile acceptance payload.\n",
-                new UTF8Encoding(false));
-            AssetDatabase.ImportAsset(ProbeFile, ImportAssetOptions.ForceUpdate);
-        }
-
-        private static void WriteWebProbeFile()
-        {
-            string absolutePath = Path.GetFullPath(WebProbeFile);
-            File.WriteAllText(
-                absolutePath,
-                "UnityRFramework Expansion WebRequest acceptance payload.\n",
-                new UTF8Encoding(false));
-            AssetDatabase.ImportAsset(WebProbeFile, ImportAssetOptions.ForceUpdate);
-        }
-
-        private static void WriteRemoteProbeFile()
-        {
-            string absolutePath = Path.GetFullPath(RemoteProbeFile);
-            if (!File.Exists(absolutePath))
-            {
-                File.WriteAllText(
-                    absolutePath,
-                    "{\n"
-                    + "  \"version\": 1,\n"
-                    + "  \"message\": \"UnityRFramework remote package probe\"\n"
-                    + "}\n",
-                    new UTF8Encoding(false));
-            }
-
-            AssetDatabase.ImportAsset(RemoteProbeFile, ImportAssetOptions.ForceUpdate);
-        }
-
-        private static void CreateContentScene()
-        {
-            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            GameObject root = new GameObject("Expansion Content Probe");
-            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            marker.name = "YooAsset Scene Marker";
-            marker.transform.SetParent(root.transform);
-            marker.transform.position = Vector3.zero;
-
-            EditorSceneManager.SaveScene(scene, ContentScene);
-        }
-
         private static void CreateFrameworkPrefab()
         {
-            string sourceFrameworkPrefab = FindFrameworkPrefab();
-            if (!AssetDatabase.CopyAsset(sourceFrameworkPrefab, DemoFrameworkPrefab)
-                && AssetDatabase.LoadAssetAtPath<GameObject>(DemoFrameworkPrefab) == null)
-            {
-                throw new InvalidOperationException(
-                    $"Can not copy framework prefab from '{sourceFrameworkPrefab}'.");
-            }
-
-            GameObject root = PrefabUtility.LoadPrefabContents(DemoFrameworkPrefab);
+            string sourcePath = FindFrameworkPrefab();
+            GameObject root = PrefabUtility.LoadPrefabContents(sourcePath);
             try
             {
-                ResourceComponent resource = root.GetComponentInChildren<ResourceComponent>(true);
-                WebRequestComponent webRequest = root.GetComponentInChildren<WebRequestComponent>(true);
+                ResourceComponent resource =
+                    root.GetComponentInChildren<ResourceComponent>(true);
+                WebRequestComponent webRequest =
+                    root.GetComponentInChildren<WebRequestComponent>(true);
                 LocalizationComponent localization =
                     root.GetComponentInChildren<LocalizationComponent>(true);
 
@@ -198,8 +300,9 @@ namespace UnityRFramework.Editor
                     "webRequestHelperTypeName",
                     "UnityRFramework.Expansion.UniTaskWebRequestHelper");
                 SetSerializedValue(localization, "loadDefaultLanguageOnStart", false);
+                CreateOnDemandProbe(root.transform);
 
-                PrefabUtility.SaveAsPrefabAsset(root, DemoFrameworkPrefab);
+                PrefabUtility.SaveAsPrefabAsset(root, FrameworkPrefab);
             }
             finally
             {
@@ -272,6 +375,10 @@ namespace UnityRFramework.Editor
             {
                 property.intValue = intValue;
             }
+            else if (value is UnityEngine.Object objectValue)
+            {
+                property.objectReferenceValue = objectValue;
+            }
             else
             {
                 throw new ArgumentException(
@@ -297,28 +404,31 @@ namespace UnityRFramework.Editor
             package.IgnoreRuleName = nameof(NormalIgnoreRule);
 
             BundleCollectorGroup group = package.Groups.FirstOrDefault(
-                item => string.Equals(item.GroupName, "ExpansionDemo", StringComparison.Ordinal));
+                item => string.Equals(item.GroupName, GroupName, StringComparison.Ordinal));
             if (group == null)
             {
-                group = BundleCollectorSettingData.CreateGroup(package, "ExpansionDemo");
+                group = BundleCollectorSettingData.CreateGroup(package, GroupName);
             }
 
             group.Collectors.Clear();
             group.Collectors.Add(CreateCollector(
-                RawDirectory,
+                DemoResources,
+                nameof(ExpansionDemoResourcesAddressRule),
                 nameof(PackSeparately),
                 nameof(CollectAll),
-                "builtin"));
+                PreloadTag));
             group.Collectors.Add(CreateCollector(
-                RemoteDirectory,
-                nameof(PackSeparately),
-                nameof(CollectAll),
-                string.Empty));
-            group.Collectors.Add(CreateCollector(
-                SceneDirectory,
+                DemoScenes,
+                nameof(AddressByFileName),
                 nameof(PackSeparately),
                 nameof(CollectScene),
-                "builtin"));
+                PreloadTag));
+            group.Collectors.Add(CreateCollector(
+                OnDemandModel,
+                nameof(ExpansionDemoOnDemandAddressRule),
+                nameof(PackSeparately),
+                nameof(CollectAll),
+                OnDemandTag));
 
             BundleCollectorSettingData.ModifyPackage(package);
             BundleCollectorSettingData.ModifyGroup(package, group);
@@ -328,6 +438,7 @@ namespace UnityRFramework.Editor
 
         private static BundleCollector CreateCollector(
             string collectPath,
+            string addressRuleName,
             string packRuleName,
             string filterRuleName,
             string assetTags)
@@ -337,218 +448,473 @@ namespace UnityRFramework.Editor
                 CollectPath = collectPath,
                 CollectorGUID = AssetDatabase.AssetPathToGUID(collectPath),
                 CollectorType = ECollectorType.MainAssetCollector,
-                AddressRuleName = nameof(AddressByFileName),
+                AddressRuleName = addressRuleName,
                 PackRuleName = packRuleName,
                 FilterRuleName = filterRuleName,
                 AssetTags = assetTags
             };
         }
 
-        private static void CreateBootScene()
+        private static void CreateOnDemandProbe(Transform frameworkRoot)
         {
-            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            Transform existing = frameworkRoot.Find("ExpansionDemoOnDemandProbe");
+            if (existing != null)
+            {
+                UnityEngine.Object.DestroyImmediate(existing.gameObject);
+            }
 
-            GameObject frameworkPrefab =
-                AssetDatabase.LoadAssetAtPath<GameObject>(DemoFrameworkPrefab);
-            PrefabUtility.InstantiatePrefab(frameworkPrefab, scene);
+            GameObject probeRoot = new GameObject("ExpansionDemoOnDemandProbe");
+            probeRoot.transform.SetParent(frameworkRoot, false);
+            ExpansionDemoOnDemandProbe probe =
+                probeRoot.AddComponent<ExpansionDemoOnDemandProbe>();
 
-            new GameObject(
-                "EventSystem",
-                typeof(EventSystem),
-                typeof(StandaloneInputModule));
-
-            GameObject controllerObject = new GameObject("ExpansionDemoController");
-            ExpansionDemoController controller =
-                controllerObject.AddComponent<ExpansionDemoController>();
-
-            Canvas canvas = CreateCanvas();
-            Image background = CreateImage(
-                "Background",
-                canvas.transform,
-                new Color32(31, 38, 50, 255));
-            Stretch(background.rectTransform);
-
-            Text title = CreateText(
-                "Title",
-                background.transform,
-                "UnityRFramework Expansion Acceptance",
-                30,
-                TextAnchor.MiddleLeft);
-            SetRect(title.rectTransform, 176, -24, -32, 60, true);
-
-            Text description = CreateText(
-                "Description",
-                background.transform,
-                "YooAsset Resource Helper + UniTask WebRequest Helper",
-                20,
-                TextAnchor.MiddleLeft);
-            SetRect(description.rectTransform, 32, -82, -32, 40, true);
-
-            Image statusPanel = CreateImage(
-                "StatusPanel",
-                background.transform,
-                new Color32(20, 25, 34, 255));
-            SetRect(statusPanel.rectTransform, 32, -136, -32, 796, true);
-
-            Text status = CreateText(
-                "Status",
-                statusPanel.transform,
-                "等待验收...",
-                20,
-                TextAnchor.UpperLeft);
-            Stretch(status.rectTransform, 20);
-            status.horizontalOverflow = HorizontalWrapMode.Wrap;
-            status.verticalOverflow = VerticalWrapMode.Overflow;
-
-            Button run = CreateButton(
-                "RunAcceptance",
-                background.transform,
-                "运行全部",
-                new Color32(37, 126, 87, 255));
-            Button cancel = CreateButton(
-                "RunCancellation",
-                background.transform,
-                "测试取消",
-                new Color32(44, 101, 174, 255));
-            Button restart = CreateButton(
-                "RestartFramework",
-                background.transform,
-                "重启框架",
-                new Color32(174, 111, 24, 255));
-
-            SetBottomButtonRect(run.GetComponent<RectTransform>(), 32, 0);
-            SetBottomButtonRect(cancel.GetComponent<RectTransform>(), 0, 1);
-            SetBottomButtonRect(restart.GetComponent<RectTransform>(), -32, 2);
-
-            SerializedObject controllerData = new SerializedObject(controller);
-            controllerData.FindProperty("statusText").objectReferenceValue = status;
-            controllerData.FindProperty("runButton").objectReferenceValue = run;
-            controllerData.FindProperty("cancelButton").objectReferenceValue = cancel;
-            controllerData.FindProperty("restartButton").objectReferenceValue = restart;
-            controllerData.ApplyModifiedPropertiesWithoutUndo();
-
-            EditorSceneManager.SaveScene(scene, BootScene);
-        }
-
-        private static Canvas CreateCanvas()
-        {
             GameObject canvasObject = new GameObject(
                 "Canvas",
                 typeof(RectTransform),
                 typeof(Canvas),
                 typeof(CanvasScaler),
                 typeof(GraphicRaycaster));
+            canvasObject.transform.SetParent(probeRoot.transform, false);
             Canvas canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 900;
 
             CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
-            return canvas;
+
+            GameObject panel = CreateImage(
+                canvasObject.transform,
+                "Panel",
+                new Color(0.07f, 0.09f, 0.12f, 0.96f));
+            SetRect(
+                panel.GetComponent<RectTransform>(),
+                Vector2.one,
+                Vector2.one,
+                new Vector2(380f, 500f),
+                new Vector2(-210f, -270f));
+
+            Text title = CreateText(
+                panel.transform,
+                "Title",
+                "YooAsset 按需加载验证",
+                24,
+                TextAnchor.MiddleCenter,
+                Color.white);
+            SetRect(
+                title.rectTransform,
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                new Vector2(340f, 46f),
+                new Vector2(0f, -30f));
+
+            GameObject previewBackground = CreateImage(
+                panel.transform,
+                "PreviewBackground",
+                new Color(0.025f, 0.035f, 0.05f, 1f));
+            SetRect(
+                previewBackground.GetComponent<RectTransform>(),
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                new Vector2(330f, 290f),
+                new Vector2(0f, -200f));
+
+            GameObject previewObject = new GameObject(
+                "Preview",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(RawImage));
+            previewObject.transform.SetParent(previewBackground.transform, false);
+            RawImage previewImage = previewObject.GetComponent<RawImage>();
+            previewImage.color = Color.white;
+            Stretch(previewObject.GetComponent<RectTransform>());
+
+            Text status = CreateText(
+                panel.transform,
+                "Status",
+                "点击按钮验证运行时按需下载。",
+                18,
+                TextAnchor.MiddleCenter,
+                new Color(0.80f, 0.85f, 0.90f, 1f));
+            SetRect(
+                status.rectTransform,
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(340f, 72f),
+                new Vector2(0f, 94f));
+
+            Button loadButton = CreateButton(
+                panel.transform,
+                "LoadButton",
+                "加载远程模型",
+                new Color(0.12f, 0.50f, 0.30f, 1f),
+                out Text loadButtonText);
+            SetRect(
+                loadButton.GetComponent<RectTransform>(),
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(240f, 52f),
+                new Vector2(0f, 40f));
+
+            GameObject previewRoot = new GameObject("PreviewRoot");
+            previewRoot.transform.SetParent(probeRoot.transform, false);
+            previewRoot.transform.position = new Vector3(10000f, 10000f, 10000f);
+
+            GameObject cameraObject = new GameObject("PreviewCamera", typeof(Camera));
+            cameraObject.transform.SetParent(probeRoot.transform, false);
+            Camera previewCamera = cameraObject.GetComponent<Camera>();
+            previewCamera.clearFlags = CameraClearFlags.SolidColor;
+            previewCamera.backgroundColor = new Color(0.025f, 0.035f, 0.05f, 1f);
+            previewCamera.cullingMask = 1 << 31;
+            previewCamera.orthographic = true;
+            previewCamera.allowHDR = false;
+            previewCamera.allowMSAA = false;
+
+            SetSerializedValue(probe, "panel", panel);
+            SetSerializedValue(probe, "statusText", status);
+            SetSerializedValue(probe, "loadButton", loadButton);
+            SetSerializedValue(probe, "loadButtonText", loadButtonText);
+            SetSerializedValue(probe, "previewImage", previewImage);
+            SetSerializedValue(probe, "previewCamera", previewCamera);
+            SetSerializedValue(probe, "previewRoot", previewRoot.transform);
         }
 
-        private static Image CreateImage(string name, Transform parent, Color color)
+        private static void CreateBootScene()
         {
-            GameObject gameObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+            if (File.Exists(BootScene))
+            {
+                FileUtil.ReplaceFile(SourceBootScene, BootScene);
+            }
+            else
+            {
+                FileUtil.CopyFileOrDirectory(SourceBootScene, BootScene);
+            }
+
+            AssetDatabase.ImportAsset(
+                BootScene,
+                ImportAssetOptions.ForceSynchronousImport
+                | ImportAssetOptions.ForceUpdate);
+            Scene scene = EditorSceneManager.OpenScene(BootScene, OpenSceneMode.Single);
+            foreach (GameObject rootObject in scene.GetRootGameObjects())
+            {
+                DemoGameEntry demoEntry =
+                    rootObject.GetComponentInChildren<DemoGameEntry>(true);
+                if (demoEntry != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(demoEntry.gameObject);
+                    continue;
+                }
+
+                if (string.Equals(
+                        rootObject.name,
+                        "UnityRFramework",
+                        StringComparison.Ordinal))
+                {
+                    UnityEngine.Object.DestroyImmediate(rootObject);
+                }
+            }
+
+            GameObject framework =
+                AssetDatabase.LoadAssetAtPath<GameObject>(FrameworkPrefab);
+            if (framework == null)
+            {
+                throw new InvalidOperationException(
+                    "ExpansionDemoBuilder: 生成的框架预制体不存在。");
+            }
+
+            PrefabUtility.InstantiatePrefab(framework, scene);
+            CreateUpdateBootstrap(scene);
+            if (!EditorSceneManager.SaveScene(scene))
+            {
+                throw new InvalidOperationException(
+                    "ExpansionDemoBuilder: 保存第三方启动场景失败。");
+            }
+        }
+
+        private static void CreateUpdateBootstrap(Scene scene)
+        {
+            GameObject bootstrap = new GameObject("ExpansionDemoBootstrap");
+            SceneManager.MoveGameObjectToScene(bootstrap, scene);
+            ExpansionDemoGameEntry entry =
+                bootstrap.AddComponent<ExpansionDemoGameEntry>();
+
+            GameObject canvasObject = new GameObject(
+                "ResourceUpdateCanvas",
+                typeof(RectTransform),
+                typeof(Canvas),
+                typeof(CanvasScaler),
+                typeof(GraphicRaycaster));
+            SceneManager.MoveGameObjectToScene(canvasObject, scene);
+            Canvas canvas = canvasObject.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 1000;
+
+            CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+
+            GameObject panel = CreateImage(
+                canvasObject.transform,
+                "UpdatePanel",
+                new Color(0.055f, 0.075f, 0.10f, 1f));
+            Stretch(panel.GetComponent<RectTransform>());
+
+            GameObject content = CreateImage(
+                panel.transform,
+                "Content",
+                new Color(0.11f, 0.14f, 0.18f, 1f));
+            SetRect(
+                content.GetComponent<RectTransform>(),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(760f, 460f),
+                Vector2.zero);
+
+            Text status = CreateText(
+                content.transform,
+                "Status",
+                "正在检查资源更新",
+                36,
+                TextAnchor.MiddleCenter,
+                Color.white);
+            SetRect(
+                status.rectTransform,
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                new Vector2(680f, 70f),
+                new Vector2(0f, -65f));
+
+            Text detail = CreateText(
+                content.transform,
+                "Detail",
+                "正在连接资源服务器...",
+                24,
+                TextAnchor.MiddleCenter,
+                new Color(0.78f, 0.83f, 0.88f, 1f));
+            SetRect(
+                detail.rectTransform,
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                new Vector2(680f, 120f),
+                new Vector2(0f, -160f));
+
+            GameObject progressBackground = CreateImage(
+                content.transform,
+                "ProgressBackground",
+                new Color(0.035f, 0.045f, 0.06f, 1f));
+            SetRect(
+                progressBackground.GetComponent<RectTransform>(),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(620f, 34f),
+                new Vector2(0f, -30f));
+
+            GameObject fillObject = CreateImage(
+                progressBackground.transform,
+                "Fill",
+                new Color(0.13f, 0.63f, 0.39f, 1f));
+            Stretch(fillObject.GetComponent<RectTransform>());
+            Image fill = fillObject.GetComponent<Image>();
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillOrigin = 0;
+            fill.fillAmount = 0f;
+
+            Text progress = CreateText(
+                progressBackground.transform,
+                "Progress",
+                "检查中",
+                20,
+                TextAnchor.MiddleCenter,
+                Color.white);
+            Stretch(progress.rectTransform);
+
+            Button primary = CreateButton(
+                content.transform,
+                "PrimaryButton",
+                "检查中...",
+                new Color(0.12f, 0.50f, 0.30f, 1f),
+                out Text primaryText);
+            SetRect(
+                primary.GetComponent<RectTransform>(),
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(250f, 58f),
+                new Vector2(-145f, 65f));
+
+            Button quit = CreateButton(
+                content.transform,
+                "QuitButton",
+                "退出",
+                new Color(0.33f, 0.37f, 0.42f, 1f),
+                out _);
+            SetRect(
+                quit.GetComponent<RectTransform>(),
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(160f, 58f),
+                new Vector2(145f, 65f));
+
+            SetSerializedValue(entry, "updatePanel", panel);
+            SetSerializedValue(entry, "statusText", status);
+            SetSerializedValue(entry, "detailText", detail);
+            SetSerializedValue(entry, "progressFill", fill);
+            SetSerializedValue(entry, "progressText", progress);
+            SetSerializedValue(entry, "primaryButton", primary);
+            SetSerializedValue(entry, "primaryButtonText", primaryText);
+            SetSerializedValue(entry, "quitButton", quit);
+
+            GameObject eventSystem = new GameObject(
+                "EventSystem",
+                typeof(EventSystem),
+                typeof(StandaloneInputModule));
+            SceneManager.MoveGameObjectToScene(eventSystem, scene);
+        }
+
+        private static GameObject CreateImage(
+            Transform parent,
+            string name,
+            Color color)
+        {
+            GameObject gameObject = new GameObject(
+                name,
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image));
             gameObject.transform.SetParent(parent, false);
-            Image image = gameObject.GetComponent<Image>();
-            image.color = color;
-            return image;
+            gameObject.GetComponent<Image>().color = color;
+            return gameObject;
         }
 
         private static Text CreateText(
-            string name,
             Transform parent,
+            string name,
             string value,
             int fontSize,
-            TextAnchor alignment)
+            TextAnchor alignment,
+            Color color)
         {
-            GameObject gameObject = new GameObject(name, typeof(RectTransform), typeof(Text));
+            GameObject gameObject = new GameObject(
+                name,
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Text));
             gameObject.transform.SetParent(parent, false);
             Text text = gameObject.GetComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.fontSize = fontSize;
-            text.color = Color.white;
-            text.alignment = alignment;
             text.text = value;
+            text.fontSize = fontSize;
+            text.alignment = alignment;
+            text.color = color;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
             return text;
         }
 
         private static Button CreateButton(
-            string name,
             Transform parent,
+            string name,
             string label,
-            Color color)
+            Color color,
+            out Text labelText)
         {
-            GameObject gameObject =
-                new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
-            gameObject.transform.SetParent(parent, false);
-            Image image = gameObject.GetComponent<Image>();
-            image.color = color;
-
-            Button button = gameObject.GetComponent<Button>();
-            button.targetGraphic = image;
-
-            Text text = CreateText("Text", gameObject.transform, label, 22, TextAnchor.MiddleCenter);
-            Stretch(text.rectTransform);
+            GameObject gameObject = CreateImage(parent, name, color);
+            Button button = gameObject.AddComponent<Button>();
+            button.targetGraphic = gameObject.GetComponent<Image>();
+            labelText = CreateText(
+                gameObject.transform,
+                "Text",
+                label,
+                24,
+                TextAnchor.MiddleCenter,
+                Color.white);
+            Stretch(labelText.rectTransform);
             return button;
         }
 
-        private static void Stretch(RectTransform rectTransform, float padding = 0)
+        private static void Stretch(RectTransform rectTransform)
         {
             rectTransform.anchorMin = Vector2.zero;
             rectTransform.anchorMax = Vector2.one;
-            rectTransform.offsetMin = new Vector2(padding, padding);
-            rectTransform.offsetMax = new Vector2(-padding, -padding);
+            rectTransform.offsetMin = Vector2.zero;
+            rectTransform.offsetMax = Vector2.zero;
         }
 
         private static void SetRect(
             RectTransform rectTransform,
-            float left,
-            float top,
-            float right,
-            float height,
-            bool stretchHorizontal)
+            Vector2 anchorMin,
+            Vector2 anchorMax,
+            Vector2 size,
+            Vector2 position)
         {
-            rectTransform.anchorMin = stretchHorizontal
-                ? new Vector2(0, 1)
-                : new Vector2(0.5f, 1);
-            rectTransform.anchorMax = stretchHorizontal
-                ? new Vector2(1, 1)
-                : new Vector2(0.5f, 1);
-            rectTransform.pivot = new Vector2(0.5f, 1);
-            rectTransform.offsetMin = new Vector2(left, top - height);
-            rectTransform.offsetMax = new Vector2(right, top);
-        }
-
-        private static void SetBottomButtonRect(
-            RectTransform rectTransform,
-            float edgeOffset,
-            int index)
-        {
-            float width = 260;
-            float spacing = 24;
-            float totalWidth = width * 3 + spacing * 2;
-            float start = -totalWidth * 0.5f;
-            float x = start + index * (width + spacing) + width * 0.5f;
-            rectTransform.anchorMin = new Vector2(0.5f, 0);
-            rectTransform.anchorMax = new Vector2(0.5f, 0);
-            rectTransform.pivot = new Vector2(0.5f, 0);
-            rectTransform.anchoredPosition = new Vector2(x + edgeOffset, 32);
-            rectTransform.sizeDelta = new Vector2(width, 64);
+            rectTransform.anchorMin = anchorMin;
+            rectTransform.anchorMax = anchorMax;
+            rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            rectTransform.sizeDelta = size;
+            rectTransform.anchoredPosition = position;
         }
 
         private static void ConfigureBuildSettings()
         {
-            List<EditorBuildSettingsScene> scenes =
-                EditorBuildSettings.scenes
-                    .Where(item => !string.Equals(item.path, BootScene, StringComparison.Ordinal)
-                        && !string.Equals(item.path, ContentScene, StringComparison.Ordinal))
-                    .ToList();
+            HashSet<string> managedScenes = new HashSet<string>(StringComparer.Ordinal)
+            {
+                BootScene,
+                SourceBootScene,
+                HallScene,
+                ExpeditionScene
+            };
+            List<EditorBuildSettingsScene> scenes = EditorBuildSettings.scenes
+                .Where(item => !managedScenes.Contains(item.path))
+                .ToList();
             scenes.Insert(0, new EditorBuildSettingsScene(BootScene, true));
-            scenes.Insert(1, new EditorBuildSettingsScene(ContentScene, true));
+            scenes.Insert(1, new EditorBuildSettingsScene(HallScene, true));
+            scenes.Insert(2, new EditorBuildSettingsScene(ExpeditionScene, true));
             EditorBuildSettings.scenes = scenes.ToArray();
+        }
+    }
+
+    /// <summary>
+    /// 将 Demo Resources 目录中的资源映射为原 Demo 使用的相对路径。
+    /// 文本和音频保留扩展名，Prefab 等 Unity 对象移除扩展名。
+    /// </summary>
+    public sealed class ExpansionDemoResourcesAddressRule : IAddressRule
+    {
+        /// <inheritdoc />
+        string IAddressRule.GetAssetAddress(AddressRuleData data)
+        {
+            const string marker = "/Resources/";
+            string path = data.AssetPath.Replace('\\', '/');
+            int markerIndex = path.LastIndexOf(marker, StringComparison.Ordinal);
+            if (markerIndex < 0)
+            {
+                throw new InvalidOperationException(
+                    $"ExpansionDemo Resources address requires a Resources path: '{path}'.");
+            }
+
+            string relativePath = path.Substring(markerIndex + marker.Length);
+            string extension = Path.GetExtension(relativePath);
+            if (string.Equals(extension, ".prefab", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(extension, ".asset", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(extension, ".mat", StringComparison.OrdinalIgnoreCase))
+            {
+                return relativePath.Substring(0, relativePath.Length - extension.Length);
+            }
+
+            return relativePath;
+        }
+    }
+
+    /// <summary>
+    /// 为按需下载验证模型提供稳定且不依赖源文件名的 YooAsset 地址。
+    /// </summary>
+    public sealed class ExpansionDemoOnDemandAddressRule : IAddressRule
+    {
+        /// <inheritdoc />
+        string IAddressRule.GetAssetAddress(AddressRuleData data)
+        {
+            return "ExpansionDemo/OnDemandModel";
         }
     }
 }

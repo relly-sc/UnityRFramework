@@ -10,9 +10,9 @@ using UnityRFramework.Runtime;
 
 /// <summary>
 /// Expansion 第三方 Helper 端到端验收控制器。
-/// 场景布局和引用由 ExpansionDemoBuilder 在编辑器中生成，本类只负责状态、文本和事件。
+/// 场景布局和引用由 ExpansionAcceptanceBuilder 在编辑器中生成，本类只负责状态、文本和事件。
 /// </summary>
-public sealed class ExpansionDemoController : MonoBehaviour
+public sealed class ExpansionAcceptanceController : MonoBehaviour
 {
     [SerializeField]
     private Text statusText;
@@ -36,7 +36,7 @@ public sealed class ExpansionDemoController : MonoBehaviour
     private string remoteProbeLocation = "RemoteProbe";
 
     [SerializeField]
-    private string webProbeRelativePath = "ExpansionDemo/WebProbe.txt";
+    private string webProbeRelativePath = "ExpansionAcceptance/WebProbe.txt";
 
     [SerializeField]
     private bool runOnStart = true;
@@ -107,7 +107,7 @@ public sealed class ExpansionDemoController : MonoBehaviour
 
     /// <summary>
     /// 在不退出应用进程的情况下重启框架。
-    /// 当前 ExpansionDemo 场景必须位于 Build Settings 的第 0 项。
+    /// 当前 ExpansionAcceptance 场景必须位于 Build Settings 的第 0 项。
     /// </summary>
     public void RestartFramework()
     {
@@ -174,7 +174,7 @@ public sealed class ExpansionDemoController : MonoBehaviour
                 webProbeUrl,
                 null,
                 null,
-                "ExpansionDemo",
+                "ExpansionAcceptance",
                 0,
                 ct);
             if (response == null || !response.IsSuccess)
@@ -208,7 +208,7 @@ public sealed class ExpansionDemoController : MonoBehaviour
         catch (Exception exception)
         {
             AppendStatus($"FAIL：{exception.Message}");
-            Log.Error("[ExpansionDemo] Acceptance failed: {0}", exception);
+            Log.Error("[ExpansionAcceptance] Acceptance failed: {0}", exception);
         }
         finally
         {
@@ -230,7 +230,7 @@ public sealed class ExpansionDemoController : MonoBehaviour
         catch (Exception exception)
         {
             AppendStatus($"取消验证失败：{exception.Message}");
-            Log.Error("[ExpansionDemo] Cancellation probe failed: {0}", exception);
+            Log.Error("[ExpansionAcceptance] Cancellation probe failed: {0}", exception);
         }
         finally
         {
@@ -248,7 +248,7 @@ public sealed class ExpansionDemoController : MonoBehaviour
                 BuildWebProbeUrl(),
                 null,
                 null,
-                "ExpansionDemoCancellation",
+                "ExpansionAcceptanceCancellation",
                 0,
                 requestCts.Token);
 
@@ -281,7 +281,7 @@ public sealed class ExpansionDemoController : MonoBehaviour
         statusText.text = string.IsNullOrEmpty(statusText.text)
             ? line
             : $"{statusText.text}\n{line}";
-        Log.Info("[ExpansionDemo] {0}", message);
+        Log.Info("[ExpansionAcceptance] {0}", message);
     }
 
     private void SetButtonsInteractable(bool interactable)

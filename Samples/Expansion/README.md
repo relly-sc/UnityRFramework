@@ -8,7 +8,8 @@
 |---|---|---|
 | `Library` / `Runtime` | 框架接口、默认实现和基础运行能力 | 禁止依赖 |
 | `Samples/Expansion` | 第三方 Helper、适配器和配套工具 | 允许按功能引入 |
-| `Samples/ExpansionDemo` | 第三方接入的可运行验收示例 | 允许依赖 Expansion |
+| `Samples/ExpansionAcceptance` | 第三方接入的专项验收示例 | 允许依赖 Expansion |
+| `Samples/ExpansionDemo` | 官方 Demo 的第三方 Helper 覆盖层 | 依赖 Demo 与 Expansion |
 
 Expansion 只负责适配，不把第三方插件的类型或生命周期反向扩散到核心框架。未导入 Expansion 时，框架必须仍可正常编译、启动、关闭和重启。
 
@@ -20,12 +21,23 @@ Expansion 只负责适配，不把第三方插件的类型或生命周期反向�
 | UniTask | `Scripts/Runtime/WebRequest/UniTaskWebRequestHelper.cs` | 阶段 1 验收完成 |
 | Excel 解析扩展 | `Scripts/Editor/Config` | 阶段 2 首版完成 |
 
-2026-07-27 已通过 ExpansionDemo 完成 EditorSimulate、Offline 与 Host
+2026-07-27 已通过 ExpansionAcceptance 完成 EditorSimulate、Offline 与 Host
 端到端验收：二进制 `TextAsset` 加载与卸载、Additive 场景加载与卸载、
 Web 成功请求、主动取消，以及不退出进程的框架关闭和重启后重复执行。Host
 进一步验证了部分内置、部分远程资源，并在保留旧 `BuiltinCatalog.bytes` 时
 从服务器 Package 加载更新后的 `RemoteProbe.json` v2；框架软重启后再次加载
 v2 并显示最终 `PASS`。Windows Player 与 Android 真机仍需在发布前验收。
+
+`YooAssetResourceHelper` 同时实现 `IResourceUpdateService`。Host 初始化取得最新
+Manifest 后，可通过 `PrepareUpdate()` 统计本地缺失的 Bundle，再通过
+`DownloadPreparedUpdateAsync()` 接收文件数量、字节数和进度并完成差量下载。
+接口只暴露框架定义的数据结构，不向 Demo 或核心框架泄漏 YooAsset 类型。完整使用
+流程见 `ExpansionDemo/README.md`。
+
+需要区分启动预下载和运行时按需下载时，可选接口
+`ITaggedResourceUpdateService` 提供 `PrepareUpdateByTags()`。启动流程只为指定标签
+创建下载计划；未包含在计划中的资源仍可在调用 `LoadAssetAsync()` 时由 YooAsset
+按内置文件、磁盘缓存、远程服务器的顺序自动解析，缺少缓存时执行按需下载。
 
 ## 推荐实施顺序
 
@@ -37,15 +49,15 @@ v2 并显示最终 `PASS`。Windows Player 与 Android 真机仍需在发布前�
 
 1. 按项目当前安装版本核对 YooAsset、UniTask API 和生命周期。
 2. 验证 Helper 初始化、正常请求、取消、异常和关闭行为。
-3. 完善 `ExpansionDemo`，覆盖框架启动、资源加载、场景切换、Web 请求、关闭和不退出进程的重启。
+3. 完善 `ExpansionAcceptance`，覆盖框架启动、资源加载、场景切换、Web 请求、关闭和不退出进程的重启。
 4. 确认第三方模块失败时不会破坏框架其他模块的运行与关闭。
 
 完成标准：
 
-- Expansion 与 ExpansionDemo 编译无错误。
+- Expansion 与 ExpansionAcceptance 编译无错误。
 - YooAsset 的 EditorSimulate、Offline、Host 中实际支持的模式均有明确配置和验收结果。
 - UniTask Web 请求的成功、失败、取消和 Shutdown 路径均可结束，不遗留悬空任务。
-- ExpansionDemo 可完成一次“启动 → 使用 → 关闭 → 重启 → 再次使用”。
+- ExpansionAcceptance 可完成一次“启动 → 使用 → 关闭 → 重启 → 再次使用”。
 
 ### 阶段 2：接入轻量 Excel 解析扩展
 
@@ -111,7 +123,7 @@ Expansion 后，默认 CSV 管线仍可独立工作。
 3. Helper 的初始化、更新、异常、取消、Shutdown 和 Restart 语义与框架模块契约一致。
 4. 不在 Library 层直接输出日志；Library 通过 `RFrameworkException` 表达错误，Runtime/Expansion 的运行日志通过 Runtime `Log` 输出。
 5. 公开配置需在 Inspector 或文档中说明用途、默认值和生效条件。
-6. 至少通过一次 ExpansionDemo 端到端运行；涉及 AOT 的集成还必须通过目标平台构建和真机验证。
+6. 至少通过一次 ExpansionAcceptance 端到端运行；涉及 AOT 的集成还必须通过目标平台构建和真机验证。
 
 ## 当前 Helper 使用方式
 
@@ -120,18 +132,18 @@ Expansion 后，默认 CSV 管线仍可独立工作。
 3. 在 `UnityRFramework` 预制体 Inspector 中配置对应 Helper：
    - Resource Helper：`UnityRFramework.Expansion.YooAssetResourceHelper`
    - Web Request Helper：`UnityRFramework.Expansion.UniTaskWebRequestHelper`
-4. 按 Helper 的 Inspector 配置初始化参数，再通过 ExpansionDemo 验证，不要直接用正式业务场景代替首次验收。
+4. 按 Helper 的 Inspector 配置初始化参数，再通过 ExpansionAcceptance 验证，不要直接用正式业务场景代替首次验收。
 
-仅导入 `ExpansionDemo` 还不能直接运行。Package Manager 只会把 Sample 自身复制到
+仅导入 `ExpansionAcceptance` 还不能直接运行。Package Manager 只会把 Sample 自身复制到
 `Assets/Samples/...`，不会把文件写入宿主工程的 `Assets/StreamingAssets`。
-导入 `Expansion` 和 `ExpansionDemo` 后，必须先执行：
+导入 `Expansion` 和 `ExpansionAcceptance` 后，必须先执行：
 
-`UnityRFramework/ExpansionDemo/Rebuild Acceptance Assets`
+`UnityRFramework/ExpansionAcceptance/Rebuild Acceptance Assets`
 
 该菜单会按脚本实际所在位置定位导入后的 Sample，生成 WebRequest 探针、验收场景、
 YooAsset Collector 和示例框架预制体。Offline/Host 所需的 YooAsset
 `StreamingAssets/yoo/<PackageName>` 内容仍需通过 YooAsset 构建窗口或内置目录
-工具生成。详细模式步骤见 `ExpansionDemo/README.md`。
+工具生成。详细模式步骤见 `ExpansionAcceptance/README.md`。
 
 当前开发工程已安装 YooAsset 与 UniTask，Excel 扩展携带 EditorOnly 的
 ExcelDataReader DLL。每个 Helper 只依赖自己实际使用的插件。
@@ -183,10 +195,14 @@ RawFile 规则收集。需要直接访问视频等原生文件时，应使用独
 Samples/
 ├── Expansion/         第三方 Helper 与工具，本目录，不单独运行
 ├── Demo/              使用框架默认实现的完整示例
-└── ExpansionDemo/     使用 Expansion 实现的可运行验收示例
+├── ExpansionAcceptance/ 第三方运行模式与异常路径专项验收
+└── ExpansionDemo/     复用 Demo 业务的资源更新与第三方 Helper 完整闭环
 ```
 
-Demo 与 ExpansionDemo 应覆盖相同的主要业务链路：前者验证默认实现，后者验证第三方实现。两者不得通过复制核心框架代码形成两套行为不一致的实现。
+Demo 与 ExpansionDemo 应覆盖相同的主要业务链路：前者验证默认实现，后者在复用
+业务代码的基础上增加资源版本检查、更新提示、差量下载，再验证第三方实现。
+ExpansionDemo 不得复制出第二套玩法实现。ExpansionAcceptance 独立负责运行模式、
+远程资源、取消和软重启等专项探针。
 
 ## 开发与发布约定
 

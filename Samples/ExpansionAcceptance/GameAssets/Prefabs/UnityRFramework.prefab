@@ -349,9 +349,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   resourceHelperTypeName: UnityRFramework.Expansion.YooAssetResourceHelper
   playMode: 0
-  packageName: ExpansionDemoPackage
+  packageName: ExpansionAcceptancePackage
   defaultHostServer: 
   fallbackHostServer: 
+  autoClearDiskCache: 1
+  maxDiskCacheSizeGB: 4
 --- !u!1 &7720000000000000001
 GameObject:
   m_ObjectHideFlags: 0

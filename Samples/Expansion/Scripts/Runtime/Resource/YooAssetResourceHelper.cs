@@ -13,7 +13,8 @@ namespace UnityRFramework.Expansion
     /// 基于 YooAsset v3 的资源辅助器。
     /// 资源句柄由本辅助器持有，资源引用计数由框架 ResourceModule 统一管理。
     /// </summary>
-    public sealed class YooAssetResourceHelper : ResourceHelperBase, IResourceCacheHelper
+    public sealed class YooAssetResourceHelper : ResourceHelperBase, IResourceCacheHelper,
+        IResourceUpdateService, ITaggedResourceUpdateService
     {
         private const long DefaultMaxCacheBytes = 4L * 1024L * 1024L * 1024L;
 
@@ -26,6 +27,7 @@ namespace UnityRFramework.Expansion
             new Dictionary<string, SceneHandle>();
 
         private ResourcePackage package;
+        private ResourceDownloaderOperation preparedDownloader;
         private YooAssetCacheController cacheController;
         private bool autoClearCacheEnabled = true;
         private long maxCacheBytes = DefaultMaxCacheBytes;
@@ -49,6 +51,136 @@ namespace UnityRFramework.Expansion
         {
             autoClearCacheEnabled = autoClearEnabled;
             maxCacheBytes = Math.Max(1L, maxBytes);
+        }
+
+        /// <inheritdoc />
+        public ResourceUpdateInfo PrepareUpdate(
+            int maximumConcurrency = 8,
+            int retryCount = 3)
+        {
+            return PrepareUpdateInternal(null, maximumConcurrency, retryCount);
+        }
+
+        /// <inheritdoc />
+        public ResourceUpdateInfo PrepareUpdateByTags(
+            string[] tags,
+            int maximumConcurrency = 8,
+            int retryCount = 3)
+        {
+            if (tags == null || tags.Length == 0)
+            {
+                throw new RFrameworkException(
+                    "YooAssetResourceHelper: update tags cannot be null or empty.");
+            }
+
+            return PrepareUpdateInternal(tags, maximumConcurrency, retryCount);
+        }
+
+        private ResourceUpdateInfo PrepareUpdateInternal(
+            string[] tags,
+            int maximumConcurrency,
+            int retryCount)
+        {
+            EnsureInitialized();
+            if (currentPlayMode != ResourcePlayMode.Host)
+            {
+                preparedDownloader = null;
+                return default;
+            }
+
+            if (preparedDownloader != null && !preparedDownloader.IsDone)
+            {
+                throw new RFrameworkException(
+                    "YooAssetResourceHelper: an update download is already running.");
+            }
+
+            ResourceDownloaderOptions options = tags == null
+                ? new ResourceDownloaderOptions(
+                    Math.Max(1, maximumConcurrency),
+                    Math.Max(0, retryCount))
+                : new ResourceDownloaderOptions(
+                    tags,
+                    Math.Max(1, maximumConcurrency),
+                    Math.Max(0, retryCount));
+            preparedDownloader = package.CreateResourceDownloader(options);
+            return new ResourceUpdateInfo(
+                preparedDownloader.TotalDownloadCount,
+                preparedDownloader.TotalDownloadBytes);
+        }
+
+        /// <inheritdoc />
+        public async Task DownloadPreparedUpdateAsync(
+            IProgress<ResourceUpdateProgress> progress,
+            CancellationToken ct = default)
+        {
+            EnsureInitialized();
+            ResourceDownloaderOperation downloader = preparedDownloader;
+            if (downloader == null)
+            {
+                throw new RFrameworkException(
+                    "YooAssetResourceHelper: call PrepareUpdate before downloading.");
+            }
+
+            if (downloader.IsDone)
+            {
+                throw new RFrameworkException(
+                    "YooAssetResourceHelper: the prepared downloader has already completed. "
+                    + "Call PrepareUpdate again before retrying.");
+            }
+
+            preparedDownloader = null;
+            SynchronizationContext ownerContext = SynchronizationContext.Current;
+            void ReportProgress(DownloadProgressChangedEventArgs args)
+            {
+                progress?.Report(new ResourceUpdateProgress(
+                    args.TotalDownloadCount,
+                    args.CurrentDownloadCount,
+                    args.TotalDownloadBytes,
+                    args.CurrentDownloadBytes));
+            }
+
+            downloader.DownloadProgressChanged += ReportProgress;
+            using CancellationTokenRegistration registration = ct.Register(() =>
+            {
+                if (ownerContext != null)
+                {
+                    ownerContext.Post(_ => downloader.CancelDownload(), null);
+                }
+                else
+                {
+                    downloader.CancelDownload();
+                }
+            });
+
+            try
+            {
+                ct.ThrowIfCancellationRequested();
+                progress?.Report(new ResourceUpdateProgress(
+                    downloader.TotalDownloadCount,
+                    0,
+                    downloader.TotalDownloadBytes,
+                    0L));
+                downloader.StartDownload();
+                await downloader;
+                ct.ThrowIfCancellationRequested();
+
+                if (downloader.Status != EOperationStatus.Succeeded)
+                {
+                    throw new RFrameworkException(
+                        "YooAssetResourceHelper: update download failed. "
+                        + $"Status: {downloader.Status}, Error: {downloader.Error}");
+                }
+
+                progress?.Report(new ResourceUpdateProgress(
+                    downloader.TotalDownloadCount,
+                    downloader.TotalDownloadCount,
+                    downloader.TotalDownloadBytes,
+                    downloader.TotalDownloadBytes));
+            }
+            finally
+            {
+                downloader.DownloadProgressChanged -= ReportProgress;
+            }
         }
 
         private readonly struct AssetHandleKey : IEquatable<AssetHandleKey>
@@ -211,6 +343,8 @@ namespace UnityRFramework.Expansion
 
             isDestroying = true;
             isInitialized = false;
+            preparedDownloader?.CancelDownload();
+            preparedDownloader = null;
 
             FlushCacheUsage();
 
@@ -741,7 +875,7 @@ namespace UnityRFramework.Expansion
             }
             catch (Exception exception)
             {
-                Log.Error("YooAssetResourceHelper cleanup failed: {0}", exception);
+                ReportCleanupError("YooAssetResourceHelper cleanup failed: {0}", exception);
             }
         }
 
@@ -749,8 +883,18 @@ namespace UnityRFramework.Expansion
             ResourcePackage packageToDestroy,
             SceneHandle[] scenes)
         {
+            if (!YooAssets.IsInitialized)
+            {
+                return;
+            }
+
             for (int i = 0; i < scenes.Length; i++)
             {
+                if (!YooAssets.IsInitialized)
+                {
+                    return;
+                }
+
                 SceneHandle scene = scenes[i];
                 if (scene == null || !scene.IsValid)
                 {
@@ -761,16 +905,21 @@ namespace UnityRFramework.Expansion
                 {
                     UnloadSceneOperation unloadOperation = scene.UnloadSceneAsync();
                     await unloadOperation;
+                    if (!YooAssets.IsInitialized)
+                    {
+                        return;
+                    }
+
                     if (unloadOperation.Status != EOperationStatus.Succeeded)
                     {
-                        Log.Error(
+                        ReportCleanupError(
                             "YooAssetResourceHelper: unload scene during cleanup failed: {0}",
                             unloadOperation.Error);
                     }
                 }
                 catch (Exception exception)
                 {
-                    Log.Error(
+                    ReportCleanupError(
                         "YooAssetResourceHelper: unload scene during cleanup failed: {0}",
                         exception);
                 }
@@ -795,6 +944,23 @@ namespace UnityRFramework.Expansion
                 && ReferenceEquals(registeredPackage, packageToDestroy))
             {
                 YooAssets.RemovePackage(packageName);
+            }
+        }
+
+        private static void ReportCleanupError(string format, params object[] args)
+        {
+            if (!RFrameworkLog.IsInitialized)
+            {
+                return;
+            }
+
+            try
+            {
+                Log.Error(format, args);
+            }
+            catch (RFrameworkException)
+            {
+                // 生命周期检查与实际写入之间，日志辅助器仍可能被关闭。
             }
         }
 

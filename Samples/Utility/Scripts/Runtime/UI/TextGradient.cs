@@ -102,11 +102,13 @@ namespace UnityRFramework.Samples
             }
         }
 
+#if UNITY_EDITOR
         protected override void OnValidate()
         {
             base.OnValidate();
             graphic?.SetVerticesDirty();
         }
+#endif
 
         private static Color32 Multiply(Color32 source, Color32 tint)
         {

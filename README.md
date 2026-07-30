@@ -62,11 +62,16 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 - `Expansion`：当前已实现 YooAsset 资源、UniTask Web 请求和 ExcelDataReader
   配置表工具。UPM 不为 Sample 解析依赖，需手动安装对应包。详见
   `Samples~/Expansion/README.md`。
-- `ExpansionDemo`：第三方 Helper 的可运行验收示例。必须先导入 `Expansion`、安装
+- `ExpansionAcceptance`：第三方 Helper 的可运行专项验收示例。必须先导入
+  `Expansion`、安装 YooAsset 与 UniTask，再执行菜单
+  `UnityRFramework/ExpansionAcceptance/Rebuild Acceptance Assets`。UPM 只复制
+  Sample 目录，不会自动生成 `Assets/StreamingAssets` 下的 Web 探针和 YooAsset
+  内置包文件；完整准备步骤见 ExpansionAcceptance 自带 README。
+- `ExpansionDemo`：官方 Demo 的第三方 Helper 覆盖层。必须同时导入 `Demo` 与
+  `Expansion`、安装
   YooAsset 与 UniTask，再执行菜单
-  `UnityRFramework/ExpansionDemo/Rebuild Acceptance Assets`。UPM 只复制 Sample
-  目录，不会自动生成 `Assets/StreamingAssets` 下的 Web 探针和 YooAsset
-  内置包文件；完整准备步骤见 ExpansionDemo 自带 README。
+  `UnityRFramework/ExpansionDemo/Rebuild Demo Overlay`。它复用 Demo 的业务脚本
+  和资源，只生成第三方框架预制体、启动场景与 YooAsset 收集规则。
 - `Demo`：官方可运行示例，**仅依赖内置 Helper、零第三方**。导入后先执行
   `UnityRFramework/Demo/Export Config and Localization`，该菜单会将配置、
   本地化、音频和公告同步到宿主工程的 `Assets/StreamingAssets`，完成后再打开

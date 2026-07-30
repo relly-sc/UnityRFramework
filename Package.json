@@ -35,8 +35,13 @@
       "path": "Samples~/Demo"
     },
     {
+      "displayName": "ExpansionAcceptance",
+      "description": "第三方辅助器的专项验收场景，覆盖 YooAsset 运行模式、远程资源、UniTask Web 请求、取消、关闭和软重启。",
+      "path": "Samples~/ExpansionAcceptance"
+    },
+    {
       "displayName": "ExpansionDemo",
-      "description": "使用 Expansion 第三方辅助器（YooAsset、UniTask 等）的完整 Demo。导入后必须执行 Rebuild Acceptance Assets 生成项目级 StreamingAssets 文件；需先安装对应第三方包并导入 Expansion Sample。",
+      "description": "复用官方 Demo 业务并切换到 YooAsset、UniTask 等第三方辅助器的覆盖层。需同时导入 Demo 与 Expansion。",
       "path": "Samples~/ExpansionDemo"
     }
   ]

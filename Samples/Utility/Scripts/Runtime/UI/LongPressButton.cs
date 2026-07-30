@@ -162,11 +162,13 @@ namespace UnityRFramework.Samples
             base.OnDisable();
         }
 
+#if UNITY_EDITOR
         protected override void OnValidate()
         {
             base.OnValidate();
             longPressDuration = Mathf.Max(0f, longPressDuration);
         }
+#endif
 
         private void Update()
         {
