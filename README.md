@@ -130,6 +130,14 @@ GameEntry.Base.RunInBackground = true;
 GameEntry.Base.NeverSleep = true;
 ```
 
+`BaseComponent` 在框架初始化时安装三类全局 Utility Helper：
+
+| Helper | 默认实现 | 可选实现 | 区别与注意事项 |
+|---|---|---|---|
+| Text | `DefaultTextHelper` | 项目自定义 `ITextHelper` | 使用线程本地 `StringBuilder` 完成框架格式化；通常无需替换。 |
+| Log | `DefaultLogHelper` | 项目自定义 `ILogHelper` | 同时写 Unity Console 和日志文件。桌面平台写到应用数据目录同级的 `Logs/RFramework`，移动平台写到 `persistentDataPath/Logs/RFramework`；包含分卷和过期清理。 |
+| JSON | `DefaultJsonHelper` | `NewtonsoftJsonHelper`、项目自定义 `IJsonHelper` | 只服务 `Utility.Json`，不决定 Config/Localization 的文件格式。 |
+
 `BaseComponent` 的 `JSON Helper` 默认使用 `DefaultJsonHelper`（`JsonUtility`），
 保证最小配置即可启动。需要属性、字典、顶层数组或更完整的 JSON 兼容性时，可在
 Inspector 下拉框切换为 `UnityRFramework.Runtime.NewtonsoftJsonHelper`：
@@ -153,6 +161,10 @@ Log.Info("玩家 {0} 登录，等级 {1}", playerName, level);
 Log.Warning("资源 {0} 加载超时", assetPath);
 Log.Error("连接服务器失败：{0}", errorMessage);
 ```
+
+Log 模块不单独创建 Helper；它使用 Base 初始化的 `ILogHelper`。默认
+`DefaultLogHelper` 会落盘，若项目不允许写本地日志、需要上传日志或需要接入平台 SDK，
+应替换 Base 的 Log Helper，而不是修改业务调用点。
 
 ### Event
 
@@ -185,6 +197,8 @@ private void OnDisable()
 }
 ```
 
+Event 模块没有 Helper，订阅、同步分发和线程安全异步入队均由 Library 实现。
+
 ### Pool
 
 ```csharp
@@ -206,6 +220,9 @@ var bullet = bulletPool.Spawn();   // SetActive(true)
 bulletPool.Unspawn(bullet);        // SetActive(false) + 挂回 parent
 ```
 
+Pool 模块没有 Helper。普通对象池由 Library 管理，GameObject 的激活、失活和父节点恢复
+由 Runtime 提供的工厂委托接入，不需要在 Inspector 选择实现。
+
 ### Timer
 
 ```csharp
@@ -224,22 +241,31 @@ timer.Resume();
 timer.Cancel();
 ```
 
+Timer 模块没有 Helper，由框架 Update 驱动；计时使用逻辑时间还是不受缩放的真实时间，
+由创建计时器时的参数决定。
+
 ### Resource
 
 ```csharp
-// 异步加载
-var prefab = await GameEntry.Resource.LoadAssetAsync<GameObject>("Assets/Prefabs/Player.prefab");
+// 默认 Resources Helper：相对于任意 Resources 目录，扩展名可写可不写
+var prefab = await GameEntry.Resource.LoadAssetAsync<GameObject>("Prefabs/Player.prefab");
 
-// 场景异步加载
+// Build Settings 场景使用场景路径
 await GameEntry.Resource.LoadSceneAsync("Assets/Scenes/Battle.unity", 1); // sceneMode: 1=Additive 叠加
 
 // 卸载
 GameEntry.Resource.UnloadAsset(prefab);
 await GameEntry.Resource.UnloadSceneAsync("Assets/Scenes/Battle.unity");
 GameEntry.Resource.UnloadUnusedAssets();
-
-// Helper 切换：DefaultResourceHelper、LocalFileResourceHelper 或 Expansion Helper
 ```
+
+| 内置 Helper | 实现与加载顺序 | location 规则 | 适用范围与注意事项 |
+|---|---|---|---|
+| `DefaultResourceHelper` | `Resources.Load`；场景使用 `SceneManager` | Unity 资源传相对 `Resources` 目录的路径，扩展名会被移除；场景必须加入 Build Settings，可传完整路径或场景名 | 零配置、小项目和原型。没有版本、远端下载或磁盘更新能力。`Resources.Load` 的异步入口只是 Task 形式，底层仍不能真正取消。 |
+| `LocalFileResourceHelper` | `persistentDataPath` 同名文件 → `StreamingAssets` → `DefaultResourceHelper` | 本地文件必须是安全的相对路径并保留扩展名，例如 `Audio/guide.ogg`；回退 Resources 时仍按 Resources 相对路径解释 | XR、展陈和需要现场替换文件的项目。只直接构造文本、字节、图片和音频；Prefab、Material、Component 和场景仍回退默认实现。Android/WebGL 的 StreamingAssets 必须异步读取。 |
+
+Resource Helper 决定所有上层模块中“资源路径”的含义。Entity、UI、Audio、Config 和
+Localization 不会再次改写路径；切换 Helper 后必须同步检查这些模块传入的 location。
 
 `LocalFileResourceHelper` 用于频繁替换文字、配置、语音、图片和视频的本地项目，加载优先级为：
 
@@ -273,12 +299,8 @@ Resources/Build Settings。Android 与 WebGL 的 StreamingAssets 位于 URL 中�
 已缓存资源需先 `UnloadAsset<T>(location)`，再重新加载才能看到新文件；Audio 模块使用
 `ClearCache()` 停止播放并清空其内部音频缓存。
 
-实现 `IResourceCacheHelper` 的第三方资源 Helper 还可接收磁盘缓存容量配置。
-Resource Inspector 默认开启自动清理，上限为 4 GB；内置 Resources 与 LocalFile Helper
-不使用磁盘下载缓存，因此会忽略该配置。Expansion 的 YooAsset 3.0.5 Helper 只在 Host
-模式初始化时执行清理，先移除当前清单不再使用的 Bundle，再按框架记录的资源访问时间
-通过 YooAsset 官方接口进行 Location 级近似 LRU 淘汰。多个资源共享同一 Bundle 时仍以
-整个 Bundle 为删除粒度，后续访问可能重新下载，但框架不会直接删除 YooAsset 缓存文件。
+第三方 Resource Helper 的地址、运行模式、下载、缓存和场景规则不属于核心默认契约。
+当前 YooAsset 实现见 [Expansion README](Samples/Expansion/README.md)。
 
 ### WebRequest
 
@@ -294,6 +316,11 @@ var result = await GameEntry.WebRequest.PostAsync("https://api.example.com/login
 var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 var data = await GameEntry.WebRequest.GetAsync(url, ct: cts.Token);
 ```
+
+核心只提供 `DefaultWebRequestHelper`：基于 `UnityWebRequest + Coroutine`，普通响应保存在
+内存，文件下载使用 `DownloadHandlerFile` 直接写目标路径，取消时中止请求并删除未完成文件。
+它不负责 JSON 对象序列化、登录态、签名或业务重试；这些由调用方或项目封装处理。
+依赖 UniTask 的实现属于 Expansion，见 `Samples/Expansion/README.md`。
 
 ### Config
 
@@ -325,6 +352,12 @@ if (GameEntry.Config.HasConfigRow<ItemConfig>(1001)) { ... }
 
 // 自定义模式：继承 ConfigHelperBase，适配项目私有二进制或文本格式
 ```
+
+| 内置 Helper | 单表格式 | Bundle 格式 | 默认 location 示例 | 注意事项 |
+|---|---|---|---|---|
+| `JsonConfigHelper` | UTF-8 JSON | JSON 多表容器 | `Config/Json/Item.json` | 默认选择，便于检查和手工排错；解析器按生成行类型转换，不等同于 Base 的 JSON Helper。 |
+| `BinaryConfigHelper` | URFC v2，兼容 URFC v1 | URFM v1 | `Config/Binary/Item.bytes` | 需要使用配置表工具生成 `.bytes`；URFC v2 依赖生成 Codec，并校验 TableId、SchemaHash 和 CRC32。 |
+| 自定义 `ConfigHelperBase` | 项目自定 | 实现 `IConfigBundleHelper` 后可支持 | 调用方显式传入 | `ParseConfig(Type, byte[])` 必须与导出端完全一致；Helper 只解析字节，文件从哪里加载仍由 Resource Helper 决定。 |
 
 `ParseConfig(Type, byte[])` 的字节格式由当前 `IConfigHelper` 决定。框架默认 JSON；`BinaryConfigHelper` 兼容反射映射的 URFC v1，并使用生成 Codec 读取带 TableId、SchemaHash 和 CRC32 的 URFC v2。JSON/二进制默认 Helper 还实现可选 `IConfigBundleHelper`，分别读取 JSON 多表容器与 URFM v1。项目私有格式可直接继承 `ConfigHelperBase`。
 
@@ -391,6 +424,8 @@ fsm.ChangeState<CombatState>();
 GameEntry.Fsm.DestroyFsm(fsm);
 ```
 
+Fsm 模块没有 Helper，是同步、通用的纯状态机实现。
+
 ### Procedure
 
 ```csharp
@@ -428,16 +463,19 @@ GameEntry.Procedure.StartProcedure<LoginProcedure>();
 
 自动发现仅扫描显式指定的业务程序集；所有状态必须提供公共无参构造函数。需要构造参数、工厂创建或希望完全避免反射时，仍可使用 `Initialize(new LoginProcedure(), new HallProcedure())` 手动注入。自定义 asmdef 以 IL2CPP 发布时，应在 `link.xml` 中保留对应业务程序集。
 
+Procedure 模块没有 Helper，内部复用同步生命周期约定；异步 I/O 应由状态启动并在
+`OnUpdate` 检查完成，不能把异步生命周期重新扩散到通用 FSM。
+
 ### Entity
 
 ```csharp
 // 加载并显示实体（需指定实体组名称）
 long playerId = 1001;
-var player = await GameEntry.Entity.ShowEntityAsync(playerId, "Assets/Prefabs/Player.prefab", "DefaultGroup");
+var player = await GameEntry.Entity.ShowEntityAsync(playerId, "Prefabs/Player.prefab", "DefaultGroup");
 
 // 先加载子实体，再按实体编号挂载（父子附加，非按资源路径）
 long weaponId = 2001;
-await GameEntry.Entity.ShowEntityAsync(weaponId, "Assets/Prefabs/Sword.prefab", "DefaultGroup");
+await GameEntry.Entity.ShowEntityAsync(weaponId, "Prefabs/Sword.prefab", "DefaultGroup");
 GameEntry.Entity.AttachEntity(weaponId, playerId);
 
 // 隐藏（进入对象池等待复用或销毁）
@@ -450,11 +488,16 @@ IEntity sceneNpc = GameEntry.Entity.RegisterSceneEntity(
 GameEntry.Entity.UnregisterSceneEntity(10001);
 ```
 
+`DefaultEntityHelper` 只负责对 Resource 返回的 Prefab 执行 `Instantiate/Destroy`，
+不加载资源、不解释路径；地址规则完全取决于当前 Resource Helper。
+`DefaultEntityGroupHelper` 是可选的空标记实现，实体组对象池参数仍由 EntityModule 管理；
+项目需要为实体组附加额外策略时可实现 `IEntityGroupHelper`。
+
 ### Scene
 
 ```csharp
 // 异步加载
-var scene = await GameEntry.Scene.LoadSceneAsync("Assets/Scenes/Battle.unity");
+await GameEntry.Scene.LoadSceneAsync("Assets/Scenes/Battle.unity");
 
 // 卸载
 await GameEntry.Scene.UnloadSceneAsync("Assets/Scenes/Battle.unity");
@@ -463,14 +506,19 @@ await GameEntry.Scene.UnloadSceneAsync("Assets/Scenes/Battle.unity");
 if (GameEntry.Scene.IsLoaded("Assets/Scenes/Battle.unity")) { ... }
 ```
 
+Scene 模块没有独立 Helper，只管理加载状态、防并发和事件，然后把实际操作委托给
+Resource Helper。`DefaultResourceHelper` 和 `LocalFileResourceHelper` 只加载 Build Settings
+场景；第三方实现的来源和地址规则见对应 Expansion 文档。加载与卸载必须传同一个
+location，`activateOnLoad:false` 当前不受支持。
+
 ### UI
 
 ```csharp
 // 打开窗口（windowLayer 数值越大越靠前；fullScreen 覆盖时自动隐藏下层 UI）
-var ui = await GameEntry.UI.OpenUIFormAsync("Assets/UI/Dialog.prefab", windowLayer: 10, fullScreen: true);
+var ui = await GameEntry.UI.OpenUIFormAsync("UI/Dialog.prefab", windowLayer: 10, fullScreen: true);
 
 // 关闭（按资源路径）
-GameEntry.UI.CloseUIForm("Assets/UI/Dialog.prefab");
+GameEntry.UI.CloseUIForm("UI/Dialog.prefab");
 
 // 场景中预先放置的 UI 可挂 SceneUIFormBinder，或通过代码登记。
 // 它参与窗口栈、统一更新和全屏暂停，但对象仍由场景持有。
@@ -479,19 +527,23 @@ IUIForm battleHud = GameEntry.UI.RegisterSceneUIForm(
 GameEntry.UI.UnregisterSceneUIForm("BattleHUD");
 ```
 
+`DefaultUIHelper` 只负责实例化和销毁 Resource 返回的 UI Prefab，不负责加载和地址转换。
+因此默认 Resources 模式使用相对 Resources 的路径；切换 YooAsset 后使用对应 Address。
+场景内 UI 通过 `SceneUIFormBinder` 登记，所有权仍属于场景，不经过 Helper 实例化或销毁。
+
 ### Audio
 
 ```csharp
 // BGM
-GameEntry.Audio.PlayBgm("Assets/Audio/bgm_main.mp3");
+GameEntry.Audio.PlayBgm("Audio/bgm_main.mp3");
 GameEntry.Audio.PauseBgm();
 GameEntry.Audio.StopBgm();
 
 // 音效
-GameEntry.Audio.PlaySfx("Assets/Audio/sfx_click.mp3");
+GameEntry.Audio.PlaySfx("Audio/sfx_click.mp3");
 
 // UI 音效
-GameEntry.Audio.PlayUI("Assets/Audio/ui_confirm.mp3");
+GameEntry.Audio.PlayUI("Audio/ui_confirm.mp3");
 
 // 音量控制
 GameEntry.Audio.BgmVolume = 0.8f;
@@ -499,6 +551,11 @@ GameEntry.Audio.SfxVolume = 1f;
 
 // AudioSource 池自动管理，无需手动创建/销毁
 ```
+
+核心只提供 `DefaultAudioHelper`：一个 BGM AudioSource、一个 UI AudioSource 和最多 16 个
+并发 SFX AudioSource，负责播放、淡入淡出和完成回调。AudioClip 始终由 ResourceModule
+加载并归还，因此路径规则仍由 Resource Helper 决定。`PlayBgm/PlaySfx` 使用同步资源入口；
+LocalFile 在 Android/WebGL 或文件音频场景应使用 `PlayBgmAsync/PlaySfxAsync`。
 
 ### Network
 
@@ -535,6 +592,16 @@ GameEntry.Event.Subscribe<NetworkConnectedEvent>(e =>
 // 正式项目建议注入经过专项测试的自定义 INetworkHelper
 ```
 
+| 内置 Helper | 传输与帧格式 | 适用范围与注意事项 |
+|---|---|---|
+| `DefaultNetworkHelper` | 空实现 | 仅用于明确禁用网络；连接和发送不会产生真实网络流量。 |
+| `TcpNetworkHelper` | `TcpClient`；`总长度(4) + 消息ID(4) + 消息体`，小端序 | 可靠字节流，处理了粘包/拆包；服务端必须使用同一长度语义。 |
+| `UdpNetworkHelper` | `UdpClient`；每个数据报为 `消息ID(4) + 消息体` | 无连接、不保证到达或顺序，适合允许丢包的数据。 |
+| `WebSocketNetworkHelper` | `ClientWebSocket`；每条消息为 `消息ID(4) + 消息体` | 适合 Web 服务端；URI、TLS、代理和平台兼容性必须专项验证。 |
+
+`NetworkComponent` 默认选择 `TcpNetworkHelper`；`DefaultNetworkHelper` 虽保留“Default”
+名称，但它是无网络占位实现，不是可通信的默认协议。
+
 ### Localization
 
 ```csharp
@@ -565,6 +632,16 @@ await GameEntry.Localization.LoadLanguageBundleAsync(
     "Localization/Json/LocalizationBundle.json");
 // BinaryLocalizationHelper 对应加载 Localization/Binary/LocalizationBundle.bytes
 ```
+
+| 内置 Helper | 单语言格式 | Bundle 格式 | 自动 location | 注意事项 |
+|---|---|---|---|---|
+| `JsonLocalizationHelper` | UTF-8 JSON Key/Value | JSON 多语言容器 | `Localization/Json/{language}.json` | 默认选择，文件可读性好。 |
+| `BinaryLocalizationHelper` | URFL v2，兼容 v1 | URLM v1 | `Localization/Binary/{language}.bytes` | 需要由配置表工具生成；URFL v2 包含 CRC32。 |
+| 自定义 Helper | 项目自定 | 实现 `ILocalizationBundleHelper` 后可支持 | 实现 `ILocalizationLocationProvider` 后可自动推导 | 未实现位置提供器时必须显式传 location，并关闭组件的启动自动加载。 |
+
+Localization Helper 只负责解析和默认地址推导，实际文件仍由 Resource Helper 加载。
+因此同一个自动 location 在 Resources、LocalFile 和 YooAsset 下分别表示 Resources 相对路径、
+本地相对文件路径和 YooAsset Address；切换 Resource Helper 时必须确保产物放置或收集正确。
 
 ## 当前技术栈
 

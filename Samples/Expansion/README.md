@@ -127,6 +127,26 @@ Expansion 后，默认 CSV 管线仍可独立工作。
 
 ## 当前 Helper 使用方式
 
+### Helper 差异
+
+| Helper | 替换的核心实现 | location / 路径规则 | 主要注意事项 |
+|---|---|---|---|
+| `YooAssetResourceHelper` | `DefaultResourceHelper` / `LocalFileResourceHelper` | 普通资源使用当前 YooAsset Package 可识别的 Address 或 AssetPath，不是 Resources 相对路径；Build Settings 场景可传完整路径或唯一场景名 | 支持 EditorSimulate、Offline、Host。Host 下未缓存资源可在异步加载时按需下载；同步加载不能承担远端下载流程。`byte[]`/`string` 对应被收集的 `TextAsset`，当前 Helper 不是 RawFile 读取器。 |
+| `UniTaskWebRequestHelper` | `DefaultWebRequestHelper` | URL 和文件保存路径与默认实现完全相同 | 只把协程轮询替换为 UniTask PlayerLoop 等待，模块的响应、取消、超时和重试契约不变。必须安装 UniTask；HTTP 4xx/5xx 仍返回框架 `WebResponse`，不会被 Helper 提前改成 UniTask 异常。 |
+
+`YooAssetResourceHelper` 的场景规则是一个例外：它先查 Player Build Settings，命中后
+使用 `SceneManager`；未命中才把 location 当作 YooAsset 场景地址。加载与卸载必须使用
+同一个 location。Build Settings 中存在多个同名场景时必须传完整路径。
+
+`ResourceComponent` 上的参数并非对所有 Helper 都生效：
+
+| Inspector 参数 | YooAsset | Default / LocalFile |
+|---|---|---|
+| Play Mode | 决定 EditorSimulate、Offline 或 Host | 忽略 |
+| Package Name | YooAsset Package 名称，必须与构建配置一致 | 忽略 |
+| Default/Fallback Host Server | Host 模式远端根地址 | 忽略 |
+| Auto Clear Cache / Max Cache Size | Host 模式磁盘缓存治理 | 忽略 |
+
 1. 在 Package Manager 中导入 **Expansion** Sample。
 2. 手动安装所需第三方包。UPM 不会根据 Sample 内容自动安装可选依赖。
 3. 在 `UnityRFramework` 预制体 Inspector 中配置对应 Helper：
@@ -151,6 +171,10 @@ ExcelDataReader DLL。每个 Helper 只依赖自己实际使用的插件。
 ### YooAsset Host 磁盘缓存
 
 当前 `YooAssetResourceHelper` 按 YooAsset 3.0.5 API 实现可选磁盘缓存容量治理。
+场景加载采用混合来源：先在 Player Build Settings 中按完整路径、无扩展名路径或
+唯一场景名查找，命中后使用 `SceneManager`；未命中时才按 YooAsset 地址加载。
+因此不需要进入 AssetBundle 的基础场景仍应加入 Build Settings；同名场景存在于
+不同目录时必须传完整路径。卸载会按照加载时记录的来源选择对应后端。
 在 `ResourceComponent` Inspector 中启用 `Auto Clear Cache` 并设置
 `Max Cache Size (GB)` 后，Helper 会在 Host 模式加载活动清单后执行一次检查：
 

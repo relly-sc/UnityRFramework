@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using RFramework;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityRFramework.Runtime;
 using YooAsset;
 
@@ -12,6 +13,7 @@ namespace UnityRFramework.Expansion
     /// <summary>
     /// 基于 YooAsset v3 的资源辅助器。
     /// 资源句柄由本辅助器持有，资源引用计数由框架 ResourceModule 统一管理。
+    /// 场景加载优先使用 Player Build Settings，未命中时再使用 YooAsset 资源包。
     /// </summary>
     public sealed class YooAssetResourceHelper : ResourceHelperBase, IResourceCacheHelper,
         IResourceUpdateService, ITaggedResourceUpdateService
@@ -25,6 +27,8 @@ namespace UnityRFramework.Expansion
             new Dictionary<AssetHandleKey, AssetHandle>();
         private readonly Dictionary<string, SceneHandle> sceneHandles =
             new Dictionary<string, SceneHandle>();
+        private readonly Dictionary<string, string> builtInScenePaths =
+            new Dictionary<string, string>();
 
         private ResourcePackage package;
         private ResourceDownloaderOperation preparedDownloader;
@@ -361,6 +365,7 @@ namespace UnityRFramework.Expansion
             SceneHandle[] scenes = new SceneHandle[sceneHandles.Count];
             sceneHandles.Values.CopyTo(scenes, 0);
             sceneHandles.Clear();
+            builtInScenePaths.Clear();
 
             ResourcePackage packageToDestroy = package;
             package = null;
@@ -507,6 +512,12 @@ namespace UnityRFramework.Expansion
         {
             EnsureInitialized();
 
+            if (string.IsNullOrWhiteSpace(location))
+            {
+                throw new RFrameworkException(
+                    "YooAssetResourceHelper: scene location is null or empty.");
+            }
+
             if (!activateOnLoad)
             {
                 throw new RFrameworkException(
@@ -514,10 +525,17 @@ namespace UnityRFramework.Expansion
                     + "IResourceHelper contract. activateOnLoad must be true.");
             }
 
+            if (TryResolveBuiltInScenePath(location, out string builtInScenePath))
+            {
+                await LoadBuiltInSceneAsync(
+                    location, builtInScenePath, sceneMode, priority, onProgress);
+                return;
+            }
+
             SceneHandle handle = package.LoadSceneAsync(
                 location,
-                (UnityEngine.SceneManagement.LoadSceneMode)sceneMode,
-                UnityEngine.SceneManagement.LocalPhysicsMode.None,
+                (LoadSceneMode)sceneMode,
+                LocalPhysicsMode.None,
                 true,
                 priority);
 
@@ -541,7 +559,7 @@ namespace UnityRFramework.Expansion
 
                 if (sceneMode == (int)UnityEngine.SceneManagement.LoadSceneMode.Single)
                 {
-                    ReleaseReplacedSceneHandles();
+                    ReleaseReplacedSceneTracking();
                 }
 
                 if (sceneHandles.TryGetValue(location, out SceneHandle previousHandle)
@@ -570,18 +588,35 @@ namespace UnityRFramework.Expansion
         /// <param name="location">场景地址。</param>
         public override async Task UnloadSceneAsync(string location)
         {
+            if (builtInScenePaths.TryGetValue(location, out string builtInScenePath))
+            {
+                AsyncOperation builtInUnloadOperation =
+                    SceneManager.UnloadSceneAsync(builtInScenePath);
+                if (builtInUnloadOperation != null)
+                {
+                    while (!builtInUnloadOperation.isDone)
+                    {
+                        await Task.Yield();
+                    }
+                }
+
+                builtInScenePaths.Remove(location);
+                return;
+            }
+
             if (!sceneHandles.TryGetValue(location, out SceneHandle handle))
             {
                 return;
             }
 
-            UnloadSceneOperation operation = handle.UnloadSceneAsync();
-            await operation;
-            if (operation.Status != EOperationStatus.Succeeded)
+            UnloadSceneOperation yooAssetUnloadOperation = handle.UnloadSceneAsync();
+            await yooAssetUnloadOperation;
+            if (yooAssetUnloadOperation.Status != EOperationStatus.Succeeded)
             {
                 throw new RFrameworkException(
                     $"YooAssetResourceHelper: unload scene '{location}' failed. "
-                    + $"Status: {operation.Status}, Error: {operation.Error}");
+                    + $"Status: {yooAssetUnloadOperation.Status}, "
+                    + $"Error: {yooAssetUnloadOperation.Error}");
             }
 
             sceneHandles.Remove(location);
@@ -595,7 +630,8 @@ namespace UnityRFramework.Expansion
         public override bool IsLocationValid(string location)
         {
             EnsureInitialized();
-            return package.IsLocationValid(location);
+            return TryResolveBuiltInScenePath(location, out _)
+                || package.IsLocationValid(location);
         }
 
         /// <summary>
@@ -606,6 +642,11 @@ namespace UnityRFramework.Expansion
         public override long GetDownloadSize(string location)
         {
             EnsureInitialized();
+            if (TryResolveBuiltInScenePath(location, out _))
+            {
+                return 0L;
+            }
+
             return package.GetDownloadSize(location);
         }
 
@@ -730,7 +771,122 @@ namespace UnityRFramework.Expansion
             return copy;
         }
 
-        private void ReleaseReplacedSceneHandles()
+        private async Task LoadBuiltInSceneAsync(
+            string location,
+            string scenePath,
+            int sceneMode,
+            uint priority,
+            IProgress<float> onProgress)
+        {
+            AsyncOperation operation = SceneManager.LoadSceneAsync(
+                scenePath, (LoadSceneMode)sceneMode);
+            if (operation == null)
+            {
+                throw new RFrameworkException(
+                    $"YooAssetResourceHelper: load built-in scene '{scenePath}' failed.");
+            }
+
+            operation.allowSceneActivation = true;
+            operation.priority = (int)priority;
+            while (!operation.isDone)
+            {
+                onProgress?.Report(operation.progress);
+                await Task.Yield();
+            }
+
+            onProgress?.Report(1f);
+            if (sceneMode == (int)LoadSceneMode.Single)
+            {
+                ReleaseReplacedSceneTracking();
+            }
+
+            builtInScenePaths[location] = scenePath;
+        }
+
+        private static bool TryResolveBuiltInScenePath(
+            string location, out string scenePath)
+        {
+            scenePath = null;
+            if (string.IsNullOrWhiteSpace(location))
+            {
+                return false;
+            }
+
+            string normalizedLocation = NormalizeScenePath(location);
+            string locationWithoutExtension = StripSceneExtension(normalizedLocation);
+
+            for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
+            {
+                string candidate = NormalizeScenePath(
+                    SceneUtility.GetScenePathByBuildIndex(i));
+                if (string.Equals(
+                        candidate, normalizedLocation, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(
+                        StripSceneExtension(candidate),
+                        locationWithoutExtension,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    scenePath = candidate;
+                    return true;
+                }
+            }
+
+            string matchedPath = null;
+            bool locationContainsDirectory =
+                locationWithoutExtension.IndexOf('/') >= 0;
+            string suffix = "/" + locationWithoutExtension;
+            for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
+            {
+                string candidate = NormalizeScenePath(
+                    SceneUtility.GetScenePathByBuildIndex(i));
+                string candidateWithoutExtension = StripSceneExtension(candidate);
+                bool matches = locationContainsDirectory
+                    ? candidateWithoutExtension.EndsWith(
+                        suffix, StringComparison.OrdinalIgnoreCase)
+                    : string.Equals(
+                        GetSceneName(candidateWithoutExtension),
+                        locationWithoutExtension,
+                        StringComparison.OrdinalIgnoreCase);
+                if (!matches)
+                {
+                    continue;
+                }
+
+                if (matchedPath != null)
+                {
+                    throw new RFrameworkException(
+                        $"YooAssetResourceHelper: built-in scene location '{location}' "
+                        + "is ambiguous. Use the full scene path.");
+                }
+
+                matchedPath = candidate;
+            }
+
+            scenePath = matchedPath;
+            return scenePath != null;
+        }
+
+        private static string NormalizeScenePath(string path)
+        {
+            return path.Trim().Replace('\\', '/');
+        }
+
+        private static string StripSceneExtension(string path)
+        {
+            return path.EndsWith(".unity", StringComparison.OrdinalIgnoreCase)
+                ? path.Substring(0, path.Length - ".unity".Length)
+                : path;
+        }
+
+        private static string GetSceneName(string path)
+        {
+            int separatorIndex = path.LastIndexOf('/');
+            return separatorIndex >= 0
+                ? path.Substring(separatorIndex + 1)
+                : path;
+        }
+
+        private void ReleaseReplacedSceneTracking()
         {
             foreach (KeyValuePair<string, SceneHandle> pair in sceneHandles)
             {
@@ -741,6 +897,7 @@ namespace UnityRFramework.Expansion
             }
 
             sceneHandles.Clear();
+            builtInScenePaths.Clear();
         }
 
         private void EnsureInitialized()

@@ -24,8 +24,8 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// WebRequest 辅助器类型全名。
         /// 必须是继承自 <see cref="WebRequestHelperBase"/> 的 MonoBehaviour 类型。
-        /// 默认指向不存在的 DefaultWebRequestHelper，运行时输出 Error 日志。
-        /// 请在 Inspector 中配置或在启动流程中通过 SetHelper 方法运行时替换。
+        /// 默认使用基于 UnityWebRequest 和 Coroutine 的 DefaultWebRequestHelper；
+        /// 也可在 Inspector 中配置或在启动流程中通过 SetHelper 方法运行时替换。
         /// </summary>
         [SerializeField]
         [Tooltip("WebRequest 辅助器类型全名。必须是继承自 WebRequestHelperBase 的 MonoBehaviour。")]
