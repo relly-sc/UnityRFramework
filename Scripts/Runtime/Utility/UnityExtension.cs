@@ -1,345 +1,290 @@
-
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 对 Unity 的扩展方法。
+/// 提供基于 Unity 原生 API 的常用扩展方法。
 /// </summary>
-/// <remarks>弱相关工具集：置于全局命名空间，免 using 直接可用。</remarks>
 public static class UnityExtension
 {
     /// <summary>
-    /// 缓存的 Transform 列表，用于递归设置层级时临时存储子对象。
+    /// 获取指定组件；组件不存在时立即添加。
     /// </summary>
-    private static readonly List<Transform> s_CachedTransforms = new List<Transform>();
-
-    /// <summary>
-    /// 获取或增加组件。
-    /// </summary>
-    /// <typeparam name="T">要获取或增加的组件。</typeparam>
+    /// <typeparam name="T">组件类型。</typeparam>
     /// <param name="gameObject">目标对象。</param>
-    /// <returns>获取或增加的组件。</returns>
+    /// <returns>已有或新添加的组件。</returns>
     public static T GetOrAddComponent<T>(this GameObject gameObject) where T : Component
     {
-        T component = gameObject.GetComponent<T>();
-        if (component == null)
+        if (gameObject == null)
         {
-            component = gameObject.AddComponent<T>();
+            throw new ArgumentNullException(nameof(gameObject));
         }
 
-        return component;
+        return gameObject.TryGetComponent(out T component)
+            ? component
+            : gameObject.AddComponent<T>();
     }
 
     /// <summary>
-    /// 获取或增加组件。
+    /// 获取指定类型的组件；组件不存在时立即添加。
     /// </summary>
     /// <param name="gameObject">目标对象。</param>
-    /// <param name="type">要获取或增加的组件类型。</param>
-    /// <returns>获取或增加的组件。</returns>
+    /// <param name="type">组件类型。</param>
+    /// <returns>已有或新添加的组件。</returns>
     public static Component GetOrAddComponent(this GameObject gameObject, Type type)
     {
-        Component component = gameObject.GetComponent(type);
-        if (component == null)
+        if (gameObject == null)
         {
-            component = gameObject.AddComponent(type);
+            throw new ArgumentNullException(nameof(gameObject));
         }
 
-        return component;
+        if (type == null || !typeof(Component).IsAssignableFrom(type))
+        {
+            throw new ArgumentException("Type must derive from UnityEngine.Component.", nameof(type));
+        }
+
+        Component component = gameObject.GetComponent(type);
+        return component != null ? component : gameObject.AddComponent(type);
     }
 
     /// <summary>
-    /// 获取 GameObject 是否在场景中。
+    /// 判断对象是否属于一个有效且已经加载的场景。
     /// </summary>
     /// <param name="gameObject">目标对象。</param>
-    /// <returns>GameObject 是否在场景中。</returns>
-    /// <remarks>若返回 true，表明此 GameObject 是一个场景中的实例对象；若返回 false，表明此 GameObject 是一个 Prefab。</remarks>
+    /// <returns>对象是否属于已加载场景。</returns>
     public static bool InScene(this GameObject gameObject)
     {
-        return gameObject.scene.name != null;
+        return gameObject != null && gameObject.scene.IsValid() && gameObject.scene.isLoaded;
     }
 
     /// <summary>
-    /// 递归设置游戏对象的层次。
+    /// 将对象及其所有子对象设置到指定层级。
     /// </summary>
-    /// <param name="gameObject"><see cref="GameObject" /> 对象。</param>
-    /// <param name="layer">目标层次的编号。</param>
+    /// <param name="gameObject">层级根对象。</param>
+    /// <param name="layer">Unity 层级编号，范围为 0～31。</param>
     public static void SetLayerRecursively(this GameObject gameObject, int layer)
     {
-        gameObject.GetComponentsInChildren(true, s_CachedTransforms);
-        for (int i = 0; i < s_CachedTransforms.Count; i++)
+        if (gameObject == null)
         {
-            s_CachedTransforms[i].gameObject.layer = layer;
+            throw new ArgumentNullException(nameof(gameObject));
         }
 
-        s_CachedTransforms.Clear();
-    }
-
-    /// <summary>
-    /// 取 <see cref="Vector3" /> 的 (x, y, z) 转换为 <see cref="Vector2" /> 的 (x, z)。
-    /// </summary>
-    /// <param name="vector3">要转换的 Vector3。</param>
-    /// <returns>转换后的 Vector2。</returns>
-    public static Vector2 ToVector2(this Vector3 vector3)
-    {
-        return new Vector2(vector3.x, vector3.z);
-    }
-
-    /// <summary>
-    /// 取 <see cref="Vector2" /> 的 (x, y) 转换为 <see cref="Vector3" /> 的 (x, 0, y)。
-    /// </summary>
-    /// <param name="vector2">要转换的 Vector2。</param>
-    /// <returns>转换后的 Vector3。</returns>
-    public static Vector3 ToVector3(this Vector2 vector2)
-    {
-        return new Vector3(vector2.x, 0f, vector2.y);
-    }
-
-    /// <summary>
-    /// 取 <see cref="Vector2" /> 的 (x, y) 和给定参数 y 转换为 <see cref="Vector3" /> 的 (x, 参数 y, y)。
-    /// </summary>
-    /// <param name="vector2">要转换的 Vector2。</param>
-    /// <param name="y">Vector3 的 y 值。</param>
-    /// <returns>转换后的 Vector3。</returns>
-    public static Vector3 ToVector3(this Vector2 vector2, float y)
-    {
-        return new Vector3(vector2.x, y, vector2.y);
-    }
-
-    #region Transform
-
-    /// <summary>
-    /// 设置绝对位置的 x 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="newValue">x 坐标值。</param>
-    public static void SetPositionX(this Transform transform, float newValue)
-    {
-        Vector3 v = transform.position;
-        v.x = newValue;
-        transform.position = v;
-    }
-
-    /// <summary>
-    /// 设置绝对位置的 y 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="newValue">y 坐标值。</param>
-    public static void SetPositionY(this Transform transform, float newValue)
-    {
-        Vector3 v = transform.position;
-        v.y = newValue;
-        transform.position = v;
-    }
-
-    /// <summary>
-    /// 设置绝对位置的 z 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="newValue">z 坐标值。</param>
-    public static void SetPositionZ(this Transform transform, float newValue)
-    {
-        Vector3 v = transform.position;
-        v.z = newValue;
-        transform.position = v;
-    }
-
-    /// <summary>
-    /// 增加绝对位置的 x 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="deltaValue">x 坐标值增量。</param>
-    public static void AddPositionX(this Transform transform, float deltaValue)
-    {
-        Vector3 v = transform.position;
-        v.x += deltaValue;
-        transform.position = v;
-    }
-
-    /// <summary>
-    /// 增加绝对位置的 y 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="deltaValue">y 坐标值增量。</param>
-    public static void AddPositionY(this Transform transform, float deltaValue)
-    {
-        Vector3 v = transform.position;
-        v.y += deltaValue;
-        transform.position = v;
-    }
-
-    /// <summary>
-    /// 增加绝对位置的 z 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="deltaValue">z 坐标值增量。</param>
-    public static void AddPositionZ(this Transform transform, float deltaValue)
-    {
-        Vector3 v = transform.position;
-        v.z += deltaValue;
-        transform.position = v;
-    }
-
-    /// <summary>
-    /// 设置相对位置的 x 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="newValue">x 坐标值。</param>
-    public static void SetLocalPositionX(this Transform transform, float newValue)
-    {
-        Vector3 v = transform.localPosition;
-        v.x = newValue;
-        transform.localPosition = v;
-    }
-
-    /// <summary>
-    /// 设置相对位置的 y 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="newValue">y 坐标值。</param>
-    public static void SetLocalPositionY(this Transform transform, float newValue)
-    {
-        Vector3 v = transform.localPosition;
-        v.y = newValue;
-        transform.localPosition = v;
-    }
-
-    /// <summary>
-    /// 设置相对位置的 z 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="newValue">z 坐标值。</param>
-    public static void SetLocalPositionZ(this Transform transform, float newValue)
-    {
-        Vector3 v = transform.localPosition;
-        v.z = newValue;
-        transform.localPosition = v;
-    }
-
-    /// <summary>
-    /// 增加相对位置的 x 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="deltaValue">x 坐标值。</param>
-    public static void AddLocalPositionX(this Transform transform, float deltaValue)
-    {
-        Vector3 v = transform.localPosition;
-        v.x += deltaValue;
-        transform.localPosition = v;
-    }
-
-    /// <summary>
-    /// 增加相对位置的 y 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="deltaValue">y 坐标值。</param>
-    public static void AddLocalPositionY(this Transform transform, float deltaValue)
-    {
-        Vector3 v = transform.localPosition;
-        v.y += deltaValue;
-        transform.localPosition = v;
-    }
-
-    /// <summary>
-    /// 增加相对位置的 z 坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="deltaValue">z 坐标值。</param>
-    public static void AddLocalPositionZ(this Transform transform, float deltaValue)
-    {
-        Vector3 v = transform.localPosition;
-        v.z += deltaValue;
-        transform.localPosition = v;
-    }
-
-    /// <summary>
-    /// 设置相对尺寸的 x 分量。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="newValue">x 分量值。</param>
-    public static void SetLocalScaleX(this Transform transform, float newValue)
-    {
-        Vector3 v = transform.localScale;
-        v.x = newValue;
-        transform.localScale = v;
-    }
-
-    /// <summary>
-    /// 设置相对尺寸的 y 分量。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="newValue">y 分量值。</param>
-    public static void SetLocalScaleY(this Transform transform, float newValue)
-    {
-        Vector3 v = transform.localScale;
-        v.y = newValue;
-        transform.localScale = v;
-    }
-
-    /// <summary>
-    /// 设置相对尺寸的 z 分量。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="newValue">z 分量值。</param>
-    public static void SetLocalScaleZ(this Transform transform, float newValue)
-    {
-        Vector3 v = transform.localScale;
-        v.z = newValue;
-        transform.localScale = v;
-    }
-
-    /// <summary>
-    /// 增加相对尺寸的 x 分量。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="deltaValue">x 分量增量。</param>
-    public static void AddLocalScaleX(this Transform transform, float deltaValue)
-    {
-        Vector3 v = transform.localScale;
-        v.x += deltaValue;
-        transform.localScale = v;
-    }
-
-    /// <summary>
-    /// 增加相对尺寸的 y 分量。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="deltaValue">y 分量增量。</param>
-    public static void AddLocalScaleY(this Transform transform, float deltaValue)
-    {
-        Vector3 v = transform.localScale;
-        v.y += deltaValue;
-        transform.localScale = v;
-    }
-
-    /// <summary>
-    /// 增加相对尺寸的 z 分量。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="deltaValue">z 分量增量。</param>
-    public static void AddLocalScaleZ(this Transform transform, float deltaValue)
-    {
-        Vector3 v = transform.localScale;
-        v.z += deltaValue;
-        transform.localScale = v;
-    }
-
-    /// <summary>
-    /// 二维空间下使 <see cref="Transform" /> 指向指向目标点的算法，使用世界坐标。
-    /// </summary>
-    /// <param name="transform"><see cref="Transform" /> 对象。</param>
-    /// <param name="lookAtPoint2D">要朝向的二维坐标点。</param>
-    /// <remarks>假定其 forward 向量为 <see cref="Vector3.up" />。</remarks>
-    public static void LookAt2D(this Transform transform, Vector2 lookAtPoint2D)
-    {
-        Vector3 vector = lookAtPoint2D.ToVector3() - transform.position;
-        vector.y = 0f;
-
-        if (vector.magnitude > 0f)
+        if (layer < 0 || layer > 31)
         {
-            transform.rotation = Quaternion.LookRotation(vector.normalized, Vector3.up);
+            throw new ArgumentOutOfRangeException(nameof(layer), layer, "Unity layer must be between 0 and 31.");
+        }
+
+        Transform[] transforms = gameObject.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            transforms[i].gameObject.layer = layer;
         }
     }
 
-    #endregion Transform
+    /// <summary>
+    /// 将 Vector3 的 XZ 平面分量转换为 Vector2。
+    /// </summary>
+    /// <param name="value">待转换的三维向量。</param>
+    /// <returns>由 XZ 分量组成的二维向量。</returns>
+    public static Vector2 ToVector2(this Vector3 value)
+    {
+        return new Vector2(value.x, value.z);
+    }
+
+    /// <summary>
+    /// 将 Vector2 映射到 Vector3 的 XZ 平面。
+    /// </summary>
+    /// <param name="value">待转换的二维向量。</param>
+    /// <returns>Y 分量为零的三维向量。</returns>
+    public static Vector3 ToVector3(this Vector2 value)
+    {
+        return value.ToVector3(0f);
+    }
+
+    /// <summary>
+    /// 将 Vector2 映射到 Vector3 的 XZ 平面，并指定 Y 分量。
+    /// </summary>
+    /// <param name="value">待转换的二维向量。</param>
+    /// <param name="y">三维向量的 Y 分量。</param>
+    /// <returns>转换后的三维向量。</returns>
+    public static Vector3 ToVector3(this Vector2 value, float y)
+    {
+        return new Vector3(value.x, y, value.y);
+    }
+
+    /// <summary>设置世界坐标的 X 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">新的 X 分量。</param>
+    public static void SetPositionX(this Transform transform, float value)
+    {
+        transform.position = WithX(transform.position, value);
+    }
+
+    /// <summary>设置世界坐标的 Y 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">新的 Y 分量。</param>
+    public static void SetPositionY(this Transform transform, float value)
+    {
+        transform.position = WithY(transform.position, value);
+    }
+
+    /// <summary>设置世界坐标的 Z 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">新的 Z 分量。</param>
+    public static void SetPositionZ(this Transform transform, float value)
+    {
+        transform.position = WithZ(transform.position, value);
+    }
+
+    /// <summary>增加世界坐标的 X 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">X 分量增量。</param>
+    public static void AddPositionX(this Transform transform, float value)
+    {
+        transform.position += new Vector3(value, 0f, 0f);
+    }
+
+    /// <summary>增加世界坐标的 Y 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">Y 分量增量。</param>
+    public static void AddPositionY(this Transform transform, float value)
+    {
+        transform.position += new Vector3(0f, value, 0f);
+    }
+
+    /// <summary>增加世界坐标的 Z 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">Z 分量增量。</param>
+    public static void AddPositionZ(this Transform transform, float value)
+    {
+        transform.position += new Vector3(0f, 0f, value);
+    }
+
+    /// <summary>设置本地坐标的 X 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">新的 X 分量。</param>
+    public static void SetLocalPositionX(this Transform transform, float value)
+    {
+        transform.localPosition = WithX(transform.localPosition, value);
+    }
+
+    /// <summary>设置本地坐标的 Y 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">新的 Y 分量。</param>
+    public static void SetLocalPositionY(this Transform transform, float value)
+    {
+        transform.localPosition = WithY(transform.localPosition, value);
+    }
+
+    /// <summary>设置本地坐标的 Z 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">新的 Z 分量。</param>
+    public static void SetLocalPositionZ(this Transform transform, float value)
+    {
+        transform.localPosition = WithZ(transform.localPosition, value);
+    }
+
+    /// <summary>增加本地坐标的 X 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">X 分量增量。</param>
+    public static void AddLocalPositionX(this Transform transform, float value)
+    {
+        transform.localPosition += new Vector3(value, 0f, 0f);
+    }
+
+    /// <summary>增加本地坐标的 Y 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">Y 分量增量。</param>
+    public static void AddLocalPositionY(this Transform transform, float value)
+    {
+        transform.localPosition += new Vector3(0f, value, 0f);
+    }
+
+    /// <summary>增加本地坐标的 Z 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">Z 分量增量。</param>
+    public static void AddLocalPositionZ(this Transform transform, float value)
+    {
+        transform.localPosition += new Vector3(0f, 0f, value);
+    }
+
+    /// <summary>设置本地缩放的 X 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">新的 X 分量。</param>
+    public static void SetLocalScaleX(this Transform transform, float value)
+    {
+        transform.localScale = WithX(transform.localScale, value);
+    }
+
+    /// <summary>设置本地缩放的 Y 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">新的 Y 分量。</param>
+    public static void SetLocalScaleY(this Transform transform, float value)
+    {
+        transform.localScale = WithY(transform.localScale, value);
+    }
+
+    /// <summary>设置本地缩放的 Z 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">新的 Z 分量。</param>
+    public static void SetLocalScaleZ(this Transform transform, float value)
+    {
+        transform.localScale = WithZ(transform.localScale, value);
+    }
+
+    /// <summary>增加本地缩放的 X 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">X 分量增量。</param>
+    public static void AddLocalScaleX(this Transform transform, float value)
+    {
+        transform.localScale += new Vector3(value, 0f, 0f);
+    }
+
+    /// <summary>增加本地缩放的 Y 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">Y 分量增量。</param>
+    public static void AddLocalScaleY(this Transform transform, float value)
+    {
+        transform.localScale += new Vector3(0f, value, 0f);
+    }
+
+    /// <summary>增加本地缩放的 Z 分量。</summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="value">Z 分量增量。</param>
+    public static void AddLocalScaleZ(this Transform transform, float value)
+    {
+        transform.localScale += new Vector3(0f, 0f, value);
+    }
+
+    /// <summary>
+    /// 在 XZ 平面上朝向指定二维坐标。
+    /// </summary>
+    /// <param name="transform">目标 Transform。</param>
+    /// <param name="target">目标点的 XZ 坐标。</param>
+    public static void LookAt2D(this Transform transform, Vector2 target)
+    {
+        Vector3 position = transform.position;
+        Vector3 direction = new Vector3(target.x - position.x, 0f, target.y - position.z);
+        if (direction.sqrMagnitude > Mathf.Epsilon)
+        {
+            transform.forward = direction.normalized;
+        }
+    }
+
+    private static Vector3 WithX(Vector3 value, float x)
+    {
+        value.x = x;
+        return value;
+    }
+
+    private static Vector3 WithY(Vector3 value, float y)
+    {
+        value.y = y;
+        return value;
+    }
+
+    private static Vector3 WithZ(Vector3 value, float z)
+    {
+        value.z = z;
+        return value;
+    }
 }

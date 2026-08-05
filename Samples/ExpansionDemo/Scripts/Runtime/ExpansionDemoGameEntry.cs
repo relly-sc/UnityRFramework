@@ -115,7 +115,7 @@ public sealed class ExpansionDemoGameEntry : MonoBehaviour
 
         try
         {
-            if (GameEntry.Base == null || GameEntry.Resource == null)
+            if (GameEntry.Framework == null || GameEntry.Resource == null)
             {
                 throw new RFrameworkException(
                     "ExpansionDemo: UnityRFramework prefab is missing.");

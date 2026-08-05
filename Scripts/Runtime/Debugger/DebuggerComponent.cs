@@ -16,7 +16,7 @@ namespace UnityRFramework.Runtime
         [Header("Window")]
         [SerializeField]
         [Tooltip("调试器窗口的激活模式：始终开启、仅开发版、仅编辑器、始终关闭。")]
-        private DebuggerActiveWindowType activeWindowType = DebuggerActiveWindowType.AlwaysOpen;
+        private DebuggerActiveWindowType activeWindowType = DebuggerActiveWindowType.Enabled;
 
         [SerializeField]
         [Tooltip("开关调试器窗口的快捷键。")]
@@ -152,19 +152,19 @@ namespace UnityRFramework.Runtime
             // 根据激活模式设置初始状态
             switch (activeWindowType)
             {
-                case DebuggerActiveWindowType.AlwaysOpen:
+                case DebuggerActiveWindowType.Enabled:
                     ActiveWindow = true;
                     break;
 
-                case DebuggerActiveWindowType.OnlyOpenWhenDevelopment:
+                case DebuggerActiveWindowType.DevelopmentBuildOnly:
                     ActiveWindow = Debug.isDebugBuild;
                     break;
 
-                case DebuggerActiveWindowType.OnlyOpenInEditor:
+                case DebuggerActiveWindowType.EditorOnly:
                     ActiveWindow = Application.isEditor;
                     break;
 
-                case DebuggerActiveWindowType.AlwaysClose:
+                case DebuggerActiveWindowType.Disabled:
                     ActiveWindow = false;
                     break;
             }

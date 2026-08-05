@@ -14,13 +14,29 @@ namespace UnityRFramework.Runtime
     /// </summary>
     public class DebuggerOverlay : MonoBehaviour
     {
+        /// <summary>
+        /// 调试面板缓存的单条 Unity 日志。
+        /// </summary>
         public struct LogEntry
         {
+            /// <summary>日志正文。</summary>
             public string Message;
+
+            /// <summary>日志堆栈。</summary>
             public string StackTrace;
+
+            /// <summary>Unity 日志类型。</summary>
             public LogType Type;
+
+            /// <summary>日志记录时间。</summary>
             public string Time;
 
+            /// <summary>
+            /// 创建日志缓存项。
+            /// </summary>
+            /// <param name="message">日志正文。</param>
+            /// <param name="stackTrace">日志堆栈。</param>
+            /// <param name="type">Unity 日志类型。</param>
             public LogEntry(string message, string stackTrace, LogType type)
             {
                 Message = message;
@@ -30,6 +46,7 @@ namespace UnityRFramework.Runtime
             }
         }
 
+        /// <summary>获取或设置完整调试窗口是否展开。</summary>
         public static bool ActiveWindow { get; set; }
 
         /// <summary>
@@ -54,11 +71,16 @@ namespace UnityRFramework.Runtime
         private static readonly List<LogEntry> logCache = new List<LogEntry>();
         private static readonly object logLock = new object();
 
+        /// <summary>
+        /// 获取当前日志缓存快照。
+        /// </summary>
+        /// <returns>不受后续日志写入影响的列表副本。</returns>
         public static List<LogEntry> GetLogCache()
         {
             lock (logLock) { return new List<LogEntry>(logCache); }
         }
 
+        /// <summary>清空运行时调试日志缓存。</summary>
         public static void ClearLogCache()
         {
             lock (logLock) { logCache.Clear(); }
@@ -136,6 +158,10 @@ namespace UnityRFramework.Runtime
         // 生命周期
         // ============================================================
 
+        /// <summary>
+        /// 在 Debugger 组件下创建运行时覆盖层。
+        /// </summary>
+        /// <param name="component">覆盖层所属的 Debugger 组件。</param>
         internal static void Initialize(DebuggerComponent component)
         {
             GameObject go = new GameObject("[DebuggerOverlay]");
@@ -581,7 +607,7 @@ namespace UnityRFramework.Runtime
                     }));
 
                 // Base
-                BaseComponent baseComponent = GameEntry.Base;
+                UnityRFrameworkController baseComponent = GameEntry.Framework;
                 if (baseComponent != null)
                     moduleInfos.Add(new ModuleDebugInfo("Base", "Running",
                         new Dictionary<string, string>
@@ -604,7 +630,7 @@ namespace UnityRFramework.Runtime
                         }));
 
                 // Event
-                var eventM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IEventModule>();
+                var eventM = RFramework.RFrameworkModuleHost.Get<RFramework.IEventModule>();
                 if (eventM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Event", "Active",
                         new Dictionary<string, string>
@@ -614,13 +640,13 @@ namespace UnityRFramework.Runtime
                         }));
 
                 // Fsm
-                var fsmM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IFsmModule>();
+                var fsmM = RFramework.RFrameworkModuleHost.Get<RFramework.IFsmModule>();
                 if (fsmM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Fsm",
                         string.Format("FSMs: {0}", fsmM.FsmCount), null));
 
                 // Procedure
-                var procM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IProcedureModule>();
+                var procM = RFramework.RFrameworkModuleHost.Get<RFramework.IProcedureModule>();
                 if (procM != null)
                 {
                     var current = procM.CurrentProcedure;
@@ -637,7 +663,7 @@ namespace UnityRFramework.Runtime
                 }
 
                 // Pool
-                var poolM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IPoolModule>();
+                var poolM = RFramework.RFrameworkModuleHost.Get<RFramework.IPoolModule>();
                 if (poolM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Pool",
                         string.Format("Pools: {0}", poolM.PoolCount),
@@ -647,17 +673,17 @@ namespace UnityRFramework.Runtime
                         }));
 
                 // Timer
-                var timerM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ITimerModule>();
+                var timerM = RFramework.RFrameworkModuleHost.Get<RFramework.ITimerModule>();
                 if (timerM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Timer",
                         string.Format("Timers: {0}", timerM.TimerCount), null));
 
                 // Resource
-                var resM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IResourceModule>();
+                var resM = RFramework.RFrameworkModuleHost.Get<RFramework.IResourceModule>();
                 if (resM != null)
                 {
                     ResourceComponent resourceComponent =
-                        UnityRFrameworkComponentEntry.GetComponent<ResourceComponent>();
+                        UnityRFrameworkRuntime.Get<ResourceComponent>();
                     double diskCacheMb = resourceComponent != null
                         ? resourceComponent.DiskCacheSizeBytes / (1024d * 1024d)
                         : 0d;
@@ -677,13 +703,13 @@ namespace UnityRFramework.Runtime
                 }
 
                 // Config
-                var cfgM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IConfigModule>();
+                var cfgM = RFramework.RFrameworkModuleHost.Get<RFramework.IConfigModule>();
                 if (cfgM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Config",
                         string.Format("Tables: {0}", cfgM.ConfigCount), null));
 
                 // Scene
-                var sceneM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ISceneModule>();
+                var sceneM = RFramework.RFrameworkModuleHost.Get<RFramework.ISceneModule>();
                 if (sceneM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -701,19 +727,20 @@ namespace UnityRFramework.Runtime
                 }
 
                 // UI
-                var uiM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IUIModule>();
+                var uiM = RFramework.RFrameworkModuleHost.Get<RFramework.IUIModule>();
                 if (uiM != null)
                     moduleInfos.Add(new ModuleDebugInfo("UI",
                         string.Format("Forms: {0}", uiM.UIFormCount), null));
 
                 // Entity
-                var entM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IEntityModule>();
+                var entM = RFramework.RFrameworkModuleHost.Get<RFramework.IEntityModule>();
                 if (entM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Entity",
-                        string.Format("Entities: {0}  Groups: {1}", entM.EntityCount, entM.EntityGroupCount), null));
+                        string.Format("Entities: {0}  Loading: {1}  Groups: {2}",
+                            entM.EntityCount, entM.LoadingEntityCount, entM.EntityGroupCount), null));
 
                 // Audio
-                var audioM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IAudioModule>();
+                var audioM = RFramework.RFrameworkModuleHost.Get<RFramework.IAudioModule>();
                 if (audioM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Audio",
                         audioM.Muted ? "Muted" : string.IsNullOrEmpty(audioM.CurrentBgmAssetName)
@@ -730,12 +757,14 @@ namespace UnityRFramework.Runtime
                         }));
 
                 // Network
-                var netM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.INetworkModule>();
+                var netM = RFramework.RFrameworkModuleHost.Get<RFramework.INetworkModule>();
                 if (netM != null)
                 {
                     RFramework.INetworkChannel defaultChannel = netM.DefaultChannel;
                     moduleInfos.Add(new ModuleDebugInfo("Network",
-                        netM.IsConnected ? "Connected" : "Disconnected",
+                        defaultChannel != null && defaultChannel.IsConnected
+                            ? "Connected"
+                            : "Disconnected",
                         new Dictionary<string, string>
                         {
                             { "Channels", netM.ChannelCount.ToString() },
@@ -751,7 +780,7 @@ namespace UnityRFramework.Runtime
                 }
 
                 // Localization
-                var locM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ILocalizationModule>();
+                var locM = RFramework.RFrameworkModuleHost.Get<RFramework.ILocalizationModule>();
                 if (locM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Localization",
                         locM.CurrentLanguage ?? "(none)",
@@ -762,7 +791,7 @@ namespace UnityRFramework.Runtime
                         }));
 
                 // WebRequest
-                var webM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IWebRequestModule>();
+                var webM = RFramework.RFrameworkModuleHost.Get<RFramework.IWebRequestModule>();
                 if (webM != null)
                     moduleInfos.Add(new ModuleDebugInfo("WebRequest",
                         string.Format("Active: {0}  Queued: {1}", webM.ActiveRequestCount, webM.QueuedRequestCount), null));
@@ -962,6 +991,12 @@ namespace UnityRFramework.Runtime
             private string status;
             private Dictionary<string, string> details;
 
+            /// <summary>
+            /// 创建模块调试信息快照。
+            /// </summary>
+            /// <param name="name">模块名称。</param>
+            /// <param name="status">状态摘要。</param>
+            /// <param name="details">详细键值信息。</param>
             public ModuleDebugInfo(string name, string status, Dictionary<string, string> details)
             {
                 this.name = name;
@@ -969,8 +1004,13 @@ namespace UnityRFramework.Runtime
                 this.details = details;
             }
 
+            /// <inheritdoc/>
             public string GetModuleName() => name;
+
+            /// <inheritdoc/>
             public string GetStatus() => status;
+
+            /// <inheritdoc/>
             public Dictionary<string, string> GetDetails() => details;
         }
     }

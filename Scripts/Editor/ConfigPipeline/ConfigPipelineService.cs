@@ -407,10 +407,6 @@ namespace UnityRFramework.Editor
         {
             string codeRoot = ResolveDirectory(options.GeneratedCodeDirectory, false);
             string outputRoot = ResolveDirectory(options.ConfigOutputDirectory, false);
-            RemoveLegacyOutputs(
-                outputRoot,
-                new[] { ConfigJsonManifestName, ConfigBinaryManifestName },
-                report);
             string jsonRoot = Path.Combine(outputRoot, JsonOutputFolderName);
             string binaryRoot = Path.Combine(outputRoot, BinaryOutputFolderName);
             HashSet<string> codeFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -511,10 +507,6 @@ namespace UnityRFramework.Editor
             ConfigPipelineReport report)
         {
             string outputRoot = ResolveDirectory(options.LocalizationOutputDirectory, false);
-            RemoveLegacyOutputs(
-                outputRoot,
-                new[] { LocalizationJsonManifestName, LocalizationBinaryManifestName },
-                report);
             string jsonRoot = Path.Combine(outputRoot, JsonOutputFolderName);
             string binaryRoot = Path.Combine(outputRoot, BinaryOutputFolderName);
             HashSet<string> jsonFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -588,59 +580,6 @@ namespace UnityRFramework.Editor
             }
 
             return name;
-        }
-
-        private static void RemoveLegacyOutputs(
-            string outputRoot, IReadOnlyList<string> manifestNames, ConfigPipelineReport report)
-        {
-            for (int manifestIndex = 0; manifestIndex < manifestNames.Count; manifestIndex++)
-            {
-                string manifestPath = Path.Combine(outputRoot, manifestNames[manifestIndex]);
-                if (!File.Exists(manifestPath))
-                {
-                    continue;
-                }
-
-                string[] previous = File.ReadAllLines(manifestPath, Encoding.UTF8);
-                for (int fileIndex = 0; fileIndex < previous.Length; fileIndex++)
-                {
-                    string relative = previous[fileIndex].Trim();
-                    if (string.IsNullOrEmpty(relative))
-                    {
-                        continue;
-                    }
-
-                    string legacyPath = Path.GetFullPath(Path.Combine(outputRoot, relative));
-                    EnsureWithinDirectory(outputRoot, legacyPath);
-                    DeleteGeneratedFile(legacyPath, report);
-                }
-
-                DeleteGeneratedFile(manifestPath, report);
-            }
-        }
-
-        private static void DeleteGeneratedFile(string fullPath, ConfigPipelineReport report)
-        {
-            if (!File.Exists(fullPath))
-            {
-                return;
-            }
-
-            string projectPath = ToProjectPath(fullPath);
-            if (projectPath.StartsWith("Assets/", StringComparison.Ordinal))
-            {
-                if (!AssetDatabase.DeleteAsset(projectPath) && File.Exists(fullPath))
-                {
-                    throw new RFrameworkException(
-                        $"Failed to remove legacy generated file '{projectPath}'.");
-                }
-            }
-            else
-            {
-                File.Delete(fullPath);
-            }
-
-            report.AddMessage("Removed legacy generated file: " + projectPath);
         }
 
         private static bool SynchronizeManifest(

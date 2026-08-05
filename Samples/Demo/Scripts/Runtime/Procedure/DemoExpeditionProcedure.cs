@@ -58,7 +58,7 @@ public sealed class DemoExpeditionProcedure : ProcedureStateBase
     {
         try
         {
-            IAudioModule audio = RFrameworkModuleEntry.GetModule<IAudioModule>();
+            IAudioModule audio = RFrameworkModuleHost.Get<IAudioModule>();
             if (audio != null)
             {
                 await audio.PlayBgmAsync(

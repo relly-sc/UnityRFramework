@@ -141,7 +141,7 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>
-        /// 将 JSON 数组或带 Items 字段的 JSON 对象解析为默认字典表。
+        /// 将 ConfigPipeline 的标准 JSON 表解析为默认字典表。
         /// </summary>
         protected static object ParseJsonToIndexedTable(Type rowType, string json)
         {

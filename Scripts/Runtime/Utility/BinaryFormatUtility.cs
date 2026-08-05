@@ -11,7 +11,7 @@ namespace UnityRFramework.Runtime
     /// </summary>
     public static class BinaryFormatUtility
     {
-        /// <summary>URFC 反射兼容协议版本。</summary>
+        /// <summary>URFC 反射读取协议版本。</summary>
         public const ushort ConfigReflectionVersion = 1;
 
         /// <summary>URFC 生成代码协议版本。</summary>
@@ -19,9 +19,6 @@ namespace UnityRFramework.Runtime
 
         /// <summary>URFM 多表配置容器协议版本。</summary>
         public const ushort ConfigBundleVersion = 1;
-
-        /// <summary>URFL 无校验兼容协议版本。</summary>
-        public const ushort LocalizationLegacyVersion = 1;
 
         /// <summary>URFL CRC32 校验协议版本。</summary>
         public const ushort LocalizationVersion = 2;

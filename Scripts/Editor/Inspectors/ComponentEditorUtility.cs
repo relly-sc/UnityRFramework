@@ -108,12 +108,12 @@ namespace UnityRFramework.Editor
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.LabelField("Runtime Information", EditorStyles.boldLabel);
 
-            if (component is Runtime.BaseComponent baseComponent)
+            if (component is Runtime.UnityRFrameworkController controller)
             {
-                DrawValue("Frame Rate", baseComponent.FrameRate.ToString());
-                DrawValue("Game Speed", baseComponent.GameSpeed.ToString("0.##"));
-                DrawValue("Game Paused", FormatBoolean(baseComponent.IsGamePaused));
-                DrawValue("Run In Background", FormatBoolean(baseComponent.RunInBackground));
+                DrawValue("Frame Rate", controller.FrameRate.ToString());
+                DrawValue("Game Speed", controller.GameSpeed.ToString("0.##"));
+                DrawValue("Game Paused", FormatBoolean(controller.IsGamePaused));
+                DrawValue("Run In Background", FormatBoolean(controller.RunInBackground));
             }
             else if (component is Runtime.AudioComponent audioComponent)
             {
@@ -140,6 +140,7 @@ namespace UnityRFramework.Editor
             else if (component is Runtime.EntityComponent entityComponent)
             {
                 DrawValue("Managed Entities", entityComponent.EntityCount.ToString());
+                DrawValue("Loading Entities", entityComponent.LoadingEntityCount.ToString());
                 DrawValue("Entity Groups", entityComponent.EntityGroupCount.ToString());
             }
             else if (component is Runtime.EventComponent eventComponent)
@@ -160,8 +161,8 @@ namespace UnityRFramework.Editor
             else if (component is Runtime.NetworkComponent networkComponent)
             {
                 DrawValue("Network Channels", networkComponent.ChannelCount.ToString());
-                DrawValue("Default Connected", FormatBoolean(networkComponent.IsConnected));
                 RFramework.INetworkChannel channel = networkComponent.DefaultChannel;
+                DrawValue("Default Connected", FormatBoolean(channel != null && channel.IsConnected));
                 DrawValue("Default Channel", channel != null ? channel.Name : "None");
                 DrawValue("Remote Endpoint", channel != null && !string.IsNullOrEmpty(channel.CurrentIP)
                     ? string.Format("{0}:{1}", channel.CurrentIP, channel.CurrentPort)

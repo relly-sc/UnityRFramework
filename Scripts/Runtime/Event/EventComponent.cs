@@ -15,7 +15,7 @@ namespace UnityRFramework.Runtime
     public sealed class EventComponent : UnityRFrameworkComponent
     {
         /// <summary>
-        /// 事件模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// 事件模块引用，由 Awake 从 RFrameworkModuleHost 获取并缓存。
         /// </summary>
         private IEventModule eventModule;
 
@@ -38,7 +38,7 @@ namespace UnityRFramework.Runtime
         protected override void Awake()
         {
             base.Awake();
-            eventModule = RFrameworkModuleEntry.GetModule<IEventModule>();
+            eventModule = RFrameworkModuleHost.Get<IEventModule>();
             eventModule.OnError += OnModuleError;
         }
 

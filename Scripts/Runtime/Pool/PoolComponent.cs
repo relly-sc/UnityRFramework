@@ -17,7 +17,7 @@ namespace UnityRFramework.Runtime
     public sealed class PoolComponent : UnityRFrameworkComponent
     {
         /// <summary>
-        /// 对象池模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// 对象池模块引用，由 Awake 从 RFrameworkModuleHost 获取并缓存。
         /// </summary>
         private IPoolModule poolModule;
 
@@ -32,7 +32,7 @@ namespace UnityRFramework.Runtime
         protected override void Awake()
         {
             base.Awake();
-            poolModule = RFrameworkModuleEntry.GetModule<IPoolModule>();
+            poolModule = RFrameworkModuleHost.Get<IPoolModule>();
         }
 
         /// <inheritdoc cref="IPoolModule.CreatePool{T}"/>

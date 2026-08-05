@@ -5,110 +5,88 @@ using UnityEngine;
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// 实体 MonoBehaviour 包装器，桥接 IEntity 接口与 Unity GameObject。
-    /// 由 IEntityHelper.CreateEntity 创建，持有 EntityLogic 子组件引用，
-    /// 将 IEntityModule 的生命周期回调转发给 EntityLogic。
-    /// 生命周期方法使用显式接口实现，仅 EntityModule 通过 IEntity 接口调用。
+    /// Unity 实体包装器，将框架生命周期转发给同一对象上的 EntityLogic。
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class Entity : MonoBehaviour, IEntity
     {
-        /// <summary>
-        /// 实体编号。
-        /// </summary>
+        private readonly List<IEntity> children = new List<IEntity>();
+        private EntityLogic logic;
+
+        /// <inheritdoc/>
         public long Id { get; private set; }
 
-        /// <summary>
-        /// 实体当前状态。
-        /// </summary>
-        public EntityStatus Status { get; set; } = EntityStatus.Unknown;
+        /// <inheritdoc/>
+        public EntityStatus Status { get; private set; } = EntityStatus.Unknown;
 
-        /// <summary>
-        /// 实体资源路径。
-        /// </summary>
+        /// <inheritdoc/>
         public string AssetName { get; private set; }
 
-        /// <summary>
-        /// 实体实例对象（即当前 GameObject）。
-        /// </summary>
+        /// <inheritdoc/>
         public object Handle => gameObject;
 
-        /// <summary>
-        /// 实体所属的实体组。
-        /// </summary>
+        /// <inheritdoc/>
         public IEntityGroup Group { get; private set; }
 
-        /// <summary>
-        /// 父实体。
-        /// </summary>
+        /// <inheritdoc/>
         public IEntity Parent { get; private set; }
 
-        /// <summary>
-        /// 子实体列表。
-        /// </summary>
-        private readonly List<IEntity> children = new List<IEntity>();
-
-        /// <summary>
-        /// 获取子实体的只读列表。
-        /// </summary>
+        /// <inheritdoc/>
         public IReadOnlyList<IEntity> Children => children;
 
-        /// <summary>
-        /// 用户扩展逻辑组件引用。
-        /// </summary>
-        private EntityLogic entityLogic;
-
-        void IEntity.OnInit(long entityId, string assetName, IEntityGroup group, bool isNewInstance, object userData)
+        void IEntity.OnInit(long entityId, string assetName, IEntityGroup group, bool isNewInstance,
+            object userData)
         {
             Id = entityId;
             AssetName = assetName;
             Group = group;
-
-            entityLogic = GetComponent<EntityLogic>();
-            if (entityLogic == null)
-            {
-                entityLogic = gameObject.AddComponent<EntityLogic>();
-            }
-
-            entityLogic.OnInit(this, isNewInstance, userData);
+            Parent = null;
+            children.Clear();
+            Status = EntityStatus.WillInit;
+            logic = GetComponent<EntityLogic>();
+            logic?.OnInit(this, isNewInstance, userData);
             Status = EntityStatus.Inited;
         }
 
         void IEntity.OnRecycle()
         {
-            if (entityLogic != null)
+            Status = EntityStatus.WillRecycle;
+            try
             {
-                entityLogic.OnRecycle();
+                logic?.OnRecycle();
             }
-
-            Id = 0;
-            AssetName = null;
-            Group = null;
-            Parent = null;
-            children.Clear();
-            Status = EntityStatus.Recycled;
+            finally
+            {
+                Id = 0;
+                AssetName = null;
+                Group = null;
+                Parent = null;
+                children.Clear();
+                logic = null;
+                Status = EntityStatus.Recycled;
+            }
         }
 
         void IEntity.OnShow(object userData)
         {
+            Status = EntityStatus.WillShow;
             gameObject.SetActive(true);
-            if (entityLogic != null)
-            {
-                entityLogic.OnShow(userData);
-            }
-
+            logic?.OnShow(userData);
             Status = EntityStatus.Showed;
         }
 
         void IEntity.OnHide(bool isShutdown, object userData)
         {
-            if (entityLogic != null)
+            Status = EntityStatus.WillHide;
+            try
             {
-                entityLogic.OnHide(isShutdown, userData);
+                logic?.OnHide(isShutdown, userData);
             }
-
-            gameObject.SetActive(false);
-            Status = EntityStatus.Hidden;
+            finally
+            {
+                gameObject.SetActive(false);
+                Status = EntityStatus.Hidden;
+            }
         }
 
         void IEntity.OnAttached(IEntity childEntity, object userData)
@@ -118,58 +96,36 @@ namespace UnityRFramework.Runtime
                 children.Add(childEntity);
             }
 
-            if (entityLogic != null)
-            {
-                entityLogic.OnAttached(childEntity, userData);
-            }
+            logic?.OnAttached(childEntity, userData);
         }
 
         void IEntity.OnDetached(IEntity childEntity, object userData)
         {
-            if (children.Contains(childEntity))
-            {
-                children.Remove(childEntity);
-            }
-
-            if (entityLogic != null)
-            {
-                entityLogic.OnDetached(childEntity, userData);
-            }
+            children.Remove(childEntity);
+            logic?.OnDetached(childEntity, userData);
         }
 
         void IEntity.OnAttachTo(IEntity parentEntity, object userData)
         {
             Parent = parentEntity;
-
-            Entity parentRuntimeEntity = parentEntity as Entity;
-            if (parentRuntimeEntity != null)
+            if (parentEntity?.Handle is GameObject parentObject)
             {
-                transform.SetParent(parentRuntimeEntity.transform);
+                transform.SetParent(parentObject.transform, true);
             }
 
-            if (entityLogic != null)
-            {
-                entityLogic.OnAttachTo(parentEntity, userData);
-            }
+            logic?.OnAttachTo(parentEntity, userData);
         }
 
         void IEntity.OnDetachFrom(IEntity parentEntity, object userData)
         {
             Parent = null;
-            transform.SetParent(null);
-
-            if (entityLogic != null)
-            {
-                entityLogic.OnDetachFrom(parentEntity, userData);
-            }
+            transform.SetParent(null, true);
+            logic?.OnDetachFrom(parentEntity, userData);
         }
 
         void IEntity.OnUpdate(float elapseSeconds, float realElapseSeconds)
         {
-            if (entityLogic != null)
-            {
-                entityLogic.OnUpdate(elapseSeconds, realElapseSeconds);
-            }
+            logic?.OnUpdate(elapseSeconds, realElapseSeconds);
         }
     }
 }

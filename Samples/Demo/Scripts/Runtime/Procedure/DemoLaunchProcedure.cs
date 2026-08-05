@@ -51,8 +51,8 @@ public class DemoLaunchProcedure : ProcedureStateBase
     {
         try
         {
-            GameEntry.Base.FrameRate = 60;
-            GameEntry.Base.GameSpeed = 1f;
+            GameEntry.Framework.FrameRate = 60;
+            GameEntry.Framework.GameSpeed = 1f;
 
             Log.Info("[Demo] Launch: initializing resource module...");
             await GameEntry.Resource.InitializeAsync();

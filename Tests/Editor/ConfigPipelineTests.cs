@@ -171,27 +171,6 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
-        /// <summary>验证 JSON Helper 仍可读取旧 Items 包装格式。</summary>
-        [Test]
-        public void ConfigJsonReaderSupportsLegacyItemsEnvelope()
-        {
-            const string json =
-                "{\"Items\":[{\"Id\":1,\"Name\":\"Legacy\",\"Price\":3.5}]}";
-            GameObject owner = new GameObject("Legacy Config JSON Tests");
-            try
-            {
-                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
-                object table = helper.ParseConfig(
-                    typeof(TestConfigRow), Encoding.UTF8.GetBytes(json));
-
-                Assert.AreEqual("Legacy", helper.GetConfig<TestConfigRow>(table, 1).Name);
-            }
-            finally
-            {
-                Object.DestroyImmediate(owner);
-            }
-        }
-
         /// <summary>验证带元数据的历史 JSON 只有显式注册迁移器后才能读取。</summary>
         [Test]
         public void ConfigJsonMigratesRegisteredLegacySchema()
@@ -248,30 +227,6 @@ namespace UnityRFramework.Editor.Tests
                 JsonConfigMigrationRegistry.Unregister(
                     typeof(TestConfigRow), legacySchema.SchemaHash);
                 ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
-                Object.DestroyImmediate(owner);
-            }
-        }
-
-        /// <summary>验证多表 JSON 容器会按配置行类型选择对应表。</summary>
-        [Test]
-        public void ConfigJsonReaderSelectsNamedTableFromMultiTableEnvelope()
-        {
-            const string json =
-                "{\"Tables\":{"
-                + "\"Other\":[{\"Id\":9,\"Name\":\"Wrong\",\"Price\":0}],"
-                + "\"TestConfigRow\":[{\"Id\":2,\"Name\":\"Selected\",\"Price\":8.5}]}}";
-            GameObject owner = new GameObject("Multi-table Config JSON Tests");
-            try
-            {
-                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
-                object table = helper.ParseConfig(
-                    typeof(TestConfigRow), Encoding.UTF8.GetBytes(json));
-
-                Assert.AreEqual("Selected", helper.GetConfig<TestConfigRow>(table, 2).Name);
-                Assert.IsNull(helper.GetConfig<TestConfigRow>(table, 9));
-            }
-            finally
-            {
                 Object.DestroyImmediate(owner);
             }
         }
@@ -358,7 +313,7 @@ namespace UnityRFramework.Editor.Tests
             ConfigSchemaRegistry.Register(
                 typeof(TestConfigRow), first.TableId, first.SchemaHash);
             GameObject owner = new GameObject("Config Module Replace Tests");
-            IConfigModule module = RFrameworkModuleEntry.GetModule<IConfigModule>();
+            IConfigModule module = RFrameworkModuleHost.Get<IConfigModule>();
             try
             {
                 JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
@@ -400,7 +355,7 @@ namespace UnityRFramework.Editor.Tests
             ConfigSchemaRegistry.Register(
                 typeof(TestConfigRow), old.TableId, old.SchemaHash);
             GameObject owner = new GameObject("Config Module Bundle Commit Tests");
-            IConfigModule module = RFrameworkModuleEntry.GetModule<IConfigModule>();
+            IConfigModule module = RFrameworkModuleHost.Get<IConfigModule>();
             try
             {
                 JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
@@ -615,9 +570,9 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
-        /// <summary>验证 URFL v2 会拒绝内容损坏，并保留 URFL v1 读取兼容。</summary>
+        /// <summary>验证 URFL v2 会拒绝内容损坏。</summary>
         [Test]
-        public void LocalizationV2RejectsCorruptBodyAndReadsV1()
+        public void LocalizationV2RejectsCorruptBody()
         {
             LocalizationTable source = new LocalizationTable
             {
@@ -630,13 +585,10 @@ namespace UnityRFramework.Editor.Tests
             };
 
             byte[] v2 = LocalizationBinaryExporter.BuildV2(source);
-            byte[] v1 = LocalizationBinaryExporter.BuildV1(source);
             GameObject owner = new GameObject("BinaryLocalizationHelper CRC Tests");
             try
             {
                 BinaryLocalizationHelper helper = owner.AddComponent<BinaryLocalizationHelper>();
-                Assert.AreEqual("Login", helper.ParseLanguage("en", v1)["ui_login"]);
-
                 v2[v2.Length - 1] ^= 0x7f;
                 Assert.Throws<RFrameworkException>(() => helper.ParseLanguage("en", v2));
             }

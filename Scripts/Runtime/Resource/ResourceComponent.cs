@@ -55,7 +55,7 @@ namespace UnityRFramework.Runtime
         private float maxDiskCacheSizeGB = 4f;
 
         /// <summary>
-        /// 资源模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// 资源模块引用，由 Awake 从 RFrameworkModuleHost 获取并缓存。
         /// </summary>
         private IResourceModule resourceModule;
 
@@ -96,10 +96,10 @@ namespace UnityRFramework.Runtime
         protected override void Awake()
         {
             base.Awake();
-            resourceModule = RFrameworkModuleEntry.GetModule<IResourceModule>();
+            resourceModule = RFrameworkModuleHost.Get<IResourceModule>();
 
             // 通过统一 Helper 创建器反射创建 MonoBehaviour 辅助器
-            ResourceHelperBase helper = Helper.CreateHelper<ResourceHelperBase>(resourceHelperTypeName, null);
+            ResourceHelperBase helper = ComponentFactory.Create<ResourceHelperBase>(resourceHelperTypeName, null);
             if (helper != null)
             {
                 helper.name = $"{helper.GetType().Name}";

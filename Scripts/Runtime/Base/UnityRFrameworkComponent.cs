@@ -1,19 +1,18 @@
-
 using UnityEngine;
 
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// 游戏框架组件抽象类。
+    /// 可由 <see cref="GameEntry"/> 查询的框架组件基类。
     /// </summary>
     public abstract class UnityRFrameworkComponent : MonoBehaviour
     {
         /// <summary>
-        /// 游戏框架组件初始化。
+        /// 注册当前组件。
         /// </summary>
         protected virtual void Awake()
         {
-            UnityRFrameworkComponentEntry.RegisterComponent(this);
+            UnityRFrameworkRuntime.Register(this);
         }
     }
 }

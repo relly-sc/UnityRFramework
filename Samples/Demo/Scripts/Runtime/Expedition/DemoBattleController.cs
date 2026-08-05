@@ -243,7 +243,7 @@ public sealed class DemoBattleController : IDisposable
     {
         try
         {
-            IAudioModule audio = RFrameworkModuleEntry.GetModule<IAudioModule>();
+            IAudioModule audio = RFrameworkModuleHost.Get<IAudioModule>();
             if (audio != null)
             {
                 await audio.PlaySfxAsync(assetName, 0.65f);

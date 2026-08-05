@@ -12,7 +12,7 @@ namespace UnityRFramework.Runtime
     /// UnityRFramework 单表二进制协议读取器。
     /// 所有整数均为 little-endian，字符串为 Int32 字节长度 + UTF-8 数据。
     /// Config 支持 URFC v1 反射映射和 URFC v2 生成 Codec 两种格式。
-    /// Localization 使用 URFL v2 Key/Value + CRC32 格式，并兼容读取 v1。
+    /// Localization 使用 URFL v2 Key/Value + CRC32 格式。
     /// </summary>
     internal static class BinaryTableUtility
     {
@@ -410,7 +410,7 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>
-        /// 读取 URFL v1/v2 本地化键值表。
+        /// 读取 URFL v2 本地化键值表。
         /// </summary>
         /// <param name="language">语言代码。</param>
         /// <param name="bytes">URFL 文件字节。</param>
@@ -436,20 +436,11 @@ namespace UnityRFramework.Runtime
                     ReadAndValidateMagic(reader, LocalizationMagic, "localization");
                     ushort version = reader.ReadUInt16();
                     int entryCount = ReadBoundedCount(reader, MaxRows, "localization entry");
-                    if (version == BinaryFormatUtility.LocalizationLegacyVersion)
-                    {
-                        Dictionary<string, string> legacy = ReadLocalizationEntries(
-                            language, reader, entryCount);
-                        EnsureFullyConsumed(stream, "localization");
-                        return legacy;
-                    }
-
                     if (version != BinaryFormatUtility.LocalizationVersion)
                     {
                         throw new RFrameworkException(
                             $"Binary localization version '{version}' is not supported. "
-                            + $"Expected '{BinaryFormatUtility.LocalizationLegacyVersion}' or "
-                            + $"'{BinaryFormatUtility.LocalizationVersion}'.");
+                            + $"Expected '{BinaryFormatUtility.LocalizationVersion}'.");
                     }
 
                     int bodyLength = reader.ReadInt32();

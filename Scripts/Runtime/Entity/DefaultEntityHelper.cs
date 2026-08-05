@@ -5,66 +5,39 @@ using Object = UnityEngine.Object;
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// 默认实体辅助器实现。
-    /// 使用纯 Unity API（Instantiate / Destroy）完成实体实例化和销毁。
-    /// 资源加载由 IResourceModule 负责，此 Helper 只处理 Instantiate/Create/Release。
+    /// 基于 Unity Instantiate/Destroy 的默认实体 Helper。
     /// </summary>
-    public class DefaultEntityHelper : EntityHelperBase
+    public sealed class DefaultEntityHelper : EntityHelperBase
     {
-        /// <inheritdoc cref="IEntityHelper.InstantiateEntity"/>
+        /// <inheritdoc/>
         public override object InstantiateEntity(object entityAsset)
         {
-            if (entityAsset == null)
+            if (!(entityAsset is GameObject prefab))
             {
-                Log.Error("Entity asset is invalid.");
-                return null;
-            }
-
-            GameObject prefab = entityAsset as GameObject;
-            if (prefab == null)
-            {
-                Log.Error("Entity asset '{0}' is not a GameObject.", entityAsset);
-                return null;
+                throw new RFrameworkException("Entity asset is not a GameObject.");
             }
 
             return Object.Instantiate(prefab);
         }
 
-        /// <inheritdoc cref="IEntityHelper.CreateEntity"/>
+        /// <inheritdoc/>
         public override IEntity CreateEntity(object entityInstance, IEntityGroup group, object userData)
         {
-            if (entityInstance == null)
+            if (!(entityInstance is GameObject instance))
             {
-                Log.Error("Entity instance is invalid.");
-                return null;
+                throw new RFrameworkException("Entity instance is not a GameObject.");
             }
 
-            GameObject go = entityInstance as GameObject;
-            if (go == null)
-            {
-                Log.Error("Entity instance '{0}' is not a GameObject.", entityInstance);
-                return null;
-            }
-
-            // 在 GameObject 上添加 Entity 包装器组件
-            Entity entity = go.GetOrAddComponent<Entity>();
-            return entity;
+            return instance.GetOrAddComponent<Entity>();
         }
 
-        /// <inheritdoc cref="IEntityHelper.ReleaseEntity"/>
+        /// <inheritdoc/>
         public override void ReleaseEntity(object entityAsset, object entityInstance)
         {
-            if (entityInstance != null)
+            if (entityInstance is GameObject instance)
             {
-                GameObject go = entityInstance as GameObject;
-                if (go != null)
-                {
-                    Object.Destroy(go);
-                }
+                Object.Destroy(instance);
             }
-
-            // 资源释放由 IResourceModule.UnloadAsset 负责
-            // 此处不调用 UnloadAsset，因为 EntityModule 内部会在合适时机统一释放
         }
     }
 }

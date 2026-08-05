@@ -11,7 +11,7 @@ namespace UnityRFramework.Runtime
     /// <summary>
     /// WebRequest 辅助器基类。
     /// 继承自 MonoBehaviour 并实现 IWebRequestHelper 接口，使 Runtime 层辅助器
-    /// 可以通过 <see cref="Helper.CreateHelper{T}(string, T)"/> 统一创建为场景中的 GameObject，
+    /// 可以通过 <see cref="ComponentFactory.Create{T}(string, T)"/> 统一创建为场景中的 GameObject，
     /// 同时仍能以接口形式注入到 Library 层的 WebRequestModule。
     /// </summary>
     /// <remarks>

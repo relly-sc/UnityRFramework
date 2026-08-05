@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// NetworkComponent 自定义 Inspector。
     /// </summary>
     [CustomEditor(typeof(Runtime.NetworkComponent))]
-    public sealed class NetworkComponentEditor : RFrameworkComponentEditor
+    public sealed class NetworkComponentEditor : UnityRFrameworkComponentEditorBase
     {
         private SerializedProperty networkHelperTypeName;
         private SerializedProperty heartbeatInterval;

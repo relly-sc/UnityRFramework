@@ -620,7 +620,7 @@ namespace UnityRFramework.Editor
                     }));
 
                 // Base
-                Runtime.BaseComponent baseComponent = Runtime.GameEntry.Base;
+                Runtime.UnityRFrameworkController baseComponent = Runtime.GameEntry.Framework;
                 if (baseComponent != null)
                 {
                     var details = new Dictionary<string, string>
@@ -647,7 +647,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Event
-                var eventM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IEventModule>();
+                var eventM = RFramework.RFrameworkModuleHost.Get<RFramework.IEventModule>();
                 if (eventM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -659,13 +659,13 @@ namespace UnityRFramework.Editor
                 }
 
                 // Fsm
-                var fsmM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IFsmModule>();
+                var fsmM = RFramework.RFrameworkModuleHost.Get<RFramework.IFsmModule>();
                 if (fsmM != null)
                     moduleInfos.Add(new ModuleDebugInfo("Fsm",
                         string.Format("FSMs: {0}", fsmM.FsmCount), null));
 
                 // Procedure
-                var procM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IProcedureModule>();
+                var procM = RFramework.RFrameworkModuleHost.Get<RFramework.IProcedureModule>();
                 if (procM != null)
                 {
                     var current = procM.CurrentProcedure;
@@ -679,7 +679,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Pool
-                var poolM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IPoolModule>();
+                var poolM = RFramework.RFrameworkModuleHost.Get<RFramework.IPoolModule>();
                 if (poolM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -691,7 +691,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Timer
-                var timerM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ITimerModule>();
+                var timerM = RFramework.RFrameworkModuleHost.Get<RFramework.ITimerModule>();
                 if (timerM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -703,11 +703,11 @@ namespace UnityRFramework.Editor
                 }
 
                 // Resource
-                var resM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IResourceModule>();
+                var resM = RFramework.RFrameworkModuleHost.Get<RFramework.IResourceModule>();
                 if (resM != null)
                 {
                     Runtime.ResourceComponent resourceComponent =
-                        Runtime.UnityRFrameworkComponentEntry.GetComponent<Runtime.ResourceComponent>();
+                        Runtime.UnityRFrameworkRuntime.Get<Runtime.ResourceComponent>();
                     double diskCacheMb = resourceComponent != null
                         ? resourceComponent.DiskCacheSizeBytes / (1024d * 1024d)
                         : 0d;
@@ -727,7 +727,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Config
-                var cfgM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IConfigModule>();
+                var cfgM = RFramework.RFrameworkModuleHost.Get<RFramework.IConfigModule>();
                 if (cfgM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -739,7 +739,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Scene
-                var sceneM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ISceneModule>();
+                var sceneM = RFramework.RFrameworkModuleHost.Get<RFramework.ISceneModule>();
                 if (sceneM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -757,7 +757,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // UI
-                var uiM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IUIModule>();
+                var uiM = RFramework.RFrameworkModuleHost.Get<RFramework.IUIModule>();
                 if (uiM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -769,20 +769,22 @@ namespace UnityRFramework.Editor
                 }
 
                 // Entity
-                var entM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IEntityModule>();
+                var entM = RFramework.RFrameworkModuleHost.Get<RFramework.IEntityModule>();
                 if (entM != null)
                 {
                     var details = new Dictionary<string, string>
                     {
                         { "Entities", entM.EntityCount.ToString() },
+                        { "Loading", entM.LoadingEntityCount.ToString() },
                         { "Groups", entM.EntityGroupCount.ToString() }
                     };
                     moduleInfos.Add(new ModuleDebugInfo("Entity",
-                        string.Format("Entities: {0}  Groups: {1}", entM.EntityCount, entM.EntityGroupCount), details));
+                        string.Format("Entities: {0}  Loading: {1}  Groups: {2}",
+                            entM.EntityCount, entM.LoadingEntityCount, entM.EntityGroupCount), details));
                 }
 
                 // Audio
-                var audioM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IAudioModule>();
+                var audioM = RFramework.RFrameworkModuleHost.Get<RFramework.IAudioModule>();
                 if (audioM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -801,7 +803,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // Network
-                var netM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.INetworkModule>();
+                var netM = RFramework.RFrameworkModuleHost.Get<RFramework.INetworkModule>();
                 if (netM != null)
                 {
                     RFramework.INetworkChannel defaultChannel = netM.DefaultChannel;
@@ -818,11 +820,13 @@ namespace UnityRFramework.Editor
                         { "Auto Reconnect", (defaultChannel != null && defaultChannel.AutoReconnect).ToString() }
                     };
                     moduleInfos.Add(new ModuleDebugInfo("Network",
-                        netM.IsConnected ? "Connected" : "Disconnected", details));
+                        defaultChannel != null && defaultChannel.IsConnected
+                            ? "Connected"
+                            : "Disconnected", details));
                 }
 
                 // Localization
-                var locM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.ILocalizationModule>();
+                var locM = RFramework.RFrameworkModuleHost.Get<RFramework.ILocalizationModule>();
                 if (locM != null)
                 {
                     var details = new Dictionary<string, string>
@@ -835,7 +839,7 @@ namespace UnityRFramework.Editor
                 }
 
                 // WebRequest
-                var webM = RFramework.RFrameworkModuleEntry.GetModule<RFramework.IWebRequestModule>();
+                var webM = RFramework.RFrameworkModuleHost.Get<RFramework.IWebRequestModule>();
                 if (webM != null)
                 {
                     var details = new Dictionary<string, string>

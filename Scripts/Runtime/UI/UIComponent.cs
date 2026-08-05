@@ -36,7 +36,7 @@ namespace UnityRFramework.Runtime
         {
             base.Awake();
 
-            uiModule = RFrameworkModuleEntry.GetModule<IUIModule>();
+            uiModule = RFrameworkModuleHost.Get<IUIModule>();
             if (uiModule == null)
             {
                 Log.Error("Can not find module '{0}'.", nameof(IUIModule));
@@ -44,13 +44,13 @@ namespace UnityRFramework.Runtime
             }
 
             // 注入依赖模块
-            IResourceModule resourceModule = RFrameworkModuleEntry.GetModule<IResourceModule>();
-            IEventModule eventModule = RFrameworkModuleEntry.GetModule<IEventModule>();
-            IPoolModule poolModule = RFrameworkModuleEntry.GetModule<IPoolModule>();
+            IResourceModule resourceModule = RFrameworkModuleHost.Get<IResourceModule>();
+            IEventModule eventModule = RFrameworkModuleHost.Get<IEventModule>();
+            IPoolModule poolModule = RFrameworkModuleHost.Get<IPoolModule>();
             uiModule.SetDependencies(resourceModule, eventModule, poolModule);
 
             // 创建并注入 UI 辅助器
-            UIHelperBase uiHelper = Helper.CreateHelper<UIHelperBase>(uiHelperTypeName, null);
+            UIHelperBase uiHelper = ComponentFactory.Create<UIHelperBase>(uiHelperTypeName, null);
             if (uiHelper != null)
             {
                 uiModule.SetHelper(uiHelper);

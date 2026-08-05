@@ -35,6 +35,7 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 - 每一次成功的 `Resource.LoadAssetAsync` / `LoadAssetSync` 都必须对应一次 `UnloadAsset`。若同一对象可能由多个路径或类型加载，使用 `UnloadAsset<T>(location)` 精确归还；旧对象参数重载遇到歧义会抛异常。框架打开的 UI 和显示的 Entity 已自行归还其资源引用，业务层直接加载的资源仍由业务层归还。
 - `LoadAssetSync` 不会与相同资源的在途异步加载并行执行；此时应改为等待 `LoadAssetAsync`。`Scene.LoadSceneAsync` 的取消令牌只在操作开始前有效，底层场景加载一旦开始不承诺中途取消或回滚；`Single` 成功后只保留新场景账本。
 - `Event.FireAsync` 可跨线程入队、主线程分发；一个事件处理器异常不会丢弃同帧其余排队事件。框架内部生命周期通知使用 `FireSafely`，订阅者异常包装为 `RFrameworkException` 后经 `IEventModule.OnError` 交给 Runtime 记录，不会回滚已经成功的模块操作。
+- Entity 的加载编号从请求开始即被占用，`HideEntity` 可取消仍在加载的请求。生命周期回调失败时模块会先清理实体索引、分组和实例所有权再抛出异常；父子附加禁止形成环，一个实体更新失败不会阻断同组其他实体本帧更新。
 - 网络 Helper 的回调会切回 `NetworkChannel.Update` 所在主线程处理。TCP 默认 Helper 的建连不会同步阻塞 Unity 主线程，WebSocket 不使用公开 `async void` 或同步等待关闭；主动 `Disconnect` 会发布一次断开事件。接收队列与单帧分发均有上限，过载时丢弃后续数据包而非无限占用内存。
 - Runtime 提供的 TCP、UDP、WebSocket Helper 只用于保证基础连接、收发和关闭链路可运行，尚未经过生产环境的严格验证。正式项目必须按自身协议、安全、弱网、移动平台后台和并发需求扩展 `INetworkHelper`，并完成目标平台压力与异常测试。
 - `LoadSceneAsync` 的内置 Resource Helper 当前只支持 `activateOnLoad: true`；延迟激活没有配套激活句柄，因此会显式抛出不支持异常而不会永久等待。
@@ -84,8 +85,8 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 
 | 模块 | 职责 | 入口 |
 |------|------|------|
-| **Base** | 框架基础设施：Helpers 注入、Update 驱动、帧率/游戏速度控制 | `GameEntry.Base` |
-| **Log** | 控制台 + 文件双输出，分卷归档，级别过滤 | `Log.Info/Warning/Error` |
+| **Framework** | 框架启动/停止、模块逐帧调度、全局 Helper 安装及运行参数控制 | `GameEntry.Framework` |
+| **Log** | Unity Console + 本地日志文件输出，按大小分卷并清理过期文件 | `Log.Info/Warning/Error` |
 | **Event** | 解耦消息通信，类型路由，`Fire<T>`（零 GC）+ `FireSafely<T>`（生命周期通知）+ `FireAsync<T>`（线程安全） | `GameEntry.Event` |
 | **Pool** | GameObject 池 + class 池，委托注入，预热 | `GameEntry.Pool` |
 | **Timer** | delay/interval/duration/maxTriggerCount 四参数计时器 | `GameEntry.Timer` |
@@ -94,7 +95,7 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 | **Config** | 配置表管理与查询，默认 JSON + 内置 URFC 二进制，可扩展自定义格式 | `GameEntry.Config` |
 | **Fsm** | 同步通用有限状态机，泛型 Owner，生命周期异常后停止运行 | `GameEntry.Fsm` |
 | **Procedure** | 同步游戏流程 FSM，Blackboard 跨状态共享数据 | `GameEntry.Procedure` |
-| **Entity** | 游戏实体生命周期，实体组+对象池，父子附加 | `GameEntry.Entity` |
+| **Entity** | 游戏实体生命周期，实体组自管实例缓存，父子附加 | `GameEntry.Entity` |
 | **Scene** | 场景异步加载/卸载，状态追踪，防并发 | `GameEntry.Scene` |
 | **UI** | UI 窗口栈管理，层级排序，FullScreen 自动隐藏 | `GameEntry.UI` |
 | **Audio** | BGM/SFX/UI 三组，AudioSource 池，淡入淡出 | `GameEntry.Audio` |
@@ -107,38 +108,37 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 
 ```csharp
 GameEntry.Pool.CreateGameObjectPool("Bullet", bulletPrefab, parent: bulletRoot);
-GameEntry.Base.FrameRate = 60;
+GameEntry.Framework.FrameRate = 60;
 GameEntry.Localization.GetString("ui_login_button");
 GameEntry.Network.CreateChannel("Chat").ConnectAsync("127.0.0.1", 9000);
 ```
 
 ## 使用说明
 
-### Base
+### Framework
 
 ```csharp
 // 帧率与游戏速度
-GameEntry.Base.FrameRate = 60;
-GameEntry.Base.GameSpeed = 1.5f;
+GameEntry.Framework.FrameRate = 60;
+GameEntry.Framework.GameSpeed = 1.5f;
 
 // 暂停/恢复
-GameEntry.Base.PauseGame();
-GameEntry.Base.ResumeGame();
+GameEntry.Framework.PauseGame();
+GameEntry.Framework.ResumeGame();
 
 // 后台运行与休眠
-GameEntry.Base.RunInBackground = true;
-GameEntry.Base.NeverSleep = true;
+GameEntry.Framework.RunInBackground = true;
+GameEntry.Framework.NeverSleep = true;
 ```
 
-`BaseComponent` 在框架初始化时安装三类全局 Utility Helper：
+`UnityRFrameworkController` 以 `-10000` 执行顺序负责框架启动、逐帧调度和停止，并在初始化时安装日志接收器与 JSON Helper：
 
-| Helper | 默认实现 | 可选实现 | 区别与注意事项 |
+| 类型 | 默认实现 | 可选实现 | 区别与注意事项 |
 |---|---|---|---|
-| Text | `DefaultTextHelper` | 项目自定义 `ITextHelper` | 使用线程本地 `StringBuilder` 完成框架格式化；通常无需替换。 |
-| Log | `DefaultLogHelper` | 项目自定义 `ILogHelper` | 同时写 Unity Console 和日志文件。桌面平台写到应用数据目录同级的 `Logs/RFramework`，移动平台写到 `persistentDataPath/Logs/RFramework`；包含分卷和过期清理。 |
+| Log | `DefaultLogSink` | 项目自定义 `ILogSink` | 同时写 Unity Console 和日志文件。桌面平台写到应用数据目录同级的 `Logs/UnityRFramework`，移动平台写到 `persistentDataPath/Logs/UnityRFramework`；包含分卷和过期清理。 |
 | JSON | `DefaultJsonHelper` | `NewtonsoftJsonHelper`、项目自定义 `IJsonHelper` | 只服务 `Utility.Json`，不决定 Config/Localization 的文件格式。 |
 
-`BaseComponent` 的 `JSON Helper` 默认使用 `DefaultJsonHelper`（`JsonUtility`），
+`UnityRFrameworkController` 的 `JSON Helper` 默认使用 `DefaultJsonHelper`（`JsonUtility`），
 保证最小配置即可启动。需要属性、字典、顶层数组或更完整的 JSON 兼容性时，可在
 Inspector 下拉框切换为 `UnityRFramework.Runtime.NewtonsoftJsonHelper`：
 
@@ -162,9 +162,10 @@ Log.Warning("资源 {0} 加载超时", assetPath);
 Log.Error("连接服务器失败：{0}", errorMessage);
 ```
 
-Log 模块不单独创建 Helper；它使用 Base 初始化的 `ILogHelper`。默认
-`DefaultLogHelper` 会落盘，若项目不允许写本地日志、需要上传日志或需要接入平台 SDK，
-应替换 Base 的 Log Helper，而不是修改业务调用点。
+Log 不是独立模块；它使用 Framework 初始化的 `ILogSink`。Runtime 的 `Log` API
+采用安全写入，框架尚未启动或已经停止时会忽略迟到日志，避免异步收尾影响关闭流程。默认
+`DefaultLogSink` 会落盘，若项目不允许写本地日志、需要上传日志或需要接入平台 SDK，
+应替换 Framework 的 Log Sink，而不是修改业务调用点。
 
 ### Event
 
@@ -368,7 +369,7 @@ JSON 与 URFC v2 均支持显式历史 Schema 迁移。二进制实现 `IBinaryC
 均拒绝。JSON 新格式为 `Tables -> 表名 -> { TableId, SchemaHash, Rows }`；旧的
 `Tables -> 数组`、`Items` 和顶层数组仍可读取，但无 SchemaHash，不能参与显式迁移。
 
-框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Config 第一行任意位置以 `!` 开头的字段名表示整列策划备注，该列不会进入校验、代码、SchemaHash、JSON 或二进制产物。Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具同时生成 JSON、配置行、静态 Codec、URFC v2、URFM v1 多表容器、带 CRC32 的 URFL v2 和 URLM v1 多语言容器，并仅在内容变化时写入。默认流程由 Excel 手动导出 UTF-8 CSV，再由工具生成 JSON/`.bytes`。可选 Expansion 提供 ExcelDataReader Editor 工具，以明确分区直接把 `.xlsx` / `.xls` Config 导出为 JSON、URFC v2 和配置代码，把 Localization 导出为 JSON、URFL v2 和 URLM v1，不让 Excel 依赖进入 Runtime。Config 的 JSON/`.bytes` 共用一个输出目录，Localization 也共用一个输出目录，两类模块的输出目录必须分开。生成命名空间留空时，配置行和 Codec 生成到全局命名空间。Runtime 仍兼容读取无 CRC 的 URFL v1。独立验收场景位于 `Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance`，固定源数据位于 `Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline`；测试只使用 `Acceptance_*` 数据，不依赖 Samples/Demo。Demo 的 `Demo_*` 源文件、生成代码和运行时产物分别位于 `Samples/Demo/ConfigSource`、`Samples/Demo/Generated`、`Samples/Demo/GameAssets/Resources`。可通过 `UnityRFramework/Tests` 下的菜单导出测试数据、重建场景、运行 Play Mode 验收或构建包含 Test Assemblies 的专用 Player。
+框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Config 第一行任意位置以 `!` 开头的字段名表示整列策划备注，该列不会进入校验、代码、SchemaHash、JSON 或二进制产物。Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具同时生成 JSON、配置行、静态 Codec、URFC v2、URFM v1 多表容器、带 CRC32 的 URFL v2 和 URLM v1 多语言容器，并仅在内容变化时写入。默认流程由 Excel 手动导出 UTF-8 CSV，再由工具生成 JSON/`.bytes`。可选 Expansion 提供 ExcelDataReader Editor 工具，以明确分区直接把 `.xlsx` / `.xls` Config 导出为 JSON、URFC v2 和配置代码，把 Localization 导出为 JSON、URFL v2 和 URLM v1，不让 Excel 依赖进入 Runtime。Config 的 JSON/`.bytes` 共用一个输出目录，Localization 也共用一个输出目录，两类模块的输出目录必须分开。生成命名空间留空时，配置行和 Codec 生成到全局命名空间。独立验收场景位于 `Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance`，固定源数据位于 `Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline`；测试只使用 `Acceptance_*` 数据，不依赖 Samples/Demo。Demo 的 `Demo_*` 源文件、生成代码和运行时产物分别位于 `Samples/Demo/ConfigSource`、`Samples/Demo/Generated`、`Samples/Demo/GameAssets/Resources`。可通过 `UnityRFramework/Tests` 下的菜单导出测试数据、重建场景、运行 Play Mode 验收或构建包含 Test Assemblies 的专用 Player。
 
 同一业务集合需要拆成多个源文件时，使用 `逻辑表名@分片名.csv`，例如
 `Warrior@1000_1999.csv` 与 `Warrior@2000_2999.csv`。两者只生成一个 `WarriorConfig`，
@@ -396,7 +397,7 @@ Config JSON 使用框架内置的受限解析器按公开字段类型精确转�
 Config JSON 根结构为 `Tables -> 分片名 -> { TableId, SchemaHash, Rows }`；手动 CSV
 流程以文件名作为分片名，`@` 前部分作为逻辑表名。Expansion Excel 工具在单 Sheet
 工作簿中使用文件名，在多 Sheet 工作簿中使用 Sheet 名。
-Runtime 仍兼容旧 `Items`、顶层数组和旧多表数组结构。
+Config JSON 使用当前 `Tables -> 分片名 -> { TableId, SchemaHash, Rows }` 结构；历史结构需要先转换，或通过显式注册的迁移器升级。
 
 ConfigPipeline 支持项目注册自定义标量字段 Codec。实现 `IConfigFieldCodec` 后，需要提供
 唯一类型关键字、公开的运行时类型、与其对应的完整 C# 类型名、大于 0 的 `SchemaVersion`、CSV 解析、
@@ -437,7 +438,7 @@ public class LoginProcedure : ProcedureStateBase
     public override void OnEnter()
     {
         string serverIP = GameEntry.Procedure.Blackboard.Get<string>("ServerIP");
-        connectTask = GameEntry.Network.ConnectAsync(serverIP, 9000);
+        connectTask = GameEntry.Network.DefaultChannel.ConnectAsync(serverIP, 9000);
     }
 
     public override void OnUpdate(float elapseSeconds, float realElapseSeconds)
@@ -469,6 +470,9 @@ Procedure 模块没有 Helper，内部复用同步生命周期约定；异步 I/
 ### Entity
 
 ```csharp
+// 实体组容量是整个组的缓存总上限；0 表示不限制。
+GameEntry.Entity.CreateEntityGroup("DefaultGroup", 30f, 32, 120f);
+
 // 加载并显示实体（需指定实体组名称）
 long playerId = 1001;
 var player = await GameEntry.Entity.ShowEntityAsync(playerId, "Prefabs/Player.prefab", "DefaultGroup");
@@ -478,11 +482,11 @@ long weaponId = 2001;
 await GameEntry.Entity.ShowEntityAsync(weaponId, "Prefabs/Sword.prefab", "DefaultGroup");
 GameEntry.Entity.AttachEntity(weaponId, playerId);
 
-// 隐藏（进入对象池等待复用或销毁）
+// 隐藏（进入组内实例缓存等待复用或释放）
 GameEntry.Entity.HideEntity(playerId);
 
 // 场景中预先放置的实体可挂 SceneEntityBinder，或通过代码登记。
-// 它参与实体组、查询、更新和父子附加，但不会进入对象池或被模块销毁。
+// 它参与实体组、查询、更新和父子附加，但不会进入实例缓存或被模块销毁。
 IEntity sceneNpc = GameEntry.Entity.RegisterSceneEntity(
     sceneNpcObject, 10001, "SceneNpc", "Scene", createGroupIfMissing: true);
 GameEntry.Entity.UnregisterSceneEntity(10001);
@@ -490,8 +494,9 @@ GameEntry.Entity.UnregisterSceneEntity(10001);
 
 `DefaultEntityHelper` 只负责对 Resource 返回的 Prefab 执行 `Instantiate/Destroy`，
 不加载资源、不解释路径；地址规则完全取决于当前 Resource Helper。
-`DefaultEntityGroupHelper` 是可选的空标记实现，实体组对象池参数仍由 EntityModule 管理；
-项目需要为实体组附加额外策略时可实现 `IEntityGroupHelper`。
+Entity 使用自身的按资源地址缓存，不依赖通用 Pool 模块。`AutoReleaseInterval` 控制扫描间隔，
+`ExpireTime` 控制闲置过期时间，`Capacity` 是整个组的缓存总上限。场景实体由外部持有，
+注销和框架关闭时只结束生命周期，不销毁其 GameObject。
 
 ### Scene
 
@@ -566,9 +571,10 @@ LocalFile 在 Android/WebGL 或文件音频场景应使用 `PlayBgmAsync/PlaySfx
 
 ```csharp
 // 单服务器
-await GameEntry.Network.ConnectAsync("127.0.0.1", 9000);
-GameEntry.Network.RegisterHandler(1001, OnMessage);
-GameEntry.Network.Send(1001, data);
+var channel = GameEntry.Network.DefaultChannel;
+channel.RegisterHandler(1001, OnMessage);
+await channel.ConnectAsync("127.0.0.1", 9000);
+channel.Send(1001, data);
 
 // 多服务器
 var login = GameEntry.Network.CreateChannel("Login");
@@ -663,3 +669,9 @@ Localization Helper 只负责解析和默认地址推导，实际文件仍由 Re
 - [GameFramework](https://github.com/EllanJiang/GameFramework) — 架构蓝本
 - [UniFramework](https://github.com/gmhevinci/UniFramework) — 轻量工具集参考
 - [TEngine](https://github.com/Alex-Rachel/TEngine) — 资源与模块组织参考
+
+## 许可证与第三方声明
+
+UnityRFramework 原创代码采用 [Apache License 2.0](./LICENSE)。随包 DLL、字体、Demo
+素材、UPM 依赖及可选 Expansion 集成的来源和许可证见
+[THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md)。各第三方内容继续适用其原许可证。

@@ -12,7 +12,7 @@ namespace UnityRFramework.Editor
     /// 使用筛选后的 KeyCode 下拉框替代默认的巨大枚举列表，解决弹窗漂移问题。
     /// </summary>
     [CustomEditor(typeof(Runtime.DebuggerComponent))]
-    public sealed class DebuggerComponentEditor : RFrameworkComponentEditor
+    public sealed class DebuggerComponentEditor : UnityRFrameworkComponentEditorBase
     {
         /// <summary>
         /// Toggle Key 可选键范围：F1-F12 + ~/Tab/Esc/Space/Enter。

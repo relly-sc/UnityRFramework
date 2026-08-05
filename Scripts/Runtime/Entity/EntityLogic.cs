@@ -4,57 +4,56 @@ using UnityEngine;
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// 实体逻辑基类，用户继承此类编写实体行为。
-    /// 生命周期方法使用 protected internal virtual：
-    /// - protected：子类可重写
-    /// - internal：Entity（同程序集）可调用
-    /// - 外部不可直接调用
+    /// 实体业务逻辑基类。仅重写实际需要的生命周期方法。
     /// </summary>
-    /// <remarks>
-    /// 设计约束：EntityLogic 是用户扩展点，不是 God Class。
-    /// 如果逻辑过多，应拆分为多个独立组件。
-    /// </remarks>
     public class EntityLogic : MonoBehaviour
     {
-        /// <summary>
-        /// 所属的 Entity 包装器引用。
-        /// </summary>
+        /// <summary>获取当前显示周期绑定的实体包装器。</summary>
         public Entity Owner { get; private set; }
 
+        /// <summary>为本次显示周期绑定实体包装器。</summary>
         protected internal virtual void OnInit(Entity owner, bool isNewInstance, object userData)
         {
             Owner = owner;
         }
 
+        /// <summary>结束本次显示周期。</summary>
         protected internal virtual void OnRecycle()
         {
             Owner = null;
         }
 
+        /// <summary>实体显示通知。</summary>
         protected internal virtual void OnShow(object userData)
         {
         }
 
+        /// <summary>实体隐藏通知。</summary>
         protected internal virtual void OnHide(bool isShutdown, object userData)
         {
         }
 
+        /// <summary>增加子实体通知。</summary>
         protected internal virtual void OnAttached(IEntity childEntity, object userData)
         {
         }
 
+        /// <summary>移除子实体通知。</summary>
         protected internal virtual void OnDetached(IEntity childEntity, object userData)
         {
         }
 
+        /// <summary>挂到父实体通知。</summary>
         protected internal virtual void OnAttachTo(IEntity parentEntity, object userData)
         {
         }
 
+        /// <summary>脱离父实体通知。</summary>
         protected internal virtual void OnDetachFrom(IEntity parentEntity, object userData)
         {
         }
 
+        /// <summary>实体组逐帧更新通知。</summary>
         protected internal virtual void OnUpdate(float elapseSeconds, float realElapseSeconds)
         {
         }

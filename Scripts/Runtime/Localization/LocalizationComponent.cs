@@ -18,8 +18,6 @@ namespace UnityRFramework.Runtime
         private const string FallbackLanguage = "zh-CN";
         private const string JsonHelperTypeName =
             "UnityRFramework.Runtime.JsonLocalizationHelper";
-        private const string LegacyJsonHelperTypeName =
-            "UnityRFramework.Runtime.DefaultLocalizationHelper";
         [SerializeField]
         [Tooltip("本地化解析辅助器类型。默认按 UTF-8 JSON 解析。")]
         private string localizationHelperTypeName = JsonHelperTypeName;
@@ -52,21 +50,19 @@ namespace UnityRFramework.Runtime
             base.Awake();
             lifetimeCts = new CancellationTokenSource();
 
-            localizationModule = RFrameworkModuleEntry.GetModule<ILocalizationModule>();
+            localizationModule = RFrameworkModuleHost.Get<ILocalizationModule>();
             if (localizationModule == null)
             {
                 Log.Error("Can not find module '{0}'.", nameof(ILocalizationModule));
                 return;
             }
 
-            if (string.IsNullOrEmpty(localizationHelperTypeName)
-                || string.Equals(localizationHelperTypeName, LegacyJsonHelperTypeName,
-                    StringComparison.Ordinal))
+            if (string.IsNullOrEmpty(localizationHelperTypeName))
             {
                 localizationHelperTypeName = JsonHelperTypeName;
             }
 
-            LocalizationHelperBase helper = Helper.CreateHelper<LocalizationHelperBase>(
+            LocalizationHelperBase helper = ComponentFactory.Create<LocalizationHelperBase>(
                 localizationHelperTypeName, null);
             if (helper != null)
             {
@@ -287,12 +283,6 @@ namespace UnityRFramework.Runtime
             string location = provider.GetLanguageLocation(language.Trim());
             ValidateLocation(location);
             return location;
-        }
-
-        [Obsolete("Use GetDefaultLanguageLocation instead.")]
-        public string GetLanguageAssetPath(string language)
-        {
-            return GetDefaultLanguageLocation(language);
         }
 
         private async Task LoadLanguageAssetInternalAsync(

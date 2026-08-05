@@ -176,19 +176,19 @@ namespace UnityRFramework.Runtime
         {
             base.Awake();
 
-            audioModule = RFrameworkModuleEntry.GetModule<IAudioModule>();
+            audioModule = RFrameworkModuleHost.Get<IAudioModule>();
             if (audioModule == null)
             {
                 Log.Error("Can not find module '{0}'.", nameof(IAudioModule));
                 return;
             }
 
-            IResourceModule resourceModule = RFrameworkModuleEntry.GetModule<IResourceModule>();
-            IEventModule eventModule = RFrameworkModuleEntry.GetModule<IEventModule>();
-            IPoolModule poolModule = RFrameworkModuleEntry.GetModule<IPoolModule>();
+            IResourceModule resourceModule = RFrameworkModuleHost.Get<IResourceModule>();
+            IEventModule eventModule = RFrameworkModuleHost.Get<IEventModule>();
+            IPoolModule poolModule = RFrameworkModuleHost.Get<IPoolModule>();
             audioModule.SetDependencies(resourceModule, eventModule, poolModule);
 
-            AudioHelperBase audioHelper = Helper.CreateHelper<AudioHelperBase>(audioHelperTypeName, null);
+            AudioHelperBase audioHelper = ComponentFactory.Create<AudioHelperBase>(audioHelperTypeName, null);
             if (audioHelper != null)
             {
                 audioModule.SetHelper(audioHelper);

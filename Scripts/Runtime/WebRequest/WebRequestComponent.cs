@@ -15,7 +15,7 @@ namespace UnityRFramework.Runtime
     /// 设计约束：
     /// - 不包含业务逻辑（逻辑在 WebRequestModule 中）。
     /// - Inspector 暴露 maxConcurrentRequests / defaultTimeoutMs / maxRetries 供设计师配置。
-    /// - 通过 Helper.CreateHelper 反射创建辅助器。
+    /// - 通过 ComponentFactory.Create 反射创建辅助器。
     /// </remarks>
     [AddComponentMenu("UnityRFramework/WebRequest")]
     [DisallowMultipleComponent]
@@ -57,7 +57,7 @@ namespace UnityRFramework.Runtime
         private int maxRetries = 0;
 
         /// <summary>
-        /// WebRequest 模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// WebRequest 模块引用，由 Awake 从 RFrameworkModuleHost 获取并缓存。
         /// </summary>
         private IWebRequestModule webRequestModule;
 
@@ -67,7 +67,7 @@ namespace UnityRFramework.Runtime
         protected override void Awake()
         {
             base.Awake();
-            webRequestModule = RFrameworkModuleEntry.GetModule<IWebRequestModule>();
+            webRequestModule = RFrameworkModuleHost.Get<IWebRequestModule>();
 
             // 注入并发/超时/重试配置
             webRequestModule.SetMaxConcurrentRequests(maxConcurrentRequests);
@@ -75,7 +75,7 @@ namespace UnityRFramework.Runtime
             webRequestModule.SetDefaultRetries(maxRetries);
 
             // 通过统一 Helper 创建器反射创建 MonoBehaviour 辅助器
-            WebRequestHelperBase helper = Helper.CreateHelper<WebRequestHelperBase>(webRequestHelperTypeName, null);
+            WebRequestHelperBase helper = ComponentFactory.Create<WebRequestHelperBase>(webRequestHelperTypeName, null);
             if (helper != null)
             {
                 helper.transform.SetParent(transform);

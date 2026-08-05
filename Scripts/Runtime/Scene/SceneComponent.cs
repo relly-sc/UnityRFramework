@@ -10,7 +10,7 @@ namespace UnityRFramework.Runtime
     /// <summary>
     /// 场景组件。作为 SceneModule 的运行时包装层，绑定 Unity 生命周期，
     /// 转发所有场景操作到 SceneModule。
-    /// Update/Shutdown 由 BaseComponent → RFrameworkModuleEntry 统一调度，
+    /// Update/Shutdown 由 UnityRFrameworkController → RFrameworkModuleHost 统一调度，
     /// 本组件不写 Update/OnDestroy。
     /// </summary>
     [AddComponentMenu("UnityRFramework/Scene")]
@@ -18,7 +18,7 @@ namespace UnityRFramework.Runtime
     public sealed class SceneComponent : UnityRFrameworkComponent
     {
         /// <summary>
-        /// 场景模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// 场景模块引用，由 Awake 从 RFrameworkModuleHost 获取并缓存。
         /// </summary>
         private ISceneModule sceneModule;
 
@@ -50,7 +50,7 @@ namespace UnityRFramework.Runtime
         {
             base.Awake();
 
-            sceneModule = RFrameworkModuleEntry.GetModule<ISceneModule>();
+            sceneModule = RFrameworkModuleHost.Get<ISceneModule>();
             if (sceneModule == null)
             {
                 Log.Error("Can not find module '{0}'.", nameof(ISceneModule));
@@ -58,8 +58,8 @@ namespace UnityRFramework.Runtime
             }
 
             // 注入依赖模块（通过接口调用，无需类型转换）
-            IResourceModule resourceModule = RFrameworkModuleEntry.GetModule<IResourceModule>();
-            IEventModule eventModule = RFrameworkModuleEntry.GetModule<IEventModule>();
+            IResourceModule resourceModule = RFrameworkModuleHost.Get<IResourceModule>();
+            IEventModule eventModule = RFrameworkModuleHost.Get<IEventModule>();
             sceneModule.SetDependencies(resourceModule, eventModule);
         }
 

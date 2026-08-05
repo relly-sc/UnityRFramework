@@ -6,23 +6,23 @@ namespace UnityRFramework.Runtime
     public enum DebuggerActiveWindowType : byte
     {
         /// <summary>
-        /// 始终开启。
+        /// 在所有构建中启用。
         /// </summary>
-        AlwaysOpen = 0,
+        Enabled = 0,
 
         /// <summary>
-        /// 仅在 Development Build 时开启。
+        /// 仅在 Development Build 中启用。
         /// </summary>
-        OnlyOpenWhenDevelopment,
+        DevelopmentBuildOnly = 1,
 
         /// <summary>
-        /// 仅在 Editor 中开启。
+        /// 仅在 Unity Editor 中启用。
         /// </summary>
-        OnlyOpenInEditor,
+        EditorOnly = 2,
 
         /// <summary>
-        /// 始终关闭。
+        /// 始终禁用。
         /// </summary>
-        AlwaysClose,
+        Disabled = 3
     }
 }

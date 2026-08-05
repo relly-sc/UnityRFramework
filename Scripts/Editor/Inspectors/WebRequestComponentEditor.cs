@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// WebRequestComponent 自定义 Inspector。
     /// </summary>
     [CustomEditor(typeof(Runtime.WebRequestComponent))]
-    public sealed class WebRequestComponentEditor : RFrameworkComponentEditor
+    public sealed class WebRequestComponentEditor : UnityRFrameworkComponentEditorBase
     {
         private SerializedProperty webRequestHelperTypeName;
         private SerializedProperty maxConcurrentRequests;

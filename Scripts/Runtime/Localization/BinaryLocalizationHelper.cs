@@ -4,7 +4,7 @@ using RFramework;
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// 框架单语言二进制协议解析器（URFL v2，兼容读取 v1）。
+    /// 框架单语言二进制协议解析器（URFL v2）。
     /// JSON 字符串入口由 DictionaryLocalizationHelperBase 保留。
     /// </summary>
     public sealed class BinaryLocalizationHelper : DictionaryLocalizationHelperBase,

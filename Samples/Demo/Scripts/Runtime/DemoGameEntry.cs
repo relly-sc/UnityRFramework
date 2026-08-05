@@ -13,7 +13,7 @@ public class DemoGameEntry : UnityEngine.MonoBehaviour
     private void Start()
     {
         // 验证框架已就绪（场景中应放置了 UnityRFramework prefab）
-        if (GameEntry.Base == null)
+        if (GameEntry.Framework == null)
         {
             Log.Error("[Demo] UnityRFramework prefab not found in scene. "
                 + "Please add the UnityRFramework prefab to the DemoBoot scene.");

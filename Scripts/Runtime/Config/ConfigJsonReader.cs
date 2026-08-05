@@ -23,7 +23,7 @@ namespace UnityRFramework.Runtime
         /// <returns>强类型配置行集合。</returns>
         public static IReadOnlyList<object> ParseRows(Type rowType, string json)
         {
-            return ParseRows(rowType, json, true, false);
+            return ParseRows(rowType, json, true);
         }
 
         /// <summary>
@@ -119,35 +119,24 @@ namespace UnityRFramework.Runtime
         }
 
         private static IReadOnlyList<object> ParseRows(
-            Type rowType, string json, bool allowMigration, bool requireSchemaMetadata)
+            Type rowType, string json, bool allowMigration)
         {
             object root = new Parser(json).Parse();
-            if (root is Dictionary<string, object> rootObject)
-            {
-                if (rootObject.TryGetValue("Tables", out object tablesValue))
-                {
-                    root = SelectTable(rowType, tablesValue);
-                }
-                else if (!rootObject.TryGetValue("Items", out root))
-                {
-                    throw new RFrameworkException(
-                        "Config JSON object has neither a 'Tables' nor legacy 'Items' field.");
-                }
-            }
-
-            if (root is Dictionary<string, object> tableEnvelope)
-            {
-                return ParseVersionedTable(
-                    rowType, json, tableEnvelope, allowMigration);
-            }
-
-            if (requireSchemaMetadata)
+            if (!(root is Dictionary<string, object> rootObject)
+                || !rootObject.TryGetValue("Tables", out object tablesValue))
             {
                 throw new RFrameworkException(
-                    "Migrated Config JSON must contain TableId, SchemaHash and Rows metadata.");
+                    "Config JSON must contain a 'Tables' object.");
             }
 
-            return ParseRowArray(rowType, root);
+            object selected = SelectTable(rowType, tablesValue);
+            if (!(selected is Dictionary<string, object> tableEnvelope))
+            {
+                throw new RFrameworkException(
+                    "Config JSON table must contain TableId, SchemaHash and Rows metadata.");
+            }
+
+            return ParseVersionedTable(rowType, json, tableEnvelope, allowMigration);
         }
 
         private static IReadOnlyList<object> ParseVersionedTable(
@@ -208,7 +197,7 @@ namespace UnityRFramework.Runtime
                     $"Config JSON migration for '{rowType.Name}' returned empty content.");
             }
 
-            return ParseRows(rowType, migratedJson, false, true);
+            return ParseRows(rowType, migratedJson, false);
         }
 
         private static IReadOnlyList<object> ParseRowArray(Type rowType, object root)

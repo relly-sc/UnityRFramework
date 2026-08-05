@@ -15,7 +15,7 @@ namespace UnityRFramework.Runtime
     public sealed class TimerComponent : UnityRFrameworkComponent
     {
         /// <summary>
-        /// 计时器模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// 计时器模块引用，由 Awake 从 RFrameworkModuleHost 获取并缓存。
         /// </summary>
         private ITimerModule timerModule;
 
@@ -30,7 +30,7 @@ namespace UnityRFramework.Runtime
         protected override void Awake()
         {
             base.Awake();
-            timerModule = RFrameworkModuleEntry.GetModule<ITimerModule>();
+            timerModule = RFrameworkModuleHost.Get<ITimerModule>();
         }
 
         /// <inheritdoc cref="ITimerModule.RegisterTimer"/>

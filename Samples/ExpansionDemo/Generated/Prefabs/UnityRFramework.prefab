@@ -172,7 +172,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   textHelperTypeName: UnityRFramework.Runtime.DefaultTextHelper
-  logHelperTypeName: UnityRFramework.Runtime.DefaultLogHelper
+  logSinkTypeName: UnityRFramework.Runtime.DefaultLogSink
   jsonHelperTypeName: UnityRFramework.Runtime.DefaultJsonHelper
   frameRate: 30
   gameSpeed: 1

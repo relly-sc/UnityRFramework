@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// LocalizationComponent 自定义 Inspector。
     /// </summary>
     [CustomEditor(typeof(Runtime.LocalizationComponent))]
-    public sealed class LocalizationComponentEditor : RFrameworkComponentEditor
+    public sealed class LocalizationComponentEditor : UnityRFrameworkComponentEditorBase
     {
         private static readonly string[] LanguageDisplayNames =
         {

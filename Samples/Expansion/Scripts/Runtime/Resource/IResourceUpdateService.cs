@@ -111,7 +111,7 @@ namespace UnityRFramework.Expansion
 
     /// <summary>
     /// 可选的按标签资源更新服务。
-    /// 用于把启动预下载资源与运行时按需下载资源分开，不改变基础更新接口的兼容性。
+    /// 用于把启动预下载资源与运行时按需下载资源分开。
     /// </summary>
     public interface ITaggedResourceUpdateService
     {

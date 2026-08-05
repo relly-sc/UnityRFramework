@@ -24,7 +24,7 @@ namespace UnityRFramework.Runtime
     public sealed class ProcedureComponent : UnityRFrameworkComponent
     {
         /// <summary>
-        /// 流程模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// 流程模块引用，由 Awake 从 RFrameworkModuleHost 获取并缓存。
         /// </summary>
         private IProcedureModule procedureModule;
 
@@ -63,7 +63,7 @@ namespace UnityRFramework.Runtime
         protected override void Awake()
         {
             base.Awake();
-            procedureModule = RFrameworkModuleEntry.GetModule<IProcedureModule>();
+            procedureModule = RFrameworkModuleHost.Get<IProcedureModule>();
         }
 
         /// <inheritdoc cref="IProcedureModule.Initialize"/>
@@ -121,7 +121,7 @@ namespace UnityRFramework.Runtime
 
                     if (type.GetConstructor(Type.EmptyTypes) == null)
                     {
-                        throw new RFrameworkException(Utility.Text.Format(
+                        throw new RFrameworkException(string.Format(
                             "Procedure state '{0}' must provide a public parameterless constructor.",
                             type.FullName));
                     }
@@ -150,7 +150,7 @@ namespace UnityRFramework.Runtime
                 }
                 catch (Exception exception)
                 {
-                    throw new RFrameworkException(Utility.Text.Format(
+                    throw new RFrameworkException(string.Format(
                         "Can not create procedure state '{0}'.", procedureType.FullName), exception);
                 }
             }
@@ -172,12 +172,12 @@ namespace UnityRFramework.Runtime
                 Exception innerException = exception.LoaderExceptions != null && exception.LoaderExceptions.Length > 0
                     ? exception.LoaderExceptions[0]
                     : exception;
-                throw new RFrameworkException(Utility.Text.Format(
+                throw new RFrameworkException(string.Format(
                     "Can not load all types from procedure assembly '{0}'.", assembly.FullName), innerException);
             }
             catch (Exception exception)
             {
-                throw new RFrameworkException(Utility.Text.Format(
+                throw new RFrameworkException(string.Format(
                     "Can not inspect procedure assembly '{0}'.", assembly.FullName), exception);
             }
         }

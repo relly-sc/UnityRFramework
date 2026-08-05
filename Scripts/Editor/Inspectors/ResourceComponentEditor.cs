@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// ResourceComponent 自定义 Inspector。
     /// </summary>
     [CustomEditor(typeof(Runtime.ResourceComponent))]
-    public sealed class ResourceComponentEditor : RFrameworkComponentEditor
+    public sealed class ResourceComponentEditor : UnityRFrameworkComponentEditorBase
     {
         private SerializedProperty resourceHelperTypeName;
         private SerializedProperty playMode;

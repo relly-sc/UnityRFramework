@@ -15,7 +15,7 @@ namespace UnityRFramework.Runtime
     public sealed class FsmComponent : UnityRFrameworkComponent
     {
         /// <summary>
-        /// 有限状态机模块引用，由 Awake 从 RFrameworkModuleEntry 获取并缓存。
+        /// 有限状态机模块引用，由 Awake 从 RFrameworkModuleHost 获取并缓存。
         /// </summary>
         private IFsmModule fsmModule;
 
@@ -30,7 +30,7 @@ namespace UnityRFramework.Runtime
         protected override void Awake()
         {
             base.Awake();
-            fsmModule = RFrameworkModuleEntry.GetModule<IFsmModule>();
+            fsmModule = RFrameworkModuleHost.Get<IFsmModule>();
         }
 
         /// <inheritdoc cref="IFsmModule.CreateFsm{TOwner}"/>

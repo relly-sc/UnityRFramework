@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using RFramework;
 using UnityEngine;
 
@@ -50,14 +48,6 @@ namespace UnityRFramework.Runtime
         // ====== 内置属性 ======
 
         /// <summary>
-        /// 默认通道是否已连接。
-        /// </summary>
-        public bool IsConnected
-        {
-            get { return networkModule != null && networkModule.IsConnected; }
-        }
-
-        /// <summary>
         /// 获取默认通道。未创建任何通道时返回 null。
         /// </summary>
         public INetworkChannel DefaultChannel
@@ -78,15 +68,15 @@ namespace UnityRFramework.Runtime
         {
             base.Awake();
 
-            networkModule = RFrameworkModuleEntry.GetModule<INetworkModule>();
+            networkModule = RFrameworkModuleHost.Get<INetworkModule>();
             if (networkModule == null)
             {
                 Log.Error("Can not find module '{0}'.", nameof(INetworkModule));
                 return;
             }
 
-            IEventModule eventModule = RFrameworkModuleEntry.GetModule<IEventModule>();
-            ITimerModule timerModule = RFrameworkModuleEntry.GetModule<ITimerModule>();
+            IEventModule eventModule = RFrameworkModuleHost.Get<IEventModule>();
+            ITimerModule timerModule = RFrameworkModuleHost.Get<ITimerModule>();
             networkModule.SetDependencies(eventModule, timerModule);
 
             // 创建默认通道并配置
@@ -95,7 +85,7 @@ namespace UnityRFramework.Runtime
             defaultChannel.AutoReconnect = autoReconnect;
             defaultChannel.ReconnectInterval = reconnectInterval;
 
-            NetworkHelperBase helper = Helper.CreateHelper<NetworkHelperBase>(networkHelperTypeName, null);
+            NetworkHelperBase helper = ComponentFactory.Create<NetworkHelperBase>(networkHelperTypeName, null);
             if (helper != null)
             {
                 defaultChannel.SetHelper(helper);
@@ -158,50 +148,5 @@ namespace UnityRFramework.Runtime
             return networkModule.GetAllChannels();
         }
 
-        // ====== 向后兼容：默认通道单连接 API ======
-
-        /// <summary>
-        /// 设置网络辅助器（运行时替换，作用于默认通道）。
-        /// </summary>
-        /// <param name="helper">网络辅助器实例。</param>
-        public void SetHelper(INetworkHelper helper)
-        {
-            if (helper == null)
-            {
-                throw new RFrameworkException("NetworkComponent: helper is invalid.");
-            }
-
-            networkModule.DefaultChannel?.SetHelper(helper);
-        }
-
-        /// <inheritdoc cref="INetworkModule.ConnectAsync"/>
-        public Task ConnectAsync(string ip, int port, CancellationToken ct = default)
-        {
-            return networkModule.ConnectAsync(ip, port, ct);
-        }
-
-        /// <inheritdoc cref="INetworkModule.Disconnect"/>
-        public void Disconnect()
-        {
-            networkModule.Disconnect();
-        }
-
-        /// <inheritdoc cref="INetworkModule.Send"/>
-        public void Send(int msgId, byte[] body)
-        {
-            networkModule.Send(msgId, body);
-        }
-
-        /// <inheritdoc cref="INetworkModule.RegisterHandler"/>
-        public void RegisterHandler(int msgId, System.Action<byte[]> handler)
-        {
-            networkModule.RegisterHandler(msgId, handler);
-        }
-
-        /// <inheritdoc cref="INetworkModule.UnregisterHandler"/>
-        public void UnregisterHandler(int msgId)
-        {
-            networkModule.UnregisterHandler(msgId);
-        }
     }
 }

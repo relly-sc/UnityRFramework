@@ -152,7 +152,7 @@ namespace UnityRFramework.Tests
                 localization.GetString("missing_acceptance_key") == "missing_acceptance_key",
                 "Missing Localization key did not fall back to the key.");
 
-            ILocalizationModule module = RFrameworkModuleEntry.GetModule<ILocalizationModule>();
+            ILocalizationModule module = RFrameworkModuleHost.Get<ILocalizationModule>();
             byte[] validBytes = await LoadBytesAsync(resource, EnglishPath);
             byte[] badCrc = CloneAndFlip(validBytes, validBytes.Length - 1);
             ExpectFailure(() => module.LoadLanguage("en", badCrc), "Localization CRC");
@@ -366,10 +366,10 @@ namespace UnityRFramework.Tests
 
         private static async Task ShutdownFrameworkAsync()
         {
-            UnityRFrameworkComponentEntry.Shutdown(ShutdownType.None);
+            UnityRFrameworkRuntime.Shutdown(UnityRFrameworkShutdownMode.Destroy);
             await Task.Yield();
             await Task.Yield();
-            Require(GameEntry.Base == null, "Framework component registry was not cleared.");
+            Require(GameEntry.Framework == null, "Framework component registry was not cleared.");
         }
 
         private static void Exit(int exitCode)

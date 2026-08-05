@@ -3,7 +3,7 @@ using UnityEngine;
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// 框架入口组件。挂在启动场景的 "RFramework" 根节点上，
+    /// 框架入口组件。挂在启动场景的 "UnityRFramework" 根节点上，
     /// 提供所有内置模块的强类型静态访问入口和自定义组件的泛型查询方法。
     /// </summary>
     /// <remarks>
@@ -19,7 +19,7 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 基础组件缓存。
         /// </summary>
-        private static BaseComponent baseCache;
+        private static UnityRFrameworkController frameworkCache;
 
         /// <summary>
         /// 对象池组件缓存。
@@ -96,15 +96,15 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 获取框架基础组件（帧率、日志、Helpers 等全局设置）。
         /// </summary>
-        public static BaseComponent Base
+        public static UnityRFrameworkController Framework
         {
             get
             {
-                if (baseCache == null)
+                if (frameworkCache == null)
                 {
-                    baseCache = Get<BaseComponent>();
+                    frameworkCache = Get<UnityRFrameworkController>();
                 }
-                return baseCache;
+                return frameworkCache;
             }
         }
 
@@ -328,7 +328,7 @@ namespace UnityRFramework.Runtime
         /// <returns>组件实例，未注册时返回 null。</returns>
         public static T Get<T>() where T : UnityRFrameworkComponent
         {
-            return UnityRFrameworkComponentEntry.GetComponent<T>();
+            return UnityRFrameworkRuntime.Get<T>();
         }
 
         /// <summary>
@@ -336,7 +336,7 @@ namespace UnityRFramework.Runtime
         /// </summary>
         public static void Restart()
         {
-            UnityRFrameworkComponentEntry.Shutdown(ShutdownType.Restart);
+            UnityRFrameworkRuntime.Shutdown(UnityRFrameworkShutdownMode.Restart);
         }
 
         /// <summary>
@@ -344,7 +344,7 @@ namespace UnityRFramework.Runtime
         /// </summary>
         public static void Quit()
         {
-            UnityRFrameworkComponentEntry.Shutdown(ShutdownType.Quit);
+            UnityRFrameworkRuntime.Shutdown(UnityRFrameworkShutdownMode.Quit);
         }
 
         /// <summary>
@@ -353,7 +353,7 @@ namespace UnityRFramework.Runtime
         /// </summary>
         internal static void ClearCachedComponents()
         {
-            baseCache = null;
+            frameworkCache = null;
             poolCache = null;
             eventCache = null;
             timerCache = null;
