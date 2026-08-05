@@ -45,7 +45,7 @@ public class DemoMenuProcedure : ProcedureStateBase
             if (GameEntry.Audio)
             {
                 await GameEntry.Audio.PlayBgmAsync(
-                                "Audio/music_background.wav", 0.25f, true, 0.25f);
+                                "Audio/Audio_BG.mp3", 0.25f, true, 0.25f);
             }
         }
         catch (Exception ex)

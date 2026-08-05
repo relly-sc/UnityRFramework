@@ -62,7 +62,7 @@ public sealed class DemoExpeditionProcedure : ProcedureStateBase
             if (audio != null)
             {
                 await audio.PlayBgmAsync(
-                    "Audio/music_background.wav", 0.35f, true, 0.25f);
+                    "Audio/Audio_BG.mp3", 0.35f, true, 0.25f);
             }
         }
         catch (Exception ex)

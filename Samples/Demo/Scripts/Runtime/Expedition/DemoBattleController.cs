@@ -118,7 +118,7 @@ public sealed class DemoBattleController : IDisposable
         {
             defending = true;
             view.AppendLog(GameEntry.Localization.GetString("UI_LogDefend"));
-            PlaySfx("Audio/sound_weapon_player.wav");
+            PlaySfx("Audio/Audio_DEF.mp3");
             battleFsm.ChangeState<DemoEnemyTurnState>();
             return;
         }
@@ -137,7 +137,9 @@ public sealed class DemoBattleController : IDisposable
         int damage = Mathf.Max(1, Mathf.RoundToInt(PlayerAttack * action.Power) - EnemyDefense);
         EnemyHp = Mathf.Max(0, EnemyHp - damage);
         view.AppendLog(string.Format(GameEntry.Localization.GetString("UI_LogPlayerHit"), damage));
-        PlaySfx("Audio/sound_weapon_player.wav");
+        PlaySfx(string.Equals(action.Type, "skill", StringComparison.OrdinalIgnoreCase)
+            ? "Audio/Audio_Skill.mp3"
+            : "Audio/Audio_ATK.mp3");
         view.RefreshBattle(this);
 
         if (EnemyHp <= 0)
@@ -199,9 +201,7 @@ public sealed class DemoBattleController : IDisposable
         GameEntry.Event.Fire(new ExpeditionEndedEvent(success, exp, gold, quest.Id));
         GameEntry.Event.Fire(new DemoStateChangedEvent());
         view.ShowResult(success, exp, gold);
-        PlaySfx(success
-            ? "Audio/sound_explosion_enemy.wav"
-            : "Audio/sound_explosion_player.wav");
+        PlaySfx("Audio/Audio_Skill.mp3");
     }
 
     private void ResolveEnemyTurn()
@@ -221,7 +221,7 @@ public sealed class DemoBattleController : IDisposable
         int damage = Mathf.Max(1, EnemyAttack - defence);
         PlayerHp = Mathf.Max(0, PlayerHp - damage);
         view.AppendLog(string.Format(GameEntry.Localization.GetString("UI_LogEnemyHit"), damage));
-        PlaySfx("Audio/sound_weapon_enemy.wav");
+        PlaySfx("Audio/Audio_ATK.mp3");
         view.RefreshBattle(this);
 
         if (PlayerHp <= 0)
