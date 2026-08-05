@@ -1,0 +1,31 @@
+{
+  "Tables": {
+    "Demo_Action": {
+      "TableId": "76BEC56B",
+      "SchemaHash": "44948E06C33E4552",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "action_attack",
+          "Type": "attack",
+          "Power": 1,
+          "Cooldown": 0
+        },
+        {
+          "Id": 2,
+          "NameKey": "action_defend",
+          "Type": "defend",
+          "Power": 0.5,
+          "Cooldown": 0
+        },
+        {
+          "Id": 3,
+          "NameKey": "action_skill",
+          "Type": "skill",
+          "Power": 1.8,
+          "Cooldown": 2
+        }
+      ]
+    }
+  }
+}
