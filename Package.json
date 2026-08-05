@@ -1,6 +1,6 @@
 {
   "name": "com.relly-sc.unityrframework",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "displayName": "UnityRFramework",
   "description": "面向 Unity 的数据驱动、模块化游戏框架。核心 Library 层保持引擎无关和零第三方依赖，Runtime 提供 Unity 运行时集成，第三方能力通过可选 Samples 按需接入。",
   "documentationUrl": "https://github.com/relly-sc/UnityRFramework/blob/main/README.md",
