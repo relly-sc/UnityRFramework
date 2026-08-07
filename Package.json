@@ -1,6 +1,6 @@
 {
   "name": "com.relly-sc.unityrframework",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "displayName": "UnityRFramework",
   "description": "面向 Unity 的数据驱动、模块化游戏框架。核心 Library 层保持引擎无关和零第三方依赖，Runtime 提供 Unity 运行时集成，第三方能力通过可选 Samples 按需接入。",
   "documentationUrl": "https://github.com/relly-sc/UnityRFramework/blob/main/README.md",
@@ -13,36 +13,47 @@
   "keywords": [
     "unityrframework",
     "UnityRFramework",
-    "game-framework"
+    "rframework",
+    "RFramework"
   ],
   "dependencies": {
     "com.unity.nuget.newtonsoft-json": "3.2.1"
   },
   "samples": [
     {
-      "displayName": "Utility",
-      "description": "与框架模块无关的可选通用组件和开发辅助能力，按需导入。",
-      "path": "Samples~/Utility"
+      "displayName": "Sample.Demo",
+      "description": "官方可运行 Demo，使用内置辅助器串通全部框架模块。不依赖第三方包；导入后需执行 Export Config and Localization，将配置、本地化、音频和公告同步到项目级 StreamingAssets。",
+      "path": "Samples~/Sample.Demo"
+    },
+    {
+      "displayName": "Expansion.Demo",
+      "description": "复用官方 Demo 业务并切换到 YooAsset、UniTask 等第三方辅助器的覆盖层。需同时导入 Sample.Demo 与对应 Expansion.* 目录。",
+      "path": "Samples~/Expansion.Demo"
+    },
+    {
+      "displayName": "Expansion.Tests",
+      "description": "第三方辅助器的专项验收场景，覆盖 YooAsset 运行模式、远程资源、UniTask Web 请求、取消、关闭和软重启。",
+      "path": "Samples~/Expansion.Tests"
+    },
+    {
+      "displayName": "Expansion.YooAsset",
+      "description": "YooAsset 资源辅助器桥接实现。需手动安装 YooAsset 3.0.5+。",
+      "path": "Samples~/Expansion.YooAsset"
+    },
+    {
+      "displayName": "Expansion.UniTask",
+      "description": "UniTask Web 请求辅助器桥接实现。需手动安装 UniTask。",
+      "path": "Samples~/Expansion.UniTask"
+    },
+    {
+      "displayName": "Expansion.ExcelDataReader",
+      "description": "ExcelDataReader 配置表读取工具，提供从 XLSX 直接读取配置的编辑器能力。需手动安装 ExcelDataReader。",
+      "path": "Samples~/Expansion.ExcelDataReader"
     },
     {
       "displayName": "Expansion",
-      "description": "可选的第三方集成：YooAsset 资源辅助器、UniTask Web 请求辅助器等。需手动安装对应第三方包（详见 Samples~/Expansion/README.md）。",
+      "description": "与框架模块无关的可选通用组件和开发辅助能力，按需导入。",
       "path": "Samples~/Expansion"
-    },
-    {
-      "displayName": "Demo",
-      "description": "官方可运行 Demo，使用内置辅助器串通全部框架模块。不依赖第三方包；导入后需执行 Export Config and Localization，将配置、本地化、音频和公告同步到项目级 StreamingAssets。",
-      "path": "Samples~/Demo"
-    },
-    {
-      "displayName": "ExpansionAcceptance",
-      "description": "第三方辅助器的专项验收场景，覆盖 YooAsset 运行模式、远程资源、UniTask Web 请求、取消、关闭和软重启。",
-      "path": "Samples~/ExpansionAcceptance"
-    },
-    {
-      "displayName": "ExpansionDemo",
-      "description": "复用官方 Demo 业务并切换到 YooAsset、UniTask 等第三方辅助器的覆盖层。需同时导入 Demo 与 Expansion。",
-      "path": "Samples~/ExpansionDemo"
     }
   ]
 }

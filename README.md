@@ -8,9 +8,13 @@
 Library/RFramework/RFramework/  ← 纯 C# 核心（.NET Standard 2.0，零 Unity/第三方依赖）
 Scripts/Runtime/                ← Unity 运行时（Component + Helper 默认实现）
 Scripts/Editor/                 ← 编辑器工具（Inspector、菜单项）
-Samples/Utility/                ← 与框架模块无关的可选通用组件
-Samples/Expansion/              ← 已实现的第三方集成（YooAsset/UniTask/ExcelDataReader）
-Samples/Demo/                   ← 官方示例（仅用内置 Helper，串通全部模块）
+Samples/Expansion/                ← 与框架模块无关的可选通用组件
+Samples/Sample.Demo/            ← 官方示例（仅用内置 Helper，串通全部模块）
+Samples/Expansion.YooAsset/     ← YooAsset 资源辅助器桥接实现
+Samples/Expansion.UniTask/      ← UniTask Web 请求辅助器桥接实现
+Samples/Expansion.ExcelDataReader/ ← ExcelDataReader 配置表读取工具
+Samples/Expansion.Demo/         ← 官方 Demo 的第三方资源实现覆盖层
+Samples/Expansion.Tests/        ← 第三方辅助器专项验收场景
 ```
 
 `main` 开发分支使用 `Samples/` 便于直接编译和维护；GitHub Actions 发布 UPM
@@ -18,9 +22,9 @@ Samples/Demo/                   ← 官方示例（仅用内置 Helper，串通�
 **Import Sample** 按需导入。
 
 命名空间按代码层固定：Library 使用 `RFramework`，Runtime 使用
-`UnityRFramework.Runtime`，Editor 使用 `UnityRFramework.Editor`，Expansion
-使用 `UnityRFramework.Expansion`，Utility Sample 使用
-`UnityRFramework.Samples`。模块子文件夹只负责组织文件，不继续扩展命名空间。
+`UnityRFramework.Runtime`，Editor 使用 `UnityRFramework.Editor`，Samples 下
+按分类使用 `UnityRFramework.Sample`（Sample.Demo）或
+`UnityRFramework.Expansion`（Expansion.* 及通用组件）。模块子文件夹只负责组织文件，不继续扩展命名空间。
 所有 Sample 的手写脚本统一放在 `Scripts/Runtime`；仅当存在编辑器脚本时创建
 `Scripts/Editor`，不保留空的 Editor 文件夹。
 Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，所有 `public/internal`
@@ -59,27 +63,29 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 
 **Samples（可选）**：在 Package Manager 中选中本包 → **Samples** → 按需点击 **Import**。
 
-- `Utility`：与框架模块无关的通用组件和开发辅助能力。
-- `Expansion`：当前已实现 YooAsset 资源、UniTask Web 请求和 ExcelDataReader
-  配置表工具。UPM 不为 Sample 解析依赖，需手动安装对应包。详见
-  `Samples~/Expansion/README.md`。
-- `ExpansionAcceptance`：第三方 Helper 的可运行专项验收示例。必须先导入
-  `Expansion`、安装 YooAsset 与 UniTask，再执行菜单
-  `UnityRFramework/ExpansionAcceptance/Rebuild Acceptance Assets`。UPM 只复制
-  Sample 目录，不会自动生成 `Assets/StreamingAssets` 下的 Web 探针和 YooAsset
-  内置包文件；完整准备步骤见 ExpansionAcceptance 自带 README。
-- `ExpansionDemo`：官方 Demo 的第三方 Helper 覆盖层。必须同时导入 `Demo` 与
-  `Expansion`、安装
-  YooAsset 与 UniTask，再执行菜单
-  `UnityRFramework/ExpansionDemo/Rebuild Demo Overlay`。它复用 Demo 的业务脚本
-  和资源，只生成第三方框架预制体、启动场景与 YooAsset 收集规则。
-- `Demo`：官方可运行示例，**仅依赖内置 Helper、零第三方**。导入后先执行
+- `Sample.Demo`：官方可运行示例，**仅依赖内置 Helper、零第三方**。导入后先执行
   `UnityRFramework/Demo/Export Config and Localization`，该菜单会将配置、
   本地化、音频和公告同步到宿主工程的 `Assets/StreamingAssets`，完成后再打开
   `GameAssets/Scenes/DemoBoot.unity`。仅导入 Sample 后直接运行会缺少这些文件。
+- `Expansion.YooAsset`：YooAsset 资源辅助器桥接实现。需手动安装 YooAsset 3.0.5+。
+- `Expansion.UniTask`：UniTask Web 请求辅助器桥接实现。需手动安装 UniTask。
+- `Expansion.ExcelDataReader`：ExcelDataReader 配置表读取工具，仅 Editor。
+  需手动安装 ExcelDataReader。
+- `Expansion.Tests`：第三方 Helper 的可运行专项验收示例。必须先导入
+  `Expansion.YooAsset` 与 `Expansion.UniTask`、安装 YooAsset 与 UniTask，再执行菜单
+  `UnityRFramework/ExpansionAcceptance/Rebuild Acceptance Assets`。UPM 只复制
+  Sample 目录，不会自动生成 `Assets/StreamingAssets` 下的 Web 探针和 YooAsset
+  内置包文件；完整准备步骤见 Expansion.Tests 自带 README。
+- `Expansion.Demo`：官方 Demo 的第三方 Helper 覆盖层。必须同时导入 `Sample.Demo` 与
+  `Expansion.YooAsset`、`Expansion.UniTask`、安装
+  YooAsset 与 UniTask，再执行菜单
+  `UnityRFramework/ExpansionDemo/Rebuild Demo Overlay`。它复用 Sample.Demo 的业务脚本
+  和资源，只生成第三方框架预制体、启动场景与 YooAsset 收集规则。
+- `Expansion`：与框架模块无关的通用组件和开发辅助能力。
 
 > 核心包仅依赖 Unity 官方维护的 `com.unity.nuget.newtonsoft-json`；当前已接入的
-> YooAsset、UniTask 和 ExcelDataReader 均位于可选 Expansion Sample。
+> YooAsset、UniTask 和 ExcelDataReader 分别位于可选 Expansion.YooAsset、Expansion.UniTask
+> 和 Expansion.ExcelDataReader Sample。
 
 ## 模块
 
@@ -301,7 +307,7 @@ Resources/Build Settings。Android 与 WebGL 的 StreamingAssets 位于 URL 中�
 `ClearCache()` 停止播放并清空其内部音频缓存。
 
 第三方 Resource Helper 的地址、运行模式、下载、缓存和场景规则不属于核心默认契约。
-当前 YooAsset 实现见 [Expansion README](Samples/Expansion/README.md)。
+当前 YooAsset 实现见 `Samples/Expansion.YooAsset/`。
 
 ### WebRequest
 
@@ -321,7 +327,7 @@ var data = await GameEntry.WebRequest.GetAsync(url, ct: cts.Token);
 核心只提供 `DefaultWebRequestHelper`：基于 `UnityWebRequest + Coroutine`，普通响应保存在
 内存，文件下载使用 `DownloadHandlerFile` 直接写目标路径，取消时中止请求并删除未完成文件。
 它不负责 JSON 对象序列化、登录态、签名或业务重试；这些由调用方或项目封装处理。
-依赖 UniTask 的实现属于 Expansion，见 `Samples/Expansion/README.md`。
+依赖 UniTask 的实现属于 Expansion，见 `Samples/Expansion.UniTask/`。
 
 ### Config
 
@@ -369,7 +375,7 @@ JSON 与 URFC v2 均支持显式历史 Schema 迁移。二进制实现 `IBinaryC
 均拒绝。JSON 新格式为 `Tables -> 表名 -> { TableId, SchemaHash, Rows }`；旧的
 `Tables -> 数组`、`Items` 和顶层数组仍可读取，但无 SchemaHash，不能参与显式迁移。
 
-框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Config 第一行任意位置以 `!` 开头的字段名表示整列策划备注，该列不会进入校验、代码、SchemaHash、JSON 或二进制产物。Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具同时生成 JSON、配置行、静态 Codec、URFC v2、URFM v1 多表容器、带 CRC32 的 URFL v2 和 URLM v1 多语言容器，并仅在内容变化时写入。默认流程由 Excel 手动导出 UTF-8 CSV，再由工具生成 JSON/`.bytes`。可选 Expansion 提供 ExcelDataReader Editor 工具，以明确分区直接把 `.xlsx` / `.xls` Config 导出为 JSON、URFC v2 和配置代码，把 Localization 导出为 JSON、URFL v2 和 URLM v1，不让 Excel 依赖进入 Runtime。Config 的 JSON/`.bytes` 共用一个输出目录，Localization 也共用一个输出目录，两类模块的输出目录必须分开。生成命名空间留空时，配置行和 Codec 生成到全局命名空间。独立验收场景位于 `Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance`，固定源数据位于 `Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline`；测试只使用 `Acceptance_*` 数据，不依赖 Samples/Demo。Demo 的 `Demo_*` 源文件、生成代码和运行时产物分别位于 `Samples/Demo/ConfigSource`、`Samples/Demo/Generated`、`Samples/Demo/GameAssets/Resources`。可通过 `UnityRFramework/Tests` 下的菜单导出测试数据、重建场景、运行 Play Mode 验收或构建包含 Test Assemblies 的专用 Player。
+框架没有独立 DataModule，配置数据统一由 ConfigModule 管理。零第三方 Editor 转换工具位于菜单 `UnityRFramework/配置表工具`：Config 与 Localization CSV 均使用“字段名、类型、注释”三行表头，第四行开始为数据。Config 必须包含唯一 `int Id`；Config 第一行任意位置以 `!` 开头的字段名表示整列策划备注，该列不会进入校验、代码、SchemaHash、JSON 或二进制产物。Localization 固定为 `Key,Value`、`string,string`，并以唯一 `string Key` 为主键。工具同时生成 JSON、配置行、静态 Codec、URFC v2、URFM v1 多表容器、带 CRC32 的 URFL v2 和 URLM v1 多语言容器，并仅在内容变化时写入。默认流程由 Excel 手动导出 UTF-8 CSV，再由工具生成 JSON/`.bytes`。可选 Expansion 提供 ExcelDataReader Editor 工具，以明确分区直接把 `.xlsx` / `.xls` Config 导出为 JSON、URFC v2 和配置代码，把 Localization 导出为 JSON、URFL v2 和 URLM v1，不让 Excel 依赖进入 Runtime。Config 的 JSON/`.bytes` 共用一个输出目录，Localization 也共用一个输出目录，两类模块的输出目录必须分开。生成命名空间留空时，配置行和 Codec 生成到全局命名空间。独立验收场景位于 `Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance`，固定源数据位于 `Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline`；测试只使用 `Acceptance_*` 数据，不依赖 Samples/Sample.Demo。Demo 的 `Demo_*` 源文件、生成代码和运行时产物分别位于 `Samples/Sample.Demo/ConfigSource`、`Samples/Sample.Demo/Generated`、`Samples/Sample.Demo/GameAssets/Resources`。可通过 `UnityRFramework/Tests` 下的菜单导出测试数据、重建场景、运行 Play Mode 验收或构建包含 Test Assemblies 的专用 Player。
 
 同一业务集合需要拆成多个源文件时，使用 `逻辑表名@分片名.csv`，例如
 `Warrior@1000_1999.csv` 与 `Warrior@2000_2999.csv`。两者只生成一个 `WarriorConfig`，

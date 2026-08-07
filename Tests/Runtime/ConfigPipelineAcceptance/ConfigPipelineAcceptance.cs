@@ -11,7 +11,7 @@ using UnityRFramework.Tests.Config;
 namespace UnityRFramework.Tests
 {
     /// <summary>
-    /// ConfigPipeline v1 独立运行时验收入口，不依赖 Samples/Demo。
+    /// ConfigPipeline v1 独立运行时验收入口，不依赖 Samples/Sample.Demo。
     /// </summary>
     public sealed class ConfigPipelineAcceptance : MonoBehaviour
     {

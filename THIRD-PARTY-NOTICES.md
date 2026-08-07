@@ -12,8 +12,8 @@ UnityRFramework 原创代码以项目根目录中的 Apache License 2.0 授权�
 - 版权所有：Copyright (c) 2014 ExcelDataReader
 - 许可证：MIT License
 - 来源：https://github.com/ExcelDataReader/ExcelDataReader
-- 完整许可证：`Samples/Expansion/Plugins/ExcelDataReader/LICENSE.txt`
-  （UPM 包中对应 `Samples~/Expansion/Plugins/ExcelDataReader/LICENSE.txt`）
+- 完整许可证：`Samples/Expansion.ExcelDataReader/Plugins/ExcelDataReader/LICENSE.txt`
+  （UPM 包中对应 `Samples~/Expansion.ExcelDataReader/Plugins/ExcelDataReader/LICENSE.txt`）
 
 ### Noto Sans SC
 
@@ -22,15 +22,15 @@ UnityRFramework 原创代码以项目根目录中的 Apache License 2.0 授权�
 - 版权所有：Copyright 2014-2021 Adobe，保留字体名称 `Source`
 - 许可证：SIL Open Font License 1.1
 - 来源：https://github.com/notofonts/noto-cjk
-- 完整许可证：`Samples/Demo/GameAssets/Fonts/Noto_Sans_SC/OFL.txt`
-  （UPM 包中对应 `Samples~/Demo/GameAssets/Fonts/Noto_Sans_SC/OFL.txt`）
+- 完整许可证：`Samples/Sample.Demo/GameAssets/Fonts/Noto_Sans_SC/OFL.txt`
+  （UPM 包中对应 `Samples~/Sample.Demo/GameAssets/Fonts/Noto_Sans_SC/OFL.txt`）
 
 ## 包管理器依赖
 
 以下内容不复制到 UnityRFramework 目录，由 Unity Package Manager 安装并保留其自身
 许可证文件。
 
-### NuGet Newtonsoft.Json for Unity 3.2.1
+### Newtonsoft.Json for Unity 3.2.1
 
 - 包名：`com.unity.nuget.newtonsoft-json`
 - 用途：可选 `NewtonsoftJsonHelper`

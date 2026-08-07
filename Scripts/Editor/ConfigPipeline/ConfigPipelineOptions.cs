@@ -39,6 +39,6 @@ namespace UnityRFramework.Editor
         public string LocalizationBundleName = "LocalizationBundle";
 
         /// <summary>生成的 Config 行类型和 Codec 所使用的命名空间；留空时使用全局命名空间。</summary>
-        public string GeneratedNamespace = "Game.Config";
+        public string GeneratedNamespace = string.Empty;
     }
 }
