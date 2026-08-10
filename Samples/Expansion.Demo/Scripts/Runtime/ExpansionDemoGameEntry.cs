@@ -14,7 +14,7 @@ namespace UnityRFramework.Expansion
     /// ExpansionDemo 启动入口。
     /// 在进入官方 Demo 流程前检查远程清单并完成缺失资源下载。
     /// </summary>
-    public sealed class ExpansionDemoGameEntry : MonoBehaviour
+    public class ExpansionDemoGameEntry : MonoBehaviour
     {
         private static readonly string[] StartupResourceTags = { "preload" };
 
@@ -62,7 +62,7 @@ namespace UnityRFramework.Expansion
         /// <summary>
         /// 绑定按钮并启动资源检查。
         /// </summary>
-        private void Start()
+        protected virtual void Start()
         {
             if (primaryButton != null)
             {
@@ -81,7 +81,7 @@ namespace UnityRFramework.Expansion
         /// <summary>
         /// 销毁时取消尚未完成的检查或下载。
         /// </summary>
-        private void OnDestroy()
+        protected virtual void OnDestroy()
         {
             isDestroying = true;
 
@@ -139,7 +139,7 @@ namespace UnityRFramework.Expansion
                 if (!updateInfo.HasUpdate)
                 {
                     Log.Info("[ExpansionDemo] Resources are up to date.");
-                    StartDemo();
+                    await OnResourcesReadyAsync(ct);
                     return;
                 }
 
@@ -202,7 +202,7 @@ namespace UnityRFramework.Expansion
 
                 SetProgress(1f, "100%");
                 Log.Info("[ExpansionDemo] Resource update completed.");
-                StartDemo();
+                await OnResourcesReadyAsync(ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -244,7 +244,7 @@ namespace UnityRFramework.Expansion
                 updateInfo = PrepareStartupUpdate();
                 if (!updateInfo.HasUpdate)
                 {
-                    StartDemo();
+                    await OnResourcesReadyAsync(ct);
                     return;
                 }
             }
@@ -299,7 +299,7 @@ namespace UnityRFramework.Expansion
         /// <summary>
         /// 进入复用的官方 Demo Procedure 流程。
         /// </summary>
-        private void StartDemo()
+        protected void StartDemo()
         {
             if (hasStartedDemo)
             {
@@ -310,6 +310,18 @@ namespace UnityRFramework.Expansion
             SetPanelVisible(false);
             GameEntry.Procedure.InitializeFromAssembly<DemoLaunchProcedure>();
             GameEntry.Procedure.StartProcedure<DemoLaunchProcedure>();
+        }
+
+        /// <summary>
+        /// 资源检查和必要下载完成后的扩展点。
+        /// 默认直接进入官方 Demo；扩展可在此加载代码热更新程序集。
+        /// </summary>
+        /// <param name="ct">启动流程取消令牌。</param>
+        protected virtual Task OnResourcesReadyAsync(CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            StartDemo();
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -338,10 +350,19 @@ namespace UnityRFramework.Expansion
         {
             if (updateService is ITaggedResourceUpdateService taggedUpdateService)
             {
-                return taggedUpdateService.PrepareUpdateByTags(StartupResourceTags);
+                return taggedUpdateService.PrepareUpdateByTags(GetStartupResourceTags());
             }
 
             return updateService.PrepareUpdate();
+        }
+
+        /// <summary>
+        /// 获取启动前必须准备的 YooAsset 标签。
+        /// </summary>
+        /// <returns>参与启动更新检查的资源标签。</returns>
+        protected virtual string[] GetStartupResourceTags()
+        {
+            return StartupResourceTags;
         }
 
         private void OnPrimaryButtonClicked()

@@ -1,0 +1,89 @@
+# UnityRFramework · Expansion.YooAsset
+
+`Expansion.YooAsset` 提供基于 YooAsset 的资源 Helper，用于替换框架默认的
+`Resources.Load` / 本地文件实现。它保留 `ResourceModule` 的统一调用接口，并补充
+资源更新、按标签下载和磁盘缓存管理能力。
+
+## 前置依赖
+
+- YooAsset 3.0.5 或兼容版本。
+- UnityRFramework Runtime。
+
+YooAsset 是可选第三方依赖。导入本 Sample 前应先在宿主项目安装 YooAsset，否则
+Sample 中引用 `YooAsset` 命名空间的脚本无法编译。
+
+## 配置
+
+1. 导入 `Expansion.YooAsset` Sample。
+2. 在 `ResourceComponent` Inspector 中，将 Resource Helper 设置为
+   `UnityRFramework.Expansion.YooAssetResourceHelper`。
+3. 填写 YooAsset `Package Name`。
+4. 选择 `EditorSimulate`、`Offline` 或 `Host` 运行模式。
+5. Host 模式还需填写 `Default Host Server`，并可按需填写备用地址。
+
+框架业务代码仍通过 `GameEntry.Resource` 加载和释放资源，不应直接持有 Helper 内部的
+YooAsset Handle。资源引用计数由 `ResourceModule` 管理，最后一个框架引用释放后，
+Helper 才释放对应 YooAsset Handle。
+
+## 运行模式
+
+### EditorSimulate
+
+仅用于 Unity Editor。Helper 会使用 YooAsset 编辑器模拟文件系统，适合开发阶段快速
+验证收集规则与资源地址，无需预先复制 Bundle 到 StreamingAssets。
+
+### Offline
+
+只使用随 Player 内置的 YooAsset 文件。构建 Package 时需将 Catalog、Manifest、Hash
+和所需 Bundle 正确复制到 YooAsset 的 StreamingAssets 目录。
+
+### Host
+
+使用“内置文件 + YooAsset 磁盘缓存 + 远程服务器”的组合。服务器 URL 必须直接指向
+包含 `<PackageName>.version`、Manifest、Hash 和 Bundle 的发布目录。
+
+Host 初始化会请求服务器 Package Version 并激活对应 Manifest。成功激活后会记录最后一次
+可用版本；后续远程版本请求或新清单加载失败时，若该版本的本地清单仍完整，则回退到该
+清单继续启动。首次运行且尚无本地可用版本时仍会报告检查失败，不能仅凭不完整缓存启动。
+资源本地不可用时，
+YooAsset 可在加载过程中下载所需 Bundle；也可通过更新接口提前计算并下载差量资源。
+
+## 更新与缓存
+
+`YooAssetResourceHelper` 同时实现以下扩展接口：
+
+- `IResourceUpdateService`：准备并下载全部差量资源。
+- `ITaggedResourceUpdateService`：按资源标签准备差量下载。
+- `IResourceCacheHelper`：配置缓存上限、自动清理并主动执行清理。
+
+更新接口仅在 Host 模式下具有远程下载语义。缓存上限由 `ResourceComponent` Inspector
+统一配置；达到上限后，缓存控制器按最后访问时间清理可删除文件。发布前仍需在目标
+平台验证磁盘权限、缓存目录和网络中断恢复行为。
+
+## 场景加载
+
+Helper 加载场景时先检查 Player Build Settings。已加入 Build Settings 的场景由 Unity
+`SceneManager` 加载；找不到时再交给 YooAsset。因此项目可以同时使用不进 Bundle 的
+内置场景和由 YooAsset 管理的远程场景。
+
+## 内置 Catalog 工具
+
+菜单入口：
+
+`UnityRFramework/Expansion/YooAsset Builtin Catalog`
+
+该工具根据 YooAsset `BundleCollectorSetting` 中的 Package 列表工作，可生成：
+
+- 全部资源远程时所需的空 `BuiltinCatalog.bytes`。
+- 部分资源内置时，与实际内置 Bundle 对应的 Catalog。
+
+Host 模式即使没有内置 Bundle，也仍需要有效的空 Builtin Catalog 来初始化 YooAsset
+内置文件系统。
+
+## 验收示例
+
+- `Expansion.Tests`：验证 EditorSimulate、Offline、Host、混合内置/远程、缓存与框架重启。
+- `Expansion.Demo`：验证启动更新提示、差量下载、进度显示和资源按需静默下载。
+
+本 Sample 只提供资源后端及配套编辑器工具，不包含代码热更新，也不替业务层决定资源
+标签、发布目录、更新确认界面或失败重试交互。

@@ -12,8 +12,10 @@ Samples/Expansion/                ← 与框架模块无关的可选通用组件
 Samples/Sample.Demo/            ← 官方示例（仅用内置 Helper，串通全部模块）
 Samples/Expansion.YooAsset/     ← YooAsset 资源辅助器桥接实现
 Samples/Expansion.UniTask/      ← UniTask Web 请求辅助器桥接实现
-Samples/Expansion.ExcelDataReader/ ← ExcelDataReader 配置表读取工具
+Samples/Expansion.ExcelDataReader/ ← ExcelDataReader 配置表导出工具（EditorOnly）
 Samples/Expansion.Demo/         ← 官方 Demo 的第三方资源实现覆盖层
+Samples/Expansion.HybridCLR/    ← HybridCLR 通用代码热更新加载扩展
+Samples/Expansion.HybridCLR.Demo/ ← Expansion.Demo 的代码热更新覆盖层
 Samples/Expansion.Tests/        ← 第三方辅助器专项验收场景
 ```
 
@@ -69,8 +71,8 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   `GameAssets/Scenes/DemoBoot.unity`。仅导入 Sample 后直接运行会缺少这些文件。
 - `Expansion.YooAsset`：YooAsset 资源辅助器桥接实现。需手动安装 YooAsset 3.0.5+。
 - `Expansion.UniTask`：UniTask Web 请求辅助器桥接实现。需手动安装 UniTask。
-- `Expansion.ExcelDataReader`：ExcelDataReader 配置表读取工具，仅 Editor。
-  需手动安装 ExcelDataReader。
+- `Expansion.ExcelDataReader`：ExcelDataReader 配置表导出工具，支持从 XLSX/XLS
+  生成 Config 与 Localization 数据；已内置 EditorOnly 依赖 DLL，无需手动安装。
 - `Expansion.Tests`：第三方 Helper 的可运行专项验收示例。必须先导入
   `Expansion.YooAsset` 与 `Expansion.UniTask`、安装 YooAsset 与 UniTask，再执行菜单
   `UnityRFramework/ExpansionAcceptance/Rebuild Acceptance Assets`。UPM 只复制
@@ -81,11 +83,18 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   YooAsset 与 UniTask，再执行菜单
   `UnityRFramework/ExpansionDemo/Rebuild Demo Overlay`。它复用 Sample.Demo 的业务脚本
   和资源，只生成第三方框架预制体、启动场景与 YooAsset 收集规则。
+- `Expansion.HybridCLR`：可选 HybridCLR 代码热更新加载扩展。需手动安装并通过
+  `HybridCLR/Installer...` 初始化 HybridCLR；核心包和普通 Demo 不依赖它。
+- `Expansion.HybridCLR.Demo`：在 `Expansion.Demo` 的 YooAsset 资源热更闭环上叠加代码
+  热更新。必须同时导入 `Sample.Demo`、`Expansion.Demo`、`Expansion.YooAsset`、
+  `Expansion.UniTask` 与 `Expansion.HybridCLR`。执行
+  `UnityRFramework/Expansion/HybridCLR Demo/重建当前平台覆盖层` 生成当前平台代码产物和
+  启动覆盖层；详细首包、Host 更新和 Player 验收顺序见该 Sample 的 README。
 - `Expansion`：与框架模块无关的通用组件和开发辅助能力。
 
 > 核心包仅依赖 Unity 官方维护的 `com.unity.nuget.newtonsoft-json`；当前已接入的
-> YooAsset、UniTask 和 ExcelDataReader 分别位于可选 Expansion.YooAsset、Expansion.UniTask
-> 和 Expansion.ExcelDataReader Sample。
+> YooAsset、UniTask、ExcelDataReader 和 HybridCLR 分别位于对应的可选 Expansion Sample，
+> 均不会成为核心包的强制第三方依赖。
 
 ## 模块
 

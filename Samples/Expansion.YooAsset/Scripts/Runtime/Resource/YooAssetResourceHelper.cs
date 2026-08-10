@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using RFramework;
@@ -19,6 +21,8 @@ namespace UnityRFramework.Expansion
         IResourceUpdateService, ITaggedResourceUpdateService
     {
         private const long DefaultMaxCacheBytes = 4L * 1024L * 1024L * 1024L;
+        private const string LastKnownPackageVersionFileName =
+            "UnityRFrameworkLastKnownPackage.version";
 
         private static readonly object lifecycleLock = new object();
         private static Task cleanupTask = Task.CompletedTask;
@@ -287,26 +291,71 @@ namespace UnityRFramework.Expansion
                         + $"Status: {operation.Status}, Error: {operation.Error}");
                 }
 
+                string activePackageVersion = null;
+                string remoteFailure = null;
                 RequestPackageVersionOperation versionOperation =
                     package.RequestPackageVersionAsync();
                 await versionOperation;
-                if (versionOperation.Status != EOperationStatus.Succeeded)
+                if (versionOperation.Status == EOperationStatus.Succeeded)
                 {
-                    throw new RFrameworkException(
-                        $"YooAssetResourceHelper: request package version '{packageName}' failed. "
-                        + $"Status: {versionOperation.Status}, Error: {versionOperation.Error}");
+                    LoadPackageManifestOperation manifestOperation =
+                        await LoadPackageManifestAsync(versionOperation.PackageVersion);
+                    if (manifestOperation.Status == EOperationStatus.Succeeded)
+                    {
+                        activePackageVersion = versionOperation.PackageVersion;
+                    }
+                    else
+                    {
+                        remoteFailure =
+                            $"load remote manifest failed. Status: {manifestOperation.Status}, "
+                            + $"Error: {manifestOperation.Error}";
+                    }
+                }
+                else
+                {
+                    remoteFailure =
+                        $"request remote version failed. Status: {versionOperation.Status}, "
+                        + $"Error: {versionOperation.Error}";
                 }
 
-                LoadPackageManifestOptions manifestOptions =
-                    new LoadPackageManifestOptions(versionOperation.PackageVersion, 60);
-                LoadPackageManifestOperation manifestOperation =
-                    package.LoadPackageManifestAsync(manifestOptions);
-                await manifestOperation;
-                if (manifestOperation.Status != EOperationStatus.Succeeded)
+                if (activePackageVersion == null
+                    && playMode == ResourcePlayMode.Host
+                    && TryReadLastKnownPackageVersion(
+                        cachePackageRoot,
+                        out string lastKnownPackageVersion))
+                {
+                    LoadPackageManifestOperation fallbackOperation =
+                        await LoadPackageManifestAsync(lastKnownPackageVersion);
+                    if (fallbackOperation.Status == EOperationStatus.Succeeded)
+                    {
+                        activePackageVersion = lastKnownPackageVersion;
+                        Log.Warning(
+                            "YooAssetResourceHelper: remote package check failed; "
+                            + "using cached package version '{0}'. Reason: {1}",
+                            lastKnownPackageVersion,
+                            remoteFailure);
+                    }
+                    else
+                    {
+                        remoteFailure +=
+                            $" Cached manifest '{lastKnownPackageVersion}' also failed. "
+                            + $"Status: {fallbackOperation.Status}, "
+                            + $"Error: {fallbackOperation.Error}";
+                    }
+                }
+
+                if (activePackageVersion == null)
                 {
                     throw new RFrameworkException(
-                        $"YooAssetResourceHelper: load package manifest '{packageName}' failed. "
-                        + $"Status: {manifestOperation.Status}, Error: {manifestOperation.Error}");
+                        $"YooAssetResourceHelper: no usable package manifest for "
+                        + $"'{packageName}'. {remoteFailure}");
+                }
+
+                if (playMode == ResourcePlayMode.Host)
+                {
+                    TryWriteLastKnownPackageVersion(
+                        cachePackageRoot,
+                        activePackageVersion);
                 }
 
                 currentPlayMode = playMode;
@@ -318,6 +367,17 @@ namespace UnityRFramework.Expansion
 
                 isDestroying = false;
                 isInitialized = true;
+
+                async Task<LoadPackageManifestOperation> LoadPackageManifestAsync(
+                    string packageVersion)
+                {
+                    LoadPackageManifestOptions manifestOptions =
+                        new LoadPackageManifestOptions(packageVersion, 60);
+                    LoadPackageManifestOperation operation =
+                        package.LoadPackageManifestAsync(manifestOptions);
+                    await operation;
+                    return operation;
+                }
             }
             catch (Exception exception)
             {
@@ -703,6 +763,91 @@ namespace UnityRFramework.Expansion
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(playMode), playMode, "Unsupported resource play mode.");
+            }
+        }
+
+        /// <summary>
+        /// 读取上一次成功激活的 Host 包版本，用于远程检查失败时回退本地清单。
+        /// </summary>
+        private static bool TryReadLastKnownPackageVersion(
+            string cachePackageRoot,
+            out string packageVersion)
+        {
+            packageVersion = null;
+            if (string.IsNullOrWhiteSpace(cachePackageRoot))
+            {
+                return false;
+            }
+
+            string filePath = Path.Combine(
+                cachePackageRoot,
+                LastKnownPackageVersionFileName);
+            if (!File.Exists(filePath))
+            {
+                return false;
+            }
+
+            try
+            {
+                packageVersion = File.ReadAllText(filePath, Encoding.UTF8).Trim();
+                return !string.IsNullOrWhiteSpace(packageVersion);
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    "YooAssetResourceHelper: failed to read last known package version: {0}",
+                    exception.Message);
+                packageVersion = null;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 记录已经成功激活的 Host 包版本。记录失败不影响本次正常启动。
+        /// </summary>
+        private static void TryWriteLastKnownPackageVersion(
+            string cachePackageRoot,
+            string packageVersion)
+        {
+            if (string.IsNullOrWhiteSpace(cachePackageRoot)
+                || string.IsNullOrWhiteSpace(packageVersion))
+            {
+                return;
+            }
+
+            string filePath = Path.Combine(
+                cachePackageRoot,
+                LastKnownPackageVersionFileName);
+            string temporaryPath = filePath + ".tmp";
+            try
+            {
+                Directory.CreateDirectory(cachePackageRoot);
+                File.WriteAllText(
+                    temporaryPath,
+                    packageVersion,
+                    new UTF8Encoding(false));
+                File.Copy(temporaryPath, filePath, true);
+                File.Delete(temporaryPath);
+            }
+            catch (Exception exception)
+            {
+                try
+                {
+                    if (File.Exists(temporaryPath))
+                    {
+                        File.Delete(temporaryPath);
+                    }
+                }
+                catch (Exception cleanupException)
+                {
+                    Log.Warning(
+                        "YooAssetResourceHelper: failed to remove temporary version file: {0}",
+                        cleanupException.Message);
+                }
+
+                Log.Warning(
+                    "YooAssetResourceHelper: failed to persist last known package version: {0}",
+                    exception.Message);
             }
         }
 

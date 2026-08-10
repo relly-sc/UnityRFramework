@@ -171,7 +171,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8f69d159fe67f4332bcbf27bce5f2a56, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  textHelperTypeName: UnityRFramework.Runtime.DefaultTextHelper
   logSinkTypeName: UnityRFramework.Runtime.DefaultLogSink
   jsonHelperTypeName: UnityRFramework.Runtime.DefaultJsonHelper
   frameRate: 30
@@ -973,9 +972,9 @@ RectTransform:
   - {fileID: 2633413690033425104}
   m_Father: {fileID: 3833976118368878327}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 190, y: 350}
+  m_AnchorMin: {x: 1, y: 1}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: -1708, y: -700}
   m_SizeDelta: {x: 380, y: 500}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &6357528027627280177
@@ -1523,9 +1522,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   resourceHelperTypeName: UnityRFramework.Expansion.YooAssetResourceHelper
-  playMode: 0
+  playMode: 2
   packageName: ExpansionDemoPackage
-  defaultHostServer: 
+  defaultHostServer: http://192.168.3.155/ExpansionDemoServer
   fallbackHostServer: 
   autoClearDiskCache: 1
   maxDiskCacheSizeGB: 4

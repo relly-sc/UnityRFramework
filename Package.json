@@ -31,6 +31,16 @@
       "path": "Samples~/Expansion.Demo"
     },
     {
+      "displayName": "Expansion.HybridCLR",
+      "description": "HybridCLR 代码热更新通用加载扩展，提供清单、AOT 元数据、程序集入口契约与产物准备工具。需手动安装并初始化 HybridCLR。",
+      "path": "Samples~/Expansion.HybridCLR"
+    },
+    {
+      "displayName": "Expansion.HybridCLR.Demo",
+      "description": "在 Expansion.Demo 资源热更闭环上叠加 HybridCLR 代码热更新的完整验收覆盖层，支持版本检查、下载、入口执行及进入现有 Demo。",
+      "path": "Samples~/Expansion.HybridCLR.Demo"
+    },
+    {
       "displayName": "Expansion.Tests",
       "description": "第三方辅助器的专项验收场景，覆盖 YooAsset 运行模式、远程资源、UniTask Web 请求、取消、关闭和软重启。",
       "path": "Samples~/Expansion.Tests"
@@ -47,7 +57,7 @@
     },
     {
       "displayName": "Expansion.ExcelDataReader",
-      "description": "ExcelDataReader 配置表读取工具，提供从 XLSX 直接读取配置的编辑器能力。需手动安装 ExcelDataReader。",
+      "description": "ExcelDataReader 配置表导出工具，支持从 XLSX/XLS 生成 Config 与 Localization 数据；已内置 EditorOnly 依赖 DLL。",
       "path": "Samples~/Expansion.ExcelDataReader"
     },
     {

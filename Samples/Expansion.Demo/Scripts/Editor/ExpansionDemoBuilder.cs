@@ -60,6 +60,16 @@ namespace UnityRFramework.Expansion
         [MenuItem("UnityRFramework/ExpansionDemo/Rebuild Demo Overlay")]
         public static void Rebuild()
         {
+            Rebuild(typeof(ExpansionDemoGameEntry), null);
+        }
+
+        /// <summary>
+        /// 重建覆盖层，并允许可选扩展替换启动入口和追加收集规则。
+        /// </summary>
+        internal static void Rebuild(
+            Type gameEntryType,
+            Action configureAdditionalCollectors)
+        {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
             {
                 return;
@@ -71,7 +81,8 @@ namespace UnityRFramework.Expansion
             EnsureFolder(GeneratedRoot + "/Scenes");
             CreateFrameworkPrefab();
             ConfigureYooAssetCollectors();
-            CreateBootScene();
+            configureAdditionalCollectors?.Invoke();
+            CreateBootScene(gameEntryType);
             ConfigureBuildSettings();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -86,6 +97,15 @@ namespace UnityRFramework.Expansion
         [MenuItem("UnityRFramework/ExpansionDemo/Build Host Package")]
         public static void BuildHostPackage()
         {
+            BuildHostPackage(null);
+        }
+
+        /// <summary>
+        /// 构建 Host Package，并允许可选覆盖层在基础收集规则之后追加资源。
+        /// </summary>
+        /// <param name="configureAdditionalCollectors">追加收集规则的回调。</param>
+        internal static void BuildHostPackage(Action configureAdditionalCollectors)
+        {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
             {
                 throw new InvalidOperationException(
@@ -94,6 +114,7 @@ namespace UnityRFramework.Expansion
 
             ValidateDependencies();
             ConfigureYooAssetCollectors();
+            configureAdditionalCollectors?.Invoke();
             AssetDatabase.SaveAssets();
 
             string version = DateTime.Now.ToString("yyyy-MM-dd-HHmmss");
@@ -279,6 +300,8 @@ namespace UnityRFramework.Expansion
 
         private static void CreateFrameworkPrefab()
         {
+            GeneratedResourceSettings resourceSettings =
+                ReadGeneratedResourceSettings();
             string sourcePath = FindFrameworkPrefab();
             GameObject root = PrefabUtility.LoadPrefabContents(sourcePath);
             try
@@ -294,8 +317,19 @@ namespace UnityRFramework.Expansion
                     resource,
                     "resourceHelperTypeName",
                     "UnityRFramework.Expansion.YooAssetResourceHelper");
-                SetSerializedValue(resource, "playMode", 0);
+                SetSerializedValue(
+                    resource,
+                    "playMode",
+                    resourceSettings.PlayMode);
                 SetSerializedValue(resource, "packageName", PackageName);
+                SetSerializedValue(
+                    resource,
+                    "defaultHostServer",
+                    resourceSettings.DefaultHostServer);
+                SetSerializedValue(
+                    resource,
+                    "fallbackHostServer",
+                    resourceSettings.FallbackHostServer);
                 SetSerializedValue(
                     webRequest,
                     "webRequestHelperTypeName",
@@ -309,6 +343,29 @@ namespace UnityRFramework.Expansion
             {
                 PrefabUtility.UnloadPrefabContents(root);
             }
+        }
+
+        private static GeneratedResourceSettings ReadGeneratedResourceSettings()
+        {
+            GameObject existing =
+                AssetDatabase.LoadAssetAtPath<GameObject>(FrameworkPrefab);
+            if (existing == null)
+            {
+                return new GeneratedResourceSettings(0, string.Empty, string.Empty);
+            }
+
+            ResourceComponent resource =
+                existing.GetComponentInChildren<ResourceComponent>(true);
+            if (resource == null)
+            {
+                return new GeneratedResourceSettings(0, string.Empty, string.Empty);
+            }
+
+            SerializedObject serializedResource = new SerializedObject(resource);
+            return new GeneratedResourceSettings(
+                serializedResource.FindProperty("playMode").intValue,
+                serializedResource.FindProperty("defaultHostServer").stringValue,
+                serializedResource.FindProperty("fallbackHostServer").stringValue);
         }
 
         private static string FindFrameworkPrefab()
@@ -390,7 +447,7 @@ namespace UnityRFramework.Expansion
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        private static void ConfigureYooAssetCollectors()
+        internal static void ConfigureYooAssetCollectors()
         {
             BundleCollectorSetting setting = BundleCollectorSettingData.Setting;
             BundleCollectorPackage package = setting.Packages.FirstOrDefault(
@@ -581,7 +638,7 @@ namespace UnityRFramework.Expansion
             SetSerializedValue(probe, "previewRoot", previewRoot.transform);
         }
 
-        private static void CreateBootScene()
+        private static void CreateBootScene(Type gameEntryType)
         {
             if (File.Exists(BootScene))
             {
@@ -625,7 +682,7 @@ namespace UnityRFramework.Expansion
             }
 
             PrefabUtility.InstantiatePrefab(framework, scene);
-            CreateUpdateBootstrap(scene);
+            CreateUpdateBootstrap(scene, gameEntryType);
             if (!EditorSceneManager.SaveScene(scene))
             {
                 throw new InvalidOperationException(
@@ -633,12 +690,19 @@ namespace UnityRFramework.Expansion
             }
         }
 
-        private static void CreateUpdateBootstrap(Scene scene)
+        private static void CreateUpdateBootstrap(Scene scene, Type gameEntryType)
         {
             GameObject bootstrap = new GameObject("ExpansionDemoBootstrap");
             SceneManager.MoveGameObjectToScene(bootstrap, scene);
+            if (gameEntryType == null
+                || !typeof(ExpansionDemoGameEntry).IsAssignableFrom(gameEntryType))
+            {
+                throw new InvalidOperationException(
+                    "ExpansionDemoBuilder: 启动入口必须继承 ExpansionDemoGameEntry。");
+            }
+
             ExpansionDemoGameEntry entry =
-                bootstrap.AddComponent<ExpansionDemoGameEntry>();
+                (ExpansionDemoGameEntry)bootstrap.AddComponent(gameEntryType);
 
             GameObject canvasObject = new GameObject(
                 "ResourceUpdateCanvas",
@@ -873,6 +937,31 @@ namespace UnityRFramework.Expansion
             scenes.Insert(1, new EditorBuildSettingsScene(HallScene, true));
             scenes.Insert(2, new EditorBuildSettingsScene(ExpeditionScene, true));
             EditorBuildSettings.scenes = scenes.ToArray();
+        }
+
+        private readonly struct GeneratedResourceSettings
+        {
+            /// <summary>
+            /// 创建一份需要跨覆盖层重建保留的资源配置快照。
+            /// </summary>
+            public GeneratedResourceSettings(
+                int playMode,
+                string defaultHostServer,
+                string fallbackHostServer)
+            {
+                PlayMode = playMode;
+                DefaultHostServer = defaultHostServer ?? string.Empty;
+                FallbackHostServer = fallbackHostServer ?? string.Empty;
+            }
+
+            /// <summary>获取资源运行模式枚举值。</summary>
+            public int PlayMode { get; }
+
+            /// <summary>获取主资源服务器地址。</summary>
+            public string DefaultHostServer { get; }
+
+            /// <summary>获取备用资源服务器地址。</summary>
+            public string FallbackHostServer { get; }
         }
     }
 
