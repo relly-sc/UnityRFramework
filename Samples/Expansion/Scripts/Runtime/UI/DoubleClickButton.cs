@@ -126,14 +126,6 @@ namespace UnityRFramework.Expansion
             base.OnDisable();
         }
 
-#if UNITY_EDITOR
-        protected override void OnValidate()
-        {
-            base.OnValidate();
-            doubleClickInterval = Mathf.Max(0f, doubleClickInterval);
-        }
-#endif
-
         private void Update()
         {
             if (!hasPendingClick)
