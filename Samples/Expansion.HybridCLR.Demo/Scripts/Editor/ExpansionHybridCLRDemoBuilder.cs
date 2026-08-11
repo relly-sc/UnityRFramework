@@ -4,8 +4,10 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityRFramework.Expansion;
+using UnityRFramework.Runtime;
 using YooAsset.Editor;
 
 namespace UnityRFramework.Editor
@@ -15,8 +17,12 @@ namespace UnityRFramework.Editor
     /// </summary>
     public static class ExpansionHybridCLRDemoBuilder
     {
-        private const string PackageName = "ExpansionDemoPackage";
-        private const string GroupName = "ExpansionDemo";
+        private const string PackageName = "ExpansionHybridCLRDemoPackage";
+        private const string GroupName = "ExpansionHybridCLRDemo";
+        private const string ServerDirectoryName =
+            "ExpansionHybridCLRDemoServer";
+        private const string PackageNote =
+            "Expansion HybridCLR Demo Host update package";
         private const string HotUpdateTag = "hotupdate";
         private const string EntryTypeName =
             "UnityRFramework.Sample.HotUpdateEntry";
@@ -35,6 +41,14 @@ namespace UnityRFramework.Editor
         private static string Root => sampleRoot ?? (sampleRoot = FindSampleRoot());
 
         private static string HotUpdateRoot => Root + "/GameAssets/HotUpdate";
+
+        private static string GeneratedRoot => Root + "/Generated";
+
+        private static string BootScene =>
+            GeneratedRoot + "/Scenes/ExpansionHybridCLRDemoBoot.unity";
+
+        private static string FrameworkPrefab =>
+            GeneratedRoot + "/Prefabs/UnityRFramework.prefab";
 
         private static string HotUpdateAsmdefPath =>
             Root + "/Scripts/Runtime/HotUpdate/UnityRFramework.HotUpdate.asmdef";
@@ -63,7 +77,12 @@ namespace UnityRFramework.Editor
 
             ExpansionDemoBuilder.Rebuild(
                 typeof(ExpansionHybridCLRDemoGameEntry),
-                ConfigureHotUpdateCollector);
+                ConfigureHotUpdateCollector,
+                GeneratedRoot,
+                "ExpansionHybridCLRDemoBoot.unity",
+                PackageName,
+                GroupName);
+            MigrateGeneratedServerUrl();
             ConfigureBootScene(targetName);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -88,7 +107,12 @@ namespace UnityRFramework.Editor
                 RequiredAotAssemblies,
                 false);
             ConfigureBootScene(targetName);
-            ExpansionDemoBuilder.BuildHostPackage(ConfigureHotUpdateCollector);
+            ExpansionDemoBuilder.BuildHostPackage(
+                ConfigureHotUpdateCollector,
+                PackageName,
+                GroupName,
+                ServerDirectoryName,
+                PackageNote);
             Debug.Log(
                 $"[ExpansionHybridCLRDemo] Host Package built. Code version: "
                 + $"{codeVersion}, Player baseline: {targetName}.");
@@ -105,7 +129,7 @@ namespace UnityRFramework.Editor
             if (package == null)
             {
                 throw new InvalidOperationException(
-                    "ExpansionHybridCLRDemoBuilder: ExpansionDemoPackage 不存在。");
+                    $"ExpansionHybridCLRDemoBuilder: {PackageName} 不存在。");
             }
 
             BundleCollectorGroup group = package.Groups.FirstOrDefault(
@@ -116,7 +140,7 @@ namespace UnityRFramework.Editor
             if (group == null)
             {
                 throw new InvalidOperationException(
-                    "ExpansionHybridCLRDemoBuilder: ExpansionDemo 分组不存在。");
+                    $"ExpansionHybridCLRDemoBuilder: {GroupName} 分组不存在。");
             }
 
             group.Collectors.RemoveAll(item => string.Equals(
@@ -140,26 +164,153 @@ namespace UnityRFramework.Editor
             BundleCollectorSettingData.SaveFile();
         }
 
-        private static void ConfigureBootScene(string targetName)
+        private static void MigrateGeneratedServerUrl()
         {
-            ExpansionHybridCLRDemoGameEntry entry =
-                UnityEngine.Object.FindObjectOfType<ExpansionHybridCLRDemoGameEntry>(true);
-            if (entry == null)
+            string defaultHostServer =
+                ReadExpansionDemoServerUrl("defaultHostServer");
+            string fallbackHostServer =
+                ReadExpansionDemoServerUrl("fallbackHostServer");
+            GameObject root = PrefabUtility.LoadPrefabContents(FrameworkPrefab);
+            try
             {
-                throw new InvalidOperationException(
-                    "ExpansionHybridCLRDemoBuilder: 启动场景中未找到 HybridCLR 入口。");
+                ResourceComponent resource =
+                    root.GetComponentInChildren<ResourceComponent>(true);
+                if (resource == null)
+                {
+                    throw new InvalidOperationException(
+                        "ExpansionHybridCLRDemoBuilder: 生成的框架预制体缺少 ResourceComponent。");
+                }
+
+                SerializedObject serializedResource = new SerializedObject(resource);
+                MigrateServerUrl(
+                    serializedResource.FindProperty("defaultHostServer"),
+                    defaultHostServer);
+                MigrateServerUrl(
+                    serializedResource.FindProperty("fallbackHostServer"),
+                    fallbackHostServer);
+                serializedResource.ApplyModifiedPropertiesWithoutUndo();
+                PrefabUtility.SaveAsPrefabAsset(root, FrameworkPrefab);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
+        private static string ReadExpansionDemoServerUrl(string propertyName)
+        {
+            string[] guids = AssetDatabase.FindAssets(
+                "ExpansionDemoBuilder t:MonoScript");
+            const string suffix = "/Scripts/Editor/ExpansionDemoBuilder.cs";
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!path.EndsWith(suffix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string prefabPath = path.Substring(0, path.Length - suffix.Length)
+                                    + "/Generated/Prefabs/UnityRFramework.prefab";
+                GameObject prefab =
+                    AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                ResourceComponent resource = prefab == null
+                    ? null
+                    : prefab.GetComponentInChildren<ResourceComponent>(true);
+                if (resource == null)
+                {
+                    return string.Empty;
+                }
+
+                SerializedProperty property =
+                    new SerializedObject(resource).FindProperty(propertyName);
+                return property?.stringValue ?? string.Empty;
             }
 
-            SerializedObject serializedEntry = new SerializedObject(entry);
-            SerializedProperty manifestLocation =
-                serializedEntry.FindProperty("manifestLocation");
-            manifestLocation.stringValue = $"HotUpdate/{targetName}/Manifest";
-            serializedEntry.ApplyModifiedPropertiesWithoutUndo();
-            EditorSceneManager.MarkSceneDirty(entry.gameObject.scene);
-            if (!EditorSceneManager.SaveScene(entry.gameObject.scene))
+            return string.Empty;
+        }
+
+        private static void MigrateServerUrl(
+            SerializedProperty property,
+            string fallbackValue)
+        {
+            if (property == null)
+            {
+                return;
+            }
+
+            string value = string.IsNullOrWhiteSpace(property.stringValue)
+                ? fallbackValue
+                : property.stringValue;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            const string oldSuffix = "/ExpansionDemoServer";
+            value = value.TrimEnd('/');
+            if (!value.EndsWith(oldSuffix, StringComparison.OrdinalIgnoreCase))
+            {
+                property.stringValue = value;
+                return;
+            }
+
+            property.stringValue = value.Substring(0, value.Length - oldSuffix.Length)
+                                   + "/" + ServerDirectoryName;
+        }
+
+        private static void ConfigureBootScene(string targetName)
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(BootScene) == null)
             {
                 throw new InvalidOperationException(
-                    "ExpansionHybridCLRDemoBuilder: 保存启动场景失败。");
+                    "ExpansionHybridCLRDemoBuilder: 独立启动场景不存在，请先执行重建当前平台覆盖层。");
+            }
+
+            Scene scene = SceneManager.GetSceneByPath(BootScene);
+            bool openedForConfiguration = !scene.IsValid() || !scene.isLoaded;
+            if (openedForConfiguration)
+            {
+                scene = EditorSceneManager.OpenScene(BootScene, OpenSceneMode.Additive);
+            }
+
+            try
+            {
+                ExpansionHybridCLRDemoGameEntry entry = null;
+                foreach (GameObject rootObject in scene.GetRootGameObjects())
+                {
+                    entry = rootObject.GetComponentInChildren<
+                        ExpansionHybridCLRDemoGameEntry>(true);
+                    if (entry != null)
+                    {
+                        break;
+                    }
+                }
+
+                if (entry == null)
+                {
+                    throw new InvalidOperationException(
+                        "ExpansionHybridCLRDemoBuilder: 独立启动场景中未找到 HybridCLR 入口。");
+                }
+
+                SerializedObject serializedEntry = new SerializedObject(entry);
+                SerializedProperty manifestLocation =
+                    serializedEntry.FindProperty("manifestLocation");
+                manifestLocation.stringValue = $"HotUpdate/{targetName}/Manifest";
+                serializedEntry.ApplyModifiedPropertiesWithoutUndo();
+                EditorSceneManager.MarkSceneDirty(scene);
+                if (!EditorSceneManager.SaveScene(scene))
+                {
+                    throw new InvalidOperationException(
+                        "ExpansionHybridCLRDemoBuilder: 保存独立启动场景失败。");
+                }
+            }
+            finally
+            {
+                if (openedForConfiguration && scene.IsValid() && scene.isLoaded)
+                {
+                    EditorSceneManager.CloseScene(scene, true);
+                }
             }
         }
 

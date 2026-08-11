@@ -24,6 +24,8 @@ namespace UnityRFramework.Expansion
     {
         private const string PackageName = "ExpansionDemoPackage";
         private const string GroupName = "ExpansionDemo";
+        private const string ServerDirectoryName = "ExpansionDemoServer";
+        private const string PackageNote = "ExpansionDemo Host update package";
         private const string PreloadTag = "preload";
         private const string OnDemandTag = "ondemand";
         private static string sampleRoot;
@@ -34,12 +36,6 @@ namespace UnityRFramework.Expansion
         private static string DemoRoot => demoRoot ?? (demoRoot = FindDemoSampleRoot());
 
         private static string GeneratedRoot => Root + "/Generated";
-
-        private static string FrameworkPrefab =>
-            GeneratedRoot + "/Prefabs/UnityRFramework.prefab";
-
-        private static string BootScene =>
-            GeneratedRoot + "/Scenes/ExpansionDemoBoot.unity";
 
         private static string DemoResources => DemoRoot + "/GameAssets/Resources";
 
@@ -60,7 +56,13 @@ namespace UnityRFramework.Expansion
         [MenuItem("UnityRFramework/ExpansionDemo/Rebuild Demo Overlay")]
         public static void Rebuild()
         {
-            Rebuild(typeof(ExpansionDemoGameEntry), null);
+            Rebuild(
+                typeof(ExpansionDemoGameEntry),
+                null,
+                GeneratedRoot,
+                "ExpansionDemoBoot.unity",
+                PackageName,
+                GroupName);
         }
 
         /// <summary>
@@ -68,22 +70,50 @@ namespace UnityRFramework.Expansion
         /// </summary>
         internal static void Rebuild(
             Type gameEntryType,
-            Action configureAdditionalCollectors)
+            Action configureAdditionalCollectors,
+            string generatedRoot,
+            string bootSceneFileName,
+            string packageName,
+            string groupName)
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
             {
                 return;
             }
 
+            if (string.IsNullOrWhiteSpace(generatedRoot))
+            {
+                throw new ArgumentException(
+                    "ExpansionDemoBuilder: 生成目录不能为空。",
+                    nameof(generatedRoot));
+            }
+
+            if (string.IsNullOrWhiteSpace(bootSceneFileName)
+                || !bootSceneFileName.EndsWith(
+                    ".unity",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    "ExpansionDemoBuilder: 启动场景文件名必须以 .unity 结尾。",
+                    nameof(bootSceneFileName));
+            }
+
+            ValidatePackageSettings(packageName, groupName, null);
+
+            string frameworkPrefab =
+                generatedRoot + "/Prefabs/UnityRFramework.prefab";
+            string bootScene =
+                generatedRoot + "/Scenes/" + bootSceneFileName;
+
             ValidateDependencies();
-            EnsureFolder(GeneratedRoot);
-            EnsureFolder(GeneratedRoot + "/Prefabs");
-            EnsureFolder(GeneratedRoot + "/Scenes");
-            CreateFrameworkPrefab();
-            ConfigureYooAssetCollectors();
+            EnsureFolder(generatedRoot);
+            EnsureFolder(generatedRoot + "/Prefabs");
+            EnsureFolder(generatedRoot + "/Scenes");
+            CreateFrameworkPrefab(frameworkPrefab, packageName);
+            ConfigureYooAssetCollectors(packageName, groupName);
             configureAdditionalCollectors?.Invoke();
-            CreateBootScene(gameEntryType);
-            ConfigureBuildSettings();
+            CreateBootScene(gameEntryType, frameworkPrefab, bootScene);
+            ConfigureBuildSettings(bootScene);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
@@ -97,14 +127,24 @@ namespace UnityRFramework.Expansion
         [MenuItem("UnityRFramework/ExpansionDemo/Build Host Package")]
         public static void BuildHostPackage()
         {
-            BuildHostPackage(null);
+            BuildHostPackage(
+                null,
+                PackageName,
+                GroupName,
+                ServerDirectoryName,
+                PackageNote);
         }
 
         /// <summary>
         /// 构建 Host Package，并允许可选覆盖层在基础收集规则之后追加资源。
         /// </summary>
         /// <param name="configureAdditionalCollectors">追加收集规则的回调。</param>
-        internal static void BuildHostPackage(Action configureAdditionalCollectors)
+        internal static void BuildHostPackage(
+            Action configureAdditionalCollectors,
+            string packageName,
+            string groupName,
+            string serverDirectoryName,
+            string packageNote)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
             {
@@ -112,8 +152,9 @@ namespace UnityRFramework.Expansion
                     "ExpansionDemoBuilder: 不能在 Play Mode 中构建资源包。");
             }
 
+            ValidatePackageSettings(packageName, groupName, serverDirectoryName);
             ValidateDependencies();
-            ConfigureYooAssetCollectors();
+            ConfigureYooAssetCollectors(packageName, groupName);
             configureAdditionalCollectors?.Invoke();
             AssetDatabase.SaveAssets();
 
@@ -121,7 +162,7 @@ namespace UnityRFramework.Expansion
             string shaderBundleName = DefaultBundlePackRule
                 .CreateShadersPackRuleResult()
                 .GetBundleName(
-                    PackageName,
+                    packageName,
                     BundleCollectorSettingData.Setting.UniqueBundleName);
             ScriptableBuildParameters parameters = new ScriptableBuildParameters
             {
@@ -130,9 +171,9 @@ namespace UnityRFramework.Expansion
                 BuildPipeline = EBuildPipeline.ScriptableBuildPipeline.ToString(),
                 BuildBundleType = (int)EBundleType.AssetBundle,
                 BuildTarget = EditorUserBuildSettings.activeBuildTarget,
-                PackageName = PackageName,
+                PackageName = packageName,
                 PackageVersion = version,
-                PackageNote = "ExpansionDemo Host update package",
+                PackageNote = packageNote,
                 EnableSharePackRule = true,
                 VerifyBuildingResult = true,
                 FileNameStyle = EFileNameStyle.BundleName,
@@ -167,7 +208,7 @@ namespace UnityRFramework.Expansion
             string serverRoot = Path.Combine(
                 projectRoot,
                 "Bundles",
-                "ExpansionDemoServer");
+                serverDirectoryName);
             PublishPackage(result.OutputPackageDirectory, serverRoot);
             Debug.Log(
                 $"[ExpansionDemo] Host package '{version}' published to '{serverRoot}'.");
@@ -219,6 +260,34 @@ namespace UnityRFramework.Expansion
             {
                 throw new InvalidOperationException(
                     "ExpansionDemoBuilder: 请先导入 Expansion.YooAsset 与 Expansion.UniTask Sample 并完成第三方依赖安装。");
+            }
+        }
+
+        private static void ValidatePackageSettings(
+            string packageName,
+            string groupName,
+            string serverDirectoryName)
+        {
+            if (string.IsNullOrWhiteSpace(packageName))
+            {
+                throw new ArgumentException(
+                    "ExpansionDemoBuilder: Package 名称不能为空。",
+                    nameof(packageName));
+            }
+
+            if (string.IsNullOrWhiteSpace(groupName))
+            {
+                throw new ArgumentException(
+                    "ExpansionDemoBuilder: Group 名称不能为空。",
+                    nameof(groupName));
+            }
+
+            if (serverDirectoryName != null
+                && string.IsNullOrWhiteSpace(serverDirectoryName))
+            {
+                throw new ArgumentException(
+                    "ExpansionDemoBuilder: Host 发布目录名称不能为空。",
+                    nameof(serverDirectoryName));
             }
         }
 
@@ -298,10 +367,12 @@ namespace UnityRFramework.Expansion
             }
         }
 
-        private static void CreateFrameworkPrefab()
+        private static void CreateFrameworkPrefab(
+            string frameworkPrefab,
+            string packageName)
         {
             GeneratedResourceSettings resourceSettings =
-                ReadGeneratedResourceSettings();
+                ReadGeneratedResourceSettings(frameworkPrefab);
             string sourcePath = FindFrameworkPrefab();
             GameObject root = PrefabUtility.LoadPrefabContents(sourcePath);
             try
@@ -321,7 +392,7 @@ namespace UnityRFramework.Expansion
                     resource,
                     "playMode",
                     resourceSettings.PlayMode);
-                SetSerializedValue(resource, "packageName", PackageName);
+                SetSerializedValue(resource, "packageName", packageName);
                 SetSerializedValue(
                     resource,
                     "defaultHostServer",
@@ -337,7 +408,7 @@ namespace UnityRFramework.Expansion
                 SetSerializedValue(localization, "loadDefaultLanguageOnStart", false);
                 CreateOnDemandProbe(root.transform);
 
-                PrefabUtility.SaveAsPrefabAsset(root, FrameworkPrefab);
+                PrefabUtility.SaveAsPrefabAsset(root, frameworkPrefab);
             }
             finally
             {
@@ -345,10 +416,11 @@ namespace UnityRFramework.Expansion
             }
         }
 
-        private static GeneratedResourceSettings ReadGeneratedResourceSettings()
+        private static GeneratedResourceSettings ReadGeneratedResourceSettings(
+            string frameworkPrefab)
         {
             GameObject existing =
-                AssetDatabase.LoadAssetAtPath<GameObject>(FrameworkPrefab);
+                AssetDatabase.LoadAssetAtPath<GameObject>(frameworkPrefab);
             if (existing == null)
             {
                 return new GeneratedResourceSettings(0, string.Empty, string.Empty);
@@ -447,14 +519,16 @@ namespace UnityRFramework.Expansion
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        internal static void ConfigureYooAssetCollectors()
+        internal static void ConfigureYooAssetCollectors(
+            string packageName,
+            string groupName)
         {
             BundleCollectorSetting setting = BundleCollectorSettingData.Setting;
             BundleCollectorPackage package = setting.Packages.FirstOrDefault(
-                item => string.Equals(item.PackageName, PackageName, StringComparison.Ordinal));
+                item => string.Equals(item.PackageName, packageName, StringComparison.Ordinal));
             if (package == null)
             {
-                package = BundleCollectorSettingData.CreatePackage(PackageName);
+                package = BundleCollectorSettingData.CreatePackage(packageName);
             }
 
             package.EnableAddressable = true;
@@ -462,10 +536,10 @@ namespace UnityRFramework.Expansion
             package.IgnoreRuleName = nameof(NormalIgnoreRule);
 
             BundleCollectorGroup group = package.Groups.FirstOrDefault(
-                item => string.Equals(item.GroupName, GroupName, StringComparison.Ordinal));
+                item => string.Equals(item.GroupName, groupName, StringComparison.Ordinal));
             if (group == null)
             {
-                group = BundleCollectorSettingData.CreateGroup(package, GroupName);
+                group = BundleCollectorSettingData.CreateGroup(package, groupName);
             }
 
             group.Collectors.Clear();
@@ -551,7 +625,7 @@ namespace UnityRFramework.Expansion
                 Vector2.one,
                 Vector2.one,
                 new Vector2(380f, 500f),
-                new Vector2(-210f, -270f));
+                new Vector2(-1493f, -725f));
 
             Text title = CreateText(
                 panel.transform,
@@ -638,22 +712,25 @@ namespace UnityRFramework.Expansion
             SetSerializedValue(probe, "previewRoot", previewRoot.transform);
         }
 
-        private static void CreateBootScene(Type gameEntryType)
+        private static void CreateBootScene(
+            Type gameEntryType,
+            string frameworkPrefab,
+            string bootScene)
         {
-            if (File.Exists(BootScene))
+            if (File.Exists(bootScene))
             {
-                FileUtil.ReplaceFile(SourceBootScene, BootScene);
+                FileUtil.ReplaceFile(SourceBootScene, bootScene);
             }
             else
             {
-                FileUtil.CopyFileOrDirectory(SourceBootScene, BootScene);
+                FileUtil.CopyFileOrDirectory(SourceBootScene, bootScene);
             }
 
             AssetDatabase.ImportAsset(
-                BootScene,
+                bootScene,
                 ImportAssetOptions.ForceSynchronousImport
                 | ImportAssetOptions.ForceUpdate);
-            Scene scene = EditorSceneManager.OpenScene(BootScene, OpenSceneMode.Single);
+            Scene scene = EditorSceneManager.OpenScene(bootScene, OpenSceneMode.Single);
             foreach (GameObject rootObject in scene.GetRootGameObjects())
             {
                 DemoGameEntry demoEntry =
@@ -674,7 +751,7 @@ namespace UnityRFramework.Expansion
             }
 
             GameObject framework =
-                AssetDatabase.LoadAssetAtPath<GameObject>(FrameworkPrefab);
+                AssetDatabase.LoadAssetAtPath<GameObject>(frameworkPrefab);
             if (framework == null)
             {
                 throw new InvalidOperationException(
@@ -921,22 +998,36 @@ namespace UnityRFramework.Expansion
             rectTransform.anchoredPosition = position;
         }
 
-        private static void ConfigureBuildSettings()
+        private static void ConfigureBuildSettings(string bootScene)
         {
             HashSet<string> managedScenes = new HashSet<string>(StringComparer.Ordinal)
             {
-                BootScene,
+                bootScene,
                 SourceBootScene,
                 HallScene,
                 ExpeditionScene
             };
             List<EditorBuildSettingsScene> scenes = EditorBuildSettings.scenes
-                .Where(item => !managedScenes.Contains(item.path))
+                .Where(item => !managedScenes.Contains(item.path)
+                    && !IsGeneratedExpansionBootScene(item.path))
                 .ToList();
-            scenes.Insert(0, new EditorBuildSettingsScene(BootScene, true));
+            scenes.Insert(0, new EditorBuildSettingsScene(bootScene, true));
             scenes.Insert(1, new EditorBuildSettingsScene(HallScene, true));
             scenes.Insert(2, new EditorBuildSettingsScene(ExpeditionScene, true));
             EditorBuildSettings.scenes = scenes.ToArray();
+        }
+
+        private static bool IsGeneratedExpansionBootScene(string scenePath)
+        {
+            string fileName = Path.GetFileName(scenePath);
+            return string.Equals(
+                    fileName,
+                    "ExpansionDemoBoot.unity",
+                    StringComparison.Ordinal)
+                || string.Equals(
+                    fileName,
+                    "ExpansionHybridCLRDemoBoot.unity",
+                    StringComparison.Ordinal);
         }
 
         private readonly struct GeneratedResourceSettings

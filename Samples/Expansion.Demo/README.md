@@ -43,6 +43,12 @@
    `GameAssets/OnDemand/Elastigirl/Elastigirl.fbx` 按需验证模型。
 5. 将 ExpansionDemoBoot、DemoHall、DemoExpedition 放入 Build Settings 前三项。
 
+该 Builder 只写入 `Expansion.Demo/Generated`。即使同时导入并重建
+`Expansion.HybridCLR.Demo`，普通 Demo 的框架预制体、启动场景和入口脚本也不会被替换；
+再次执行本菜单会把普通 Demo 启动场景切回 Build Settings 第一项。
+`ExpansionDemoPackage` 也只收集本 Sample 的资源更新闭环，不包含 HybridCLR DLL、AOT
+补充元数据或代码版本 Manifest。
+
 生成完成后，在 YooAsset 构建窗口选择 `ExpansionDemoPackage`：
 
 - EditorSimulate：生成模拟清单后直接运行 ExpansionDemoBoot；差量列表为空，正常进入 Demo。

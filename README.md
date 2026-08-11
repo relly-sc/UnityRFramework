@@ -89,7 +89,9 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   热更新。必须同时导入 `Sample.Demo`、`Expansion.Demo`、`Expansion.YooAsset`、
   `Expansion.UniTask` 与 `Expansion.HybridCLR`。执行
   `UnityRFramework/Expansion/HybridCLR Demo/重建当前平台覆盖层` 生成当前平台代码产物和
-  启动覆盖层；详细首包、Host 更新和 Player 验收顺序见该 Sample 的 README。
+  启动覆盖层；它使用独立的 YooAsset Package、收集分组和 Host 发布目录，不会把代码
+  热更新资源写入普通 `Expansion.Demo` 的 Package。详细首包、Host 更新和 Player 验收
+  顺序见该 Sample 的 README。
 - `Expansion`：与框架模块无关的通用组件和开发辅助能力。
 
 > 核心包仅依赖 Unity 官方维护的 `com.unity.nuget.newtonsoft-json`；当前已接入的
