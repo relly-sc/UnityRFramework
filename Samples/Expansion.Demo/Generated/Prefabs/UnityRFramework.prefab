@@ -132,6 +132,7 @@ Transform:
   - {fileID: 3680816138324828378}
   - {fileID: 3538311391822894244}
   - {fileID: 7813249811787562114}
+  - {fileID: 1170089015755893948}
   - {fileID: 6449678617277043847}
   - {fileID: 259552893889737593}
   - {fileID: 226830818795414786}
@@ -936,6 +937,54 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!1 &4785414127276997299
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1170089015755893948}
+  - component: {fileID: 2374481592906404450}
+  m_Layer: 0
+  m_Name: Download
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1170089015755893948
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4785414127276997299}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1825794738314003970}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2374481592906404450
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4785414127276997299}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e06fe4b81ad5e042bda551458516fc6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  resumeByDefault: 1
+  maxRetries: 2
+  retryDelayMilliseconds: 500
+  requestTimeoutMilliseconds: 0
 --- !u!1 &5381564187181714580
 GameObject:
   m_ObjectHideFlags: 0

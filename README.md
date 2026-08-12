@@ -109,6 +109,7 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 | **Timer** | delay/interval/duration/maxTriggerCount 四参数计时器 | `GameEntry.Timer` |
 | **Resource** | 资源异步加载，引用计数，并发去重 | `GameEntry.Resource` |
 | **WebRequest** | HTTP GET/POST/PUT/DELETE，并发控制，超时+重试，multipart 上传+进度 | `GameEntry.WebRequest` |
+| **Download** | 大文件可靠下载，`.part` 断点续传、重试、速度/ETA、大小与 SHA-256 校验 | `GameEntry.Download` |
 | **Config** | 配置表管理与查询，默认 JSON + 内置 URFC 二进制，可扩展自定义格式 | `GameEntry.Config` |
 | **Fsm** | 同步通用有限状态机，泛型 Owner，生命周期异常后停止运行 | `GameEntry.Fsm` |
 | **Procedure** | 同步游戏流程 FSM，Blackboard 跨状态共享数据 | `GameEntry.Procedure` |
@@ -336,9 +337,58 @@ var data = await GameEntry.WebRequest.GetAsync(url, ct: cts.Token);
 ```
 
 核心只提供 `DefaultWebRequestHelper`：基于 `UnityWebRequest + Coroutine`，普通响应保存在
-内存，文件下载使用 `DownloadHandlerFile` 直接写目标路径，取消时中止请求并删除未完成文件。
+内存。`GameEntry.WebRequest.DownloadFileAsync` 是一次性流式文件下载，直接写目标路径，失败或取消时删除未完成文件；
+`DownloadFileRangeAsync` 是供 Download 模块和自定义下载器使用的底层 Range 写入接口，会返回 HTTP 状态与响应头。
 它不负责 JSON 对象序列化、登录态、签名或业务重试；这些由调用方或项目封装处理。
 依赖 UniTask 的实现属于 Expansion，见 `Samples/Expansion.UniTask/`。
+
+### Download
+
+```csharp
+string savePath = Path.Combine(Application.persistentDataPath, "Patch", "content.bytes");
+var options = new DownloadOptions
+{
+    ExpectedSize = manifest.Size,
+    ExpectedSha256 = manifest.Sha256,
+    MaxRetries = 2
+};
+
+var progress = new Progress<DownloadProgress>(value =>
+{
+    float percent = value.Progress;
+    double mbPerSecond = value.BytesPerSecond / (1024d * 1024d);
+    TimeSpan? eta = value.EstimatedRemaining;
+});
+
+DownloadResult result = await GameEntry.Download.DownloadAsync(
+    downloadUrl, savePath, options, progress, cancellationToken);
+```
+
+下载 ZIP 并在校验后解压：
+
+```csharp
+var options = new DownloadOptions
+{
+    ExpectedSha256 = manifest.Sha256,
+    ExtractZip = true,
+    ExtractDirectory = Path.Combine(Application.persistentDataPath, "Content"),
+    DeleteArchiveAfterExtraction = false,
+    MaxArchiveEntries = 10000,
+    MaxExtractedBytes = 8L * 1024L * 1024L * 1024L
+};
+
+DownloadResult result = await GameEntry.Download.DownloadAsync(
+    zipUrl, zipSavePath, options, progress, cancellationToken);
+```
+
+Download 模块依赖 WebRequest 模块，默认使用 `目标路径.part` 保存分片。服务端支持 HTTP Range 时会续传；
+若服务端忽略 Range 并返回完整内容，会删除旧分片后重新完整下载。成功后先校验预期大小和可选 SHA-256，
+再将 `.part` 提交为最终文件。用户取消、网络失败或框架关闭会保留分片，便于下次继续；
+同一最终路径不允许并发下载。它不负责上传、下载任务持久化、后台系统通知或业务版本管理。
+
+ZIP 使用 .NET 标准库实现，不依赖第三方。模块先解压到独立临时目录，拒绝绝对路径和 `../` 路径穿越，
+并限制条目数与解压总大小；全部成功后才替换正式目录。解压失败会清理临时目录、保留已校验的 ZIP，
+已有正式目录保持不变。默认不删除 ZIP；带密码 ZIP、7z 和 RAR 不在默认实现范围，项目可在下载完成后接入自定义解压器。
 
 ### Config
 

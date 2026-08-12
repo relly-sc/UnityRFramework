@@ -56,10 +56,11 @@ namespace UnityRFramework.Expansion
         }
 
         /// <inheritdoc />
-        public override async Task DownloadFileAsync(
+        public override async Task<WebResponse> DownloadFileAsync(
             WebRequestData request,
             string savePath,
-            IProgress<float> progress,
+            bool append,
+            IProgress<WebDownloadProgress> progress,
             CancellationToken ct)
         {
             UnityWebRequest uwr = null;
@@ -75,8 +76,12 @@ namespace UnityRFramework.Expansion
                     System.IO.Directory.CreateDirectory(dir);
                 }
 
+                long initialLength = append && System.IO.File.Exists(savePath)
+                    ? new System.IO.FileInfo(savePath).Length
+                    : 0L;
+
                 uwr = new UnityWebRequest(request.Url, MapMethod(request.Method));
-                uwr.downloadHandler = new DownloadHandlerFile(savePath) { removeFileOnAbort = true };
+                uwr.downloadHandler = new DownloadHandlerFile(savePath, append) { removeFileOnAbort = false };
 
                 if (request.Headers != null)
                 {
@@ -93,16 +98,11 @@ namespace UnityRFramework.Expansion
                 while (!asyncOperation.isDone)
                 {
                     await UniTask.Yield(PlayerLoopTiming.Update, ct);
-                    progress?.Report(asyncOperation.progress);
+                    progress?.Report(BuildDownloadProgress(uwr, initialLength));
                 }
 
-                if (uwr.result != UnityWebRequest.Result.Success)
-                {
-                    throw new System.Exception(
-                        string.Format("UniTask download failed: {0} ({1})", uwr.error, uwr.responseCode));
-                }
-
-                progress?.Report(1f);
+                progress?.Report(BuildDownloadProgress(uwr, initialLength));
+                return BuildFileResponse(uwr);
             }
             catch (OperationCanceledException)
             {

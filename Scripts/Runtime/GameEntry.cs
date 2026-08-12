@@ -62,6 +62,11 @@ namespace UnityRFramework.Runtime
         private static WebRequestComponent webRequestCache;
 
         /// <summary>
+        /// 下载组件缓存。
+        /// </summary>
+        private static DownloadComponent downloadCache;
+
+        /// <summary>
         /// 实体组件缓存。
         /// </summary>
         private static EntityComponent entityCache;
@@ -229,6 +234,21 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>
+        /// 获取可靠文件下载组件。
+        /// </summary>
+        public static DownloadComponent Download
+        {
+            get
+            {
+                if (downloadCache == null)
+                {
+                    downloadCache = Get<DownloadComponent>();
+                }
+                return downloadCache;
+            }
+        }
+
+        /// <summary>
         /// 获取场景组件。
         /// </summary>
         public static SceneComponent Scene
@@ -362,6 +382,7 @@ namespace UnityRFramework.Runtime
             fsmCache = null;
             procedureCache = null;
             webRequestCache = null;
+            downloadCache = null;
             entityCache = null;
             sceneCache = null;
             uiCache = null;

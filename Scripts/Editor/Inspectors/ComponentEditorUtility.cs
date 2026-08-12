@@ -210,6 +210,13 @@ namespace UnityRFramework.Editor
                 DrawValue("Active Requests", webRequestComponent.ActiveRequestCount.ToString());
                 DrawValue("Queued Requests", webRequestComponent.QueuedRequestCount.ToString());
             }
+            else if (component is Runtime.DownloadComponent downloadComponent)
+            {
+                DrawValue("Active Downloads", downloadComponent.ActiveDownloadCount.ToString());
+                DrawValue(
+                    "Downloaded Parts",
+                    string.Format("{0:0.00} MB", downloadComponent.ActiveDownloadedBytes / (1024d * 1024d)));
+            }
 
             EditorGUILayout.EndVertical();
         }

@@ -219,6 +219,22 @@ namespace UnityRFramework.Runtime
             return webRequestModule.DownloadFileAsync(url, savePath, progress, headers, tag, priority, ct);
         }
 
+        /// <inheritdoc cref="IWebRequestModule.DownloadFileRangeAsync" />
+        public Task<WebResponse> DownloadFileRangeAsync(
+            string url,
+            string savePath,
+            long offset,
+            IProgress<WebDownloadProgress> progress = null,
+            Dictionary<string, string> headers = null,
+            string tag = null,
+            uint priority = 0,
+            int timeoutMs = 0,
+            CancellationToken ct = default)
+        {
+            return webRequestModule.DownloadFileRangeAsync(
+                url, savePath, offset, progress, headers, tag, priority, timeoutMs, ct);
+        }
+
         /// <inheritdoc cref="IWebRequestModule.GetJsonAsync{T}"/>
         public Task<T> GetJsonAsync<T>(
             string url,

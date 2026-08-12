@@ -850,6 +850,19 @@ namespace UnityRFramework.Editor
                     moduleInfos.Add(new ModuleDebugInfo("WebRequest",
                         string.Format("Active: {0}  Queued: {1}", webM.ActiveRequestCount, webM.QueuedRequestCount), details));
                 }
+
+                // Download
+                var downloadM = RFramework.RFrameworkModuleHost.Get<RFramework.IDownloadModule>();
+                if (downloadM != null)
+                {
+                    var details = new Dictionary<string, string>
+                    {
+                        { "Active", downloadM.ActiveDownloadCount.ToString() },
+                        { "Partial Bytes", downloadM.ActiveDownloadedBytes.ToString() }
+                    };
+                    moduleInfos.Add(new ModuleDebugInfo("Download",
+                        string.Format("Active: {0}", downloadM.ActiveDownloadCount), details));
+                }
             }
             catch (Exception)
             {

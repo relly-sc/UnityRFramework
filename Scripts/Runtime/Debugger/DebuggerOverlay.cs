@@ -795,6 +795,16 @@ namespace UnityRFramework.Runtime
                 if (webM != null)
                     moduleInfos.Add(new ModuleDebugInfo("WebRequest",
                         string.Format("Active: {0}  Queued: {1}", webM.ActiveRequestCount, webM.QueuedRequestCount), null));
+
+                // Download
+                var downloadM = RFramework.RFrameworkModuleHost.Get<RFramework.IDownloadModule>();
+                if (downloadM != null)
+                    moduleInfos.Add(new ModuleDebugInfo("Download",
+                        string.Format("Active: {0}", downloadM.ActiveDownloadCount),
+                        new Dictionary<string, string>
+                        {
+                            { "Partial Bytes", downloadM.ActiveDownloadedBytes.ToString() }
+                        }));
             }
             catch (Exception e)
             {

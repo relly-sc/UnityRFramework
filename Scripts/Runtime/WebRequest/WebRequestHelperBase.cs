@@ -32,7 +32,12 @@ namespace UnityRFramework.Runtime
         public abstract Task<WebResponse> SendAsync(WebRequestData request, IProgress<float> progress, CancellationToken ct);
 
         /// <inheritdoc/>
-        public abstract Task DownloadFileAsync(WebRequestData request, string savePath, IProgress<float> progress, CancellationToken ct);
+        public abstract Task<WebResponse> DownloadFileAsync(
+            WebRequestData request,
+            string savePath,
+            bool append,
+            IProgress<WebDownloadProgress> progress,
+            CancellationToken ct);
 
         #region 共享工具方法
 
@@ -119,6 +124,49 @@ namespace UnityRFramework.Runtime
             var (error, errorMessage) = MapError(uwr.result, uwr.error);
 
             return new WebResponse(statusCode, contentType, headersDict, data, error, errorMessage);
+        }
+
+        /// <summary>
+        /// 从文件下载请求构建响应。DownloadHandlerFile 不读取响应体，只保留状态与响应头。
+        /// </summary>
+        protected static WebResponse BuildFileResponse(UnityWebRequest uwr)
+        {
+            int statusCode = (int)uwr.responseCode;
+            string contentType = uwr.GetResponseHeader("Content-Type") ?? string.Empty;
+            Dictionary<string, string> headers = uwr.GetResponseHeaders() is Dictionary<string, string> source
+                ? new Dictionary<string, string>(source, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            (WebRequestError error, string errorMessage) = MapError(uwr.result, uwr.error);
+            return new WebResponse(statusCode, contentType, headers, null, error, errorMessage);
+        }
+
+        /// <summary>
+        /// 根据 UnityWebRequest 当前状态生成累计文件字节进度。
+        /// </summary>
+        protected static WebDownloadProgress BuildDownloadProgress(UnityWebRequest uwr, long initialLength)
+        {
+            long downloaded = initialLength + (long)uwr.downloadedBytes;
+            long total = ParseTotalLength(uwr.GetResponseHeader("Content-Range"));
+            if (total < 0 && long.TryParse(uwr.GetResponseHeader("Content-Length"), out long responseLength))
+            {
+                total = initialLength + responseLength;
+            }
+
+            return new WebDownloadProgress(downloaded, total);
+        }
+
+        private static long ParseTotalLength(string contentRange)
+        {
+            if (string.IsNullOrEmpty(contentRange))
+            {
+                return -1;
+            }
+
+            int slashIndex = contentRange.LastIndexOf('/');
+            return slashIndex >= 0
+                && long.TryParse(contentRange.Substring(slashIndex + 1), out long total)
+                    ? total
+                    : -1;
         }
 
         /// <summary>
