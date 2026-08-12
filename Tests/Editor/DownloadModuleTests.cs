@@ -121,6 +121,33 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        /// <summary>验证远端 HEAD 明确返回不同大小时会在文件传输前失败。</summary>
+        [Test]
+        public void DownloadAsyncRejectsRemoteSizeBeforeTransfer()
+        {
+            string targetPath = Path.Combine(testDirectory, "payload.bin");
+            FakeDownloadHelper helper = new FakeDownloadHelper(
+                (request, path, append) =>
+                {
+                    Assert.Fail("File transfer must not start after remote size mismatch.");
+                    return null;
+                },
+                request => Response(200, null, 12L));
+            RFrameworkModuleHost.Get<IWebRequestModule>().SetHelper(helper);
+
+            RFrameworkException exception = Assert.Throws<RFrameworkException>(() =>
+                RFrameworkModuleHost.Get<IDownloadModule>().DownloadAsync(
+                        "https://example.invalid/payload.bin",
+                        targetPath,
+                        new DownloadOptions { ExpectedSize = 6, MaxRetries = 0 })
+                    .GetAwaiter()
+                    .GetResult());
+
+            StringAssert.Contains("before download", exception.Message);
+            Assert.AreEqual(0, helper.DownloadCallCount);
+            Assert.IsFalse(File.Exists(targetPath + ".part"));
+        }
+
         /// <summary>验证 ZIP 下载成功后会安全解压并提交目标目录。</summary>
         [UnityTest]
         public IEnumerator DownloadAsyncExtractsZipArchive()
@@ -134,6 +161,7 @@ namespace UnityRFramework.Editor.Tests
             });
             RFrameworkModuleHost.Get<IWebRequestModule>().SetHelper(helper);
 
+            float extractionProgress = 0f;
             Task<DownloadResult> task = RFrameworkModuleHost.Get<IDownloadModule>().DownloadAsync(
                 "https://example.invalid/content.zip",
                 targetPath,
@@ -142,11 +170,19 @@ namespace UnityRFramework.Editor.Tests
                     ExpectedSize = archive.Length,
                     ExtractZip = true,
                     ExtractDirectory = Path.Combine(testDirectory, "content")
-                });
+                },
+                new Progress<DownloadProgress>(value =>
+                {
+                    if (value.Stage == DownloadStage.Extracting)
+                    {
+                        extractionProgress = value.Progress;
+                    }
+                }));
             yield return WaitForTask(task);
             DownloadResult result = task.GetAwaiter().GetResult();
 
             Assert.IsTrue(result.Extracted);
+            Assert.AreEqual(1f, extractionProgress, 0.001f);
             Assert.AreEqual("payload", File.ReadAllText(Path.Combine(testDirectory, "content", "folder", "data.txt")));
         }
 
@@ -187,12 +223,17 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
-        private static WebResponse Response(int statusCode, string contentRange)
+        private static WebResponse Response(int statusCode, string contentRange, long? contentLength = null)
         {
             Dictionary<string, string> headers = new Dictionary<string, string>();
             if (!string.IsNullOrEmpty(contentRange))
             {
                 headers["content-range"] = contentRange;
+            }
+
+            if (contentLength.HasValue)
+            {
+                headers["content-length"] = contentLength.Value.ToString();
             }
 
             return new WebResponse(statusCode, string.Empty, headers, null);
@@ -226,15 +267,27 @@ namespace UnityRFramework.Editor.Tests
         private sealed class FakeDownloadHelper : IWebRequestHelper
         {
             private readonly Func<WebRequestData, string, bool, WebResponse> download;
+            private readonly Func<WebRequestData, WebResponse> send;
 
-            public FakeDownloadHelper(Func<WebRequestData, string, bool, WebResponse> download)
+            public int DownloadCallCount { get; private set; }
+
+            public FakeDownloadHelper(
+                Func<WebRequestData, string, bool, WebResponse> download,
+                Func<WebRequestData, WebResponse> send = null)
             {
                 this.download = download;
+                this.send = send;
             }
 
             public Task<WebResponse> SendAsync(WebRequestData request, IProgress<float> progress, CancellationToken ct)
             {
-                throw new NotSupportedException();
+                ct.ThrowIfCancellationRequested();
+                if (send == null)
+                {
+                    throw new NotSupportedException();
+                }
+
+                return Task.FromResult(send(request));
             }
 
             public Task<WebResponse> DownloadFileAsync(
@@ -245,6 +298,7 @@ namespace UnityRFramework.Editor.Tests
                 CancellationToken ct)
             {
                 ct.ThrowIfCancellationRequested();
+                DownloadCallCount++;
                 return Task.FromResult(download(request, savePath, append));
             }
         }

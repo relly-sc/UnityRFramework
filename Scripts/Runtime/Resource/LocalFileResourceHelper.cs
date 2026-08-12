@@ -51,7 +51,7 @@ namespace UnityRFramework.Runtime
 
         /// <inheritdoc/>
         public override async Task<object> LoadAssetAsync(string location, Type assetType,
-            uint priority, CancellationToken ct = default)
+            uint priority, CancellationToken ct = default, IProgress<float> onProgress = null)
         {
             ValidateLocation(location);
             Type requestedType = assetType ?? typeof(Object);
@@ -59,19 +59,21 @@ namespace UnityRFramework.Runtime
             AssetHandleKey key = new AssetHandleKey(location, requestedType);
             if (loadedAssets.TryGetValue(key, out LoadedAssetHandle cached))
             {
+                onProgress?.Report(1f);
                 return cached.Asset;
             }
 
             if (!CanLoadFromLocalFile(localFileType))
             {
-                return await LoadFallbackAsync(key, location, requestedType, priority, ct);
+                return await LoadFallbackAsync(
+                    key, location, requestedType, priority, ct, onProgress);
             }
 
             string persistentPath = GetPersistentPath(location);
             if (File.Exists(persistentPath))
             {
                 LoadedAssetHandle persistentHandle = await LoadFromUrlAsync(
-                    ToRequestUrl(persistentPath), localFileType, ct);
+                    ToRequestUrl(persistentPath), localFileType, ct, onProgress);
                 loadedAssets.Add(key, persistentHandle);
                 return persistentHandle.Asset;
             }
@@ -82,7 +84,7 @@ namespace UnityRFramework.Runtime
             try
             {
                 streamingHandle = await LoadFromUrlAsync(
-                    ToRequestUrl(streamingPath), localFileType, ct);
+                    ToRequestUrl(streamingPath), localFileType, ct, onProgress);
             }
             catch (OperationCanceledException)
             {
@@ -100,7 +102,7 @@ namespace UnityRFramework.Runtime
             }
 
             object fallbackAsset = await resourcesFallback.LoadAssetAsync(
-                location, requestedType, priority, ct);
+                location, requestedType, priority, ct, onProgress);
             if (fallbackAsset == null)
             {
                 throw new RFrameworkException(
@@ -250,10 +252,10 @@ namespace UnityRFramework.Runtime
         }
 
         private async Task<object> LoadFallbackAsync(AssetHandleKey key, string location,
-            Type requestedType, uint priority, CancellationToken ct)
+            Type requestedType, uint priority, CancellationToken ct, IProgress<float> onProgress)
         {
             object asset = await resourcesFallback.LoadAssetAsync(
-                location, requestedType, priority, ct);
+                location, requestedType, priority, ct, onProgress);
             if (asset != null)
             {
                 loadedAssets.Add(key, LoadedAssetHandle.CreateFallback(asset));
@@ -274,9 +276,10 @@ namespace UnityRFramework.Runtime
         }
 
         private static async Task<LoadedAssetHandle> LoadFromUrlAsync(
-            string url, Type requestedType, CancellationToken ct)
+            string url, Type requestedType, CancellationToken ct, IProgress<float> onProgress)
         {
             ct.ThrowIfCancellationRequested();
+            onProgress?.Report(0f);
             UnityWebRequest request = CreateRequest(url, requestedType);
             try
             {
@@ -289,6 +292,7 @@ namespace UnityRFramework.Runtime
                         ct.ThrowIfCancellationRequested();
                     }
 
+                    onProgress?.Report(operation.progress);
                     await Task.Yield();
                 }
 
@@ -299,7 +303,9 @@ namespace UnityRFramework.Runtime
                         $"LocalFileResourceHelper: request failed '{url}'. {request.error}");
                 }
 
-                return CreateHandleFromRequest(request, requestedType);
+                LoadedAssetHandle handle = CreateHandleFromRequest(request, requestedType);
+                onProgress?.Report(1f);
+                return handle;
             }
             finally
             {

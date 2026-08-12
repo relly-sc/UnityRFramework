@@ -26,6 +26,11 @@
       "path": "Samples~/Sample.Demo"
     },
     {
+      "displayName": "Sample.Download",
+      "description": "内置 DownloadModule 的独立轻量验收场景，覆盖进度、取消、断点续传、大小与 SHA-256 校验、ZIP 解压和软重启。",
+      "path": "Samples~/Sample.Download"
+    },
+    {
       "displayName": "Expansion.Demo",
       "description": "复用官方 Demo 业务并切换到 YooAsset、UniTask 等第三方辅助器的覆盖层。需同时导入 Sample.Demo 与对应 Expansion.* 目录。",
       "path": "Samples~/Expansion.Demo"
@@ -54,6 +59,11 @@
       "displayName": "Expansion.UniTask",
       "description": "UniTask Web 请求辅助器桥接实现。需手动安装 UniTask。",
       "path": "Samples~/Expansion.UniTask"
+    },
+    {
+      "displayName": "Expansion.SharpZipLib",
+      "description": "基于 SharpZipLib 1.4.2 的 DownloadModule 可选 ZIP 解压辅助器，支持 Zip64、加密 ZIP 和解压进度；已内置 Runtime DLL 与 MIT 许可证。",
+      "path": "Samples~/Expansion.SharpZipLib"
     },
     {
       "displayName": "Expansion.ExcelDataReader",

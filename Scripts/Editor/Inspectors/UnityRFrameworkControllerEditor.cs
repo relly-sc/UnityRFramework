@@ -12,7 +12,7 @@ namespace UnityRFramework.Editor
     [CustomEditor(typeof(Runtime.UnityRFrameworkController))]
     public sealed class UnityRFrameworkControllerEditor : UnityRFrameworkComponentEditorBase
     {
-        private SerializedProperty logSinkTypeName;
+        private SerializedProperty logHelperTypeName;
         private SerializedProperty jsonHelperTypeName;
         private SerializedProperty frameRate;
         private SerializedProperty gameSpeed;
@@ -21,7 +21,7 @@ namespace UnityRFramework.Editor
 
         private void OnEnable()
         {
-            logSinkTypeName = serializedObject.FindProperty("logSinkTypeName");
+            logHelperTypeName = serializedObject.FindProperty("logHelperTypeName");
             jsonHelperTypeName = serializedObject.FindProperty("jsonHelperTypeName");
             frameRate = serializedObject.FindProperty("frameRate");
             gameSpeed = serializedObject.FindProperty("gameSpeed");
@@ -34,8 +34,8 @@ namespace UnityRFramework.Editor
             serializedObject.Update();
 
             EditorGUILayout.LabelField("Helpers", EditorStyles.boldLabel);
-            logSinkTypeName.stringValue = ComponentEditorUtility.HelperTypePopup(
-                "Log Sink", logSinkTypeName.stringValue, typeof(ILogSink));
+            logHelperTypeName.stringValue = ComponentEditorUtility.HelperTypePopup(
+                "Log Helper", logHelperTypeName.stringValue, typeof(ILogHelper));
             jsonHelperTypeName.stringValue = ComponentEditorUtility.HelperTypePopup(
                 "JSON Helper", jsonHelperTypeName.stringValue,
                 typeof(RFramework.Utility.Json.IJsonHelper));

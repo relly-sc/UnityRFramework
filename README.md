@@ -10,8 +10,10 @@ Scripts/Runtime/                ← Unity 运行时（Component + Helper 默认�
 Scripts/Editor/                 ← 编辑器工具（Inspector、菜单项）
 Samples/Expansion/                ← 与框架模块无关的可选通用组件
 Samples/Sample.Demo/            ← 官方示例（仅用内置 Helper，串通全部模块）
+Samples/Sample.Download/        ← DownloadModule 独立轻量验收示例
 Samples/Expansion.YooAsset/     ← YooAsset 资源辅助器桥接实现
 Samples/Expansion.UniTask/      ← UniTask Web 请求辅助器桥接实现
+Samples/Expansion.SharpZipLib/  ← SharpZipLib ZIP 解压辅助器桥接实现
 Samples/Expansion.ExcelDataReader/ ← ExcelDataReader 配置表导出工具（EditorOnly）
 Samples/Expansion.Demo/         ← 官方 Demo 的第三方资源实现覆盖层
 Samples/Expansion.HybridCLR/    ← HybridCLR 通用代码热更新加载扩展
@@ -69,6 +71,9 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   `UnityRFramework/Demo/Export Config and Localization`，该菜单会将配置、
   本地化、音频和公告同步到宿主工程的 `Assets/StreamingAssets`，完成后再打开
   `GameAssets/Scenes/DemoBoot.unity`。仅导入 Sample 后直接运行会缺少这些文件。
+- `Sample.Download`：内置 `DownloadModule` 的独立轻量验收场景，不依赖其他 Sample；
+  覆盖进度、取消、断点续传、大小与 SHA-256 校验、ZIP 解压和软重启。导入后打开
+  `GameAssets/Scenes/DownloadAcceptance.unity`，完整步骤见 Sample 自带 README。
 - `Expansion.YooAsset`：YooAsset 资源辅助器桥接实现。需手动安装 YooAsset 3.0.5+。
 - `Expansion.UniTask`：UniTask Web 请求辅助器桥接实现。需手动安装 UniTask。
 - `Expansion.ExcelDataReader`：ExcelDataReader 配置表导出工具，支持从 XLSX/XLS
@@ -83,6 +88,9 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   YooAsset 与 UniTask，再执行菜单
   `UnityRFramework/ExpansionDemo/Rebuild Demo Overlay`。它复用 Sample.Demo 的业务脚本
   和资源，只生成第三方框架预制体、启动场景与 YooAsset 收集规则。
+- `Expansion.SharpZipLib`：可选 ZIP 解压扩展，随 Sample 提供 SharpZipLib 1.4.2 Runtime DLL
+  与 MIT 许可证。通过 `GameEntry.Download.SetArchiveHelper(...)` 注入后支持 Zip64、加密 ZIP
+  和解压进度；完整用法见该 Sample 的 README。
 - `Expansion.HybridCLR`：可选 HybridCLR 代码热更新加载扩展。需手动安装并通过
   `HybridCLR/Installer...` 初始化 HybridCLR；核心包和普通 Demo 不依赖它。
 - `Expansion.HybridCLR.Demo`：在 `Expansion.Demo` 的 YooAsset 资源热更闭环上叠加代码
@@ -149,11 +157,11 @@ GameEntry.Framework.RunInBackground = true;
 GameEntry.Framework.NeverSleep = true;
 ```
 
-`UnityRFrameworkController` 以 `-10000` 执行顺序负责框架启动、逐帧调度和停止，并在初始化时安装日志接收器与 JSON Helper：
+`UnityRFrameworkController` 以 `-10000` 执行顺序负责框架启动、逐帧调度和停止，并在初始化时安装 Log Helper 与 JSON Helper：
 
 | 类型 | 默认实现 | 可选实现 | 区别与注意事项 |
 |---|---|---|---|
-| Log | `DefaultLogSink` | 项目自定义 `ILogSink` | 同时写 Unity Console 和日志文件。桌面平台写到应用数据目录同级的 `Logs/UnityRFramework`，移动平台写到 `persistentDataPath/Logs/UnityRFramework`；包含分卷和过期清理。 |
+| Log | `DefaultLogHelper` | 项目自定义 `ILogHelper` | 同时写 Unity Console 和日志文件。桌面平台写到应用数据目录同级的 `Logs/UnityRFramework`，移动平台写到 `persistentDataPath/Logs/UnityRFramework`；包含分卷和过期清理。 |
 | JSON | `DefaultJsonHelper` | `NewtonsoftJsonHelper`、项目自定义 `IJsonHelper` | 只服务 `Utility.Json`，不决定 Config/Localization 的文件格式。 |
 
 `UnityRFrameworkController` 的 `JSON Helper` 默认使用 `DefaultJsonHelper`（`JsonUtility`），
@@ -180,10 +188,10 @@ Log.Warning("资源 {0} 加载超时", assetPath);
 Log.Error("连接服务器失败：{0}", errorMessage);
 ```
 
-Log 不是独立模块；它使用 Framework 初始化的 `ILogSink`。Runtime 的 `Log` API
+Log 不是独立模块；它使用 Framework 初始化的 `ILogHelper`。Runtime 的 `Log` API
 采用安全写入，框架尚未启动或已经停止时会忽略迟到日志，避免异步收尾影响关闭流程。默认
-`DefaultLogSink` 会落盘，若项目不允许写本地日志、需要上传日志或需要接入平台 SDK，
-应替换 Framework 的 Log Sink，而不是修改业务调用点。
+`DefaultLogHelper` 会落盘，若项目不允许写本地日志、需要上传日志或需要接入平台 SDK，
+应替换 Framework 的 Log Helper，而不是修改业务调用点。
 
 ### Event
 
@@ -278,6 +286,25 @@ await GameEntry.Resource.UnloadSceneAsync("Assets/Scenes/Battle.unity");
 GameEntry.Resource.UnloadUnusedAssets();
 ```
 
+资源与场景异步加载均可传入 `IProgress<float>`：
+
+```csharp
+var progress = new Progress<float>(value =>
+{
+    float percent = value * 100f;
+});
+
+Texture2D texture = await GameEntry.Resource.LoadAssetAsync<Texture2D>(
+    "Images/guide.png", ct: cancellationToken, onProgress: progress);
+await GameEntry.Resource.LoadSceneAsync(
+    "Scenes/Hall", onProgress: progress);
+```
+
+`DefaultResourceHelper` 的资源入口底层使用同步 `Resources.Load`，只能报告开始 0 和完成 1；
+其场景入口使用 `SceneManager.LoadSceneAsync`，可连续报告进度。`LocalFileResourceHelper` 的本地文件请求
+和 `YooAssetResourceHelper` 的资源/场景加载可连续报告底层进度。缓存命中直接报告 1；同资源并发去重时，
+后加入的等待者只报告 0/1，不共享首请求的中间进度。
+
 | 内置 Helper | 实现与加载顺序 | location 规则 | 适用范围与注意事项 |
 |---|---|---|---|
 | `DefaultResourceHelper` | `Resources.Load`；场景使用 `SceneManager` | Unity 资源传相对 `Resources` 目录的路径，扩展名会被移除；场景必须加入 Build Settings，可传完整路径或场景名 | 零配置、小项目和原型。没有版本、远端下载或磁盘更新能力。`Resources.Load` 的异步入口只是 Task 形式，底层仍不能真正取消。 |
@@ -355,6 +382,7 @@ var options = new DownloadOptions
 
 var progress = new Progress<DownloadProgress>(value =>
 {
+    DownloadStage stage = value.Stage; // Preflight / Downloading / Verifying / Extracting
     float percent = value.Progress;
     double mbPerSecond = value.BytesPerSecond / (1024d * 1024d);
     TimeSpan? eta = value.EstimatedRemaining;
@@ -386,9 +414,27 @@ Download 模块依赖 WebRequest 模块，默认使用 `目标路径.part` 保�
 再将 `.part` 提交为最终文件。用户取消、网络失败或框架关闭会保留分片，便于下次继续；
 同一最终路径不允许并发下载。它不负责上传、下载任务持久化、后台系统通知或业务版本管理。
 
-ZIP 使用 .NET 标准库实现，不依赖第三方。模块先解压到独立临时目录，拒绝绝对路径和 `../` 路径穿越，
+设置 `ExpectedSize` 后默认先通过 HEAD 尝试读取远端 `Content-Length`，明确不一致时会在传输前失败；
+服务器不支持 HEAD、未提供长度或使用非 identity 的 `Content-Encoding` 时继续下载。远端声明可能缺失或不可信，
+因此完成后的实际文件大小校验始终保留。可通过 `PreflightRemoteSize = false` 关闭这次额外 HEAD 请求。
+
+ZIP 使用 .NET 标准库在后台线程解压，不依赖第三方，并通过同一 `DownloadProgress` 报告解压阶段、
+解压后字节和当前条目。模块先解压到独立临时目录，拒绝绝对路径和 `../` 路径穿越，
 并限制条目数与解压总大小；全部成功后才替换正式目录。解压失败会清理临时目录、保留已校验的 ZIP，
-已有正式目录保持不变。默认不删除 ZIP；带密码 ZIP、7z 和 RAR 不在默认实现范围，项目可在下载完成后接入自定义解压器。
+已有正式目录保持不变。默认不删除 ZIP；带密码 ZIP、7z 和 RAR 不在默认实现范围。项目可实现
+`IArchiveHelper` 并通过 `GameEntry.Download.SetArchiveHelper(...)` 注入 SharpZipLib 等第三方解压器，
+但仍须实现路径边界、条目数和解压总大小限制。
+
+可选 `Expansion.SharpZipLib` 已实现该接口。导入 Sample 后，推荐直接在 `DownloadComponent`
+Inspector 的 `Archive Helper` 下拉框选择 `UnityRFramework.Expansion.SharpZipLibArchiveHelper`。
+它属于 Download 模块自身配置，不放在全局 Controller 上。也可以在首次下载前通过代码注入：
+
+```csharp
+GameEntry.Download.SetArchiveHelper(new SharpZipLibArchiveHelper());
+```
+
+它不会自动替换核心默认实现，避免仅导入 Sample 就改变现有项目行为。加密 ZIP 可通过构造参数传入密码；
+具体依赖、能力边界和用法见 `Samples/Expansion.SharpZipLib/README.md`。
 
 ### Config
 

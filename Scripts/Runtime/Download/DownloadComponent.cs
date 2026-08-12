@@ -14,6 +14,12 @@ namespace UnityRFramework.Runtime
     [DisallowMultipleComponent]
     public sealed class DownloadComponent : UnityRFrameworkComponent
     {
+        private const string DefaultArchiveHelperTypeName = "RFramework.DefaultZipArchiveHelper";
+
+        [SerializeField]
+        [Tooltip("压缩文件解压辅助器类型全名。默认使用 .NET ZIP 实现，可选择 SharpZipLib 等扩展。")]
+        private string archiveHelperTypeName = DefaultArchiveHelperTypeName;
+
         [SerializeField]
         [Tooltip("默认是否保留并续传 .part 临时文件。")]
         private bool resumeByDefault = true;
@@ -40,6 +46,16 @@ namespace UnityRFramework.Runtime
         {
             base.Awake();
             downloadModule = RFrameworkModuleHost.Get<IDownloadModule>();
+            InstallArchiveHelper();
+        }
+
+        /// <summary>
+        /// 设置压缩文件解压辅助器。传入 null 时恢复框架默认 ZIP 实现。
+        /// 可在项目启动流程中注入 SharpZipLib 等第三方实现。
+        /// </summary>
+        public void SetArchiveHelper(IArchiveHelper helper)
+        {
+            downloadModule.SetArchiveHelper(helper);
         }
 
         /// <summary>
@@ -81,6 +97,32 @@ namespace UnityRFramework.Runtime
                 RetryDelayMilliseconds = retryDelayMilliseconds,
                 RequestTimeoutMilliseconds = requestTimeoutMilliseconds
             };
+        }
+
+        private void InstallArchiveHelper()
+        {
+            if (string.IsNullOrWhiteSpace(archiveHelperTypeName))
+            {
+                archiveHelperTypeName = DefaultArchiveHelperTypeName;
+            }
+
+            Type helperType = Utility.Assembly.GetType(archiveHelperTypeName);
+            if (helperType == null || !typeof(IArchiveHelper).IsAssignableFrom(helperType))
+            {
+                throw new RFrameworkException(
+                    $"DownloadComponent: archive helper '{archiveHelperTypeName}' is missing or invalid.");
+            }
+
+            try
+            {
+                downloadModule.SetArchiveHelper(
+                    (IArchiveHelper)Activator.CreateInstance(helperType));
+            }
+            catch (Exception ex) when (!(ex is RFrameworkException))
+            {
+                throw new RFrameworkException(
+                    $"DownloadComponent: archive helper '{archiveHelperTypeName}' could not be created.", ex);
+            }
         }
     }
 }

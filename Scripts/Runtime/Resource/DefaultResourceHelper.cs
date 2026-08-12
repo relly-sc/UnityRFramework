@@ -104,7 +104,7 @@ namespace UnityRFramework.Runtime
 
         /// <inheritdoc/>
         public override Task<object> LoadAssetAsync(string location, Type assetType, uint priority,
-            CancellationToken ct = default)
+            CancellationToken ct = default, IProgress<float> onProgress = null)
         {
             // 同步路径无法真正中断 Resources.Load，但需在调用方已取消时尽早返回取消，
             // 由上层 ResourceModule 统一处理"首调用者取消"语义（不再发起无意义同步加载）。
@@ -113,7 +113,10 @@ namespace UnityRFramework.Runtime
                 return Task.FromCanceled<object>(ct);
             }
 
-            return Task.FromResult(LoadAssetSync(location, assetType));
+            onProgress?.Report(0f);
+            object asset = LoadAssetSync(location, assetType);
+            onProgress?.Report(1f);
+            return Task.FromResult(asset);
         }
 
         /// <inheritdoc/>

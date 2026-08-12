@@ -41,22 +41,22 @@ namespace UnityRFramework.Editor.Tests
 
         /// <summary>验证强制日志与关闭后安全日志具有不同失败语义。</summary>
         [Test]
-        public void LogSinkSupportsRequiredAndSafeWrites()
+        public void LogHelperSupportsRequiredAndSafeWrites()
         {
-            RecordingSink sink = new RecordingSink();
-            RFrameworkLog.SetSink(sink);
+            RecordingLogHelper helper = new RecordingLogHelper();
+            RFrameworkLog.SetHelper(helper);
 
             RFrameworkLog.Write(LogLevel.Info, "Value {0}", 7);
-            Assert.AreEqual("Value 7", sink.Messages[0]);
+            Assert.AreEqual("Value 7", helper.Messages[0]);
 
             RFrameworkLog.Clear();
-            Assert.IsTrue(sink.IsDisposed);
+            Assert.IsTrue(helper.IsDisposed);
             Assert.IsFalse(RFrameworkLog.TryWrite(LogLevel.Warning, "late"));
             Assert.Throws<RFrameworkException>(() =>
                 RFrameworkLog.Write(LogLevel.Error, "required"));
         }
 
-        private sealed class RecordingSink : ILogSink
+        private sealed class RecordingLogHelper : ILogHelper
         {
             public readonly List<string> Messages = new List<string>();
 

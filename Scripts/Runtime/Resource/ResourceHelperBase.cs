@@ -41,7 +41,7 @@ namespace UnityRFramework.Runtime
         /// <param name="ct">取消令牌，调用方已取消时应尽早中止底层加载。</param>
         /// <returns>加载的资源对象。</returns>
         public abstract Task<object> LoadAssetAsync(string location, Type assetType, uint priority,
-            CancellationToken ct = default);
+            CancellationToken ct = default, IProgress<float> onProgress = null);
 
         /// <summary>
         /// 同步加载资源并返回原始对象。

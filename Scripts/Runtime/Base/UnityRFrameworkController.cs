@@ -1,7 +1,6 @@
 using System;
 using RFramework;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace UnityRFramework.Runtime
 {
@@ -13,9 +12,8 @@ namespace UnityRFramework.Runtime
     [DefaultExecutionOrder(-10000)]
     public sealed class UnityRFrameworkController : UnityRFrameworkComponent
     {
-        [FormerlySerializedAs("logHelperTypeName")]
         [SerializeField]
-        private string logSinkTypeName = "UnityRFramework.Runtime.DefaultLogSink";
+        private string logHelperTypeName = "UnityRFramework.Runtime.DefaultLogHelper";
 
         [SerializeField]
         private string jsonHelperTypeName = "UnityRFramework.Runtime.DefaultJsonHelper";
@@ -91,7 +89,7 @@ namespace UnityRFramework.Runtime
         protected override void Awake()
         {
             base.Awake();
-            InstallLogSink();
+            InstallLogHelper();
             Log.Info("[UnityRFramework] Framework startup started.");
             Log.Info("Unity Version: {0}", Application.unityVersion);
 
@@ -205,23 +203,23 @@ namespace UnityRFramework.Runtime
             }
         }
 
-        private void InstallLogSink()
+        private void InstallLogHelper()
         {
-            Type sinkType = Utility.Assembly.GetType(logSinkTypeName);
-            if (sinkType == null || !typeof(ILogSink).IsAssignableFrom(sinkType))
+            Type helperType = Utility.Assembly.GetType(logHelperTypeName);
+            if (helperType == null || !typeof(ILogHelper).IsAssignableFrom(helperType))
             {
                 throw new RFrameworkException(
-                    $"Log sink '{logSinkTypeName}' is missing or does not implement ILogSink.");
+                    $"Log helper '{logHelperTypeName}' is missing or does not implement ILogHelper.");
             }
 
             try
             {
-                RFrameworkLog.SetSink((ILogSink)Activator.CreateInstance(sinkType));
+                RFrameworkLog.SetHelper((ILogHelper)Activator.CreateInstance(helperType));
             }
             catch (Exception ex) when (!(ex is RFrameworkException))
             {
                 throw new RFrameworkException(
-                    $"Log sink '{logSinkTypeName}' could not be created.", ex);
+                    $"Log helper '{logHelperTypeName}' could not be created.", ex);
             }
         }
 

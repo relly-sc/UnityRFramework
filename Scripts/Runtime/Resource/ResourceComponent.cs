@@ -165,10 +165,11 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 异步加载资源
         /// </summary>
-        public Task<T> LoadAssetAsync<T>(string location, uint priority = 0, CancellationToken ct = default)
+        public Task<T> LoadAssetAsync<T>(string location, uint priority = 0,
+            CancellationToken ct = default, IProgress<float> onProgress = null)
             where T : class
         {
-            return resourceModule.LoadAssetAsync<T>(location, priority, ct);
+            return resourceModule.LoadAssetAsync<T>(location, priority, ct, onProgress);
         }
 
         /// <summary>

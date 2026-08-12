@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 
+using RFramework;
 using UnityEditor;
 
 namespace UnityRFramework.Editor
@@ -10,6 +11,7 @@ namespace UnityRFramework.Editor
     [CustomEditor(typeof(Runtime.DownloadComponent))]
     public sealed class DownloadComponentEditor : UnityRFrameworkComponentEditorBase
     {
+        private SerializedProperty archiveHelperTypeName;
         private SerializedProperty resumeByDefault;
         private SerializedProperty maxRetries;
         private SerializedProperty retryDelayMilliseconds;
@@ -17,6 +19,7 @@ namespace UnityRFramework.Editor
 
         private void OnEnable()
         {
+            archiveHelperTypeName = serializedObject.FindProperty("archiveHelperTypeName");
             resumeByDefault = serializedObject.FindProperty("resumeByDefault");
             maxRetries = serializedObject.FindProperty("maxRetries");
             retryDelayMilliseconds = serializedObject.FindProperty("retryDelayMilliseconds");
@@ -26,6 +29,11 @@ namespace UnityRFramework.Editor
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
+            EditorGUILayout.LabelField("Helpers", EditorStyles.boldLabel);
+            archiveHelperTypeName.stringValue = ComponentEditorUtility.HelperTypePopup(
+                "Archive Helper", archiveHelperTypeName.stringValue, typeof(IArchiveHelper));
+
+            EditorGUILayout.Space();
             EditorGUILayout.LabelField("Download Settings", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(resumeByDefault);
             EditorGUILayout.PropertyField(maxRetries);

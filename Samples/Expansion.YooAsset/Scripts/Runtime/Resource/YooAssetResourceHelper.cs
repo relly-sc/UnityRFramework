@@ -444,7 +444,7 @@ namespace UnityRFramework.Expansion
         /// <param name="ct">取消令牌。</param>
         /// <returns>加载后的资源对象。</returns>
         public override async Task<object> LoadAssetAsync(string location, Type assetType, uint priority,
-            CancellationToken ct = default)
+            CancellationToken ct = default, IProgress<float> onProgress = null)
         {
             EnsureInitialized();
             ct.ThrowIfCancellationRequested();
@@ -454,6 +454,7 @@ namespace UnityRFramework.Expansion
             AssetHandleKey key = new AssetHandleKey(location, requestedType);
             if (assetHandles.TryGetValue(key, out AssetHandle cachedHandle))
             {
+                onProgress?.Report(1f);
                 RecordCacheAccess(location);
                 return ConvertAsset(cachedHandle.AssetObject, requestedType, location);
             }
@@ -464,6 +465,7 @@ namespace UnityRFramework.Expansion
                 while (!handle.IsDone)
                 {
                     ct.ThrowIfCancellationRequested();
+                    onProgress?.Report(handle.Progress);
                     await Task.Yield();
                 }
 
@@ -478,6 +480,7 @@ namespace UnityRFramework.Expansion
                 }
 
                 object result = ConvertAsset(handle.AssetObject, requestedType, location);
+                onProgress?.Report(1f);
                 assetHandles.Add(key, handle);
                 RecordCacheAccess(location);
                 return result;

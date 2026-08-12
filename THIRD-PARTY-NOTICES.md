@@ -15,6 +15,16 @@ UnityRFramework 原创代码以项目根目录中的 Apache License 2.0 授权�
 - 完整许可证：`Samples/Expansion.ExcelDataReader/Plugins/ExcelDataReader/LICENSE.txt`
   （UPM 包中对应 `Samples~/Expansion.ExcelDataReader/Plugins/ExcelDataReader/LICENSE.txt`）
 
+### SharpZipLib 1.4.2
+
+- 组件：`ICSharpCode.SharpZipLib.dll`
+- 用途：Expansion.SharpZipLib Sample 的可选 ZIP 解压辅助器
+- 版权所有：Copyright (c) 2000-2018 SharpZipLib Contributors
+- 许可证：MIT License
+- 来源：https://github.com/icsharpcode/SharpZipLib/tree/v1.4.2
+- 完整许可证：`Samples/Expansion.SharpZipLib/Plugins/SharpZipLib/LICENSE.txt`
+  （UPM 包中对应 `Samples~/Expansion.SharpZipLib/Plugins/SharpZipLib/LICENSE.txt`）
+
 ### Noto Sans SC
 
 - 文件：`NotoSansSC-Regular.ttf`、`NotoSansSC-Medium.ttf`、`NotoSansSC-Bold.ttf`
