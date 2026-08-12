@@ -1,0 +1,27 @@
+{
+    "schemaVersion": 1,
+    "codeVersion": "2026-08-10-142935",
+    "buildTarget": "StandaloneWindows64",
+    "entryTypeName": "UnityRFramework.Sample.HotUpdateEntry",
+    "aotMetadata": [
+        {
+            "assemblyName": "mscorlib",
+            "location": "HotUpdate/StandaloneWindows64/AOT/mscorlib.dll"
+        },
+        {
+            "assemblyName": "System",
+            "location": "HotUpdate/StandaloneWindows64/AOT/System.dll"
+        },
+        {
+            "assemblyName": "System.Core",
+            "location": "HotUpdate/StandaloneWindows64/AOT/System.Core.dll"
+        }
+    ],
+    "hotUpdateAssemblies": [
+        {
+            "assemblyName": "UnityRFramework.HotUpdate",
+            "dllLocation": "HotUpdate/StandaloneWindows64/Assemblies/UnityRFramework.HotUpdate.dll",
+            "pdbLocation": ""
+        }
+    ]
+}

@@ -1,0 +1,5 @@
+Id,NameKey,Power
+int,string,float
+编号,名称键,威力
+1,acceptance_attack,1
+2,acceptance_skill,1.5

@@ -1,0 +1,74 @@
+name: Publish UPM Branch
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# This workflow force-updates only the generated `upm` branch.
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Generate UPM package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out main source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Create and publish UPM branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          release_dir="$(mktemp -d)"
+          commit_message_file="$RUNNER_TEMP/upm-commit-message.txt"
+          git archive --format=tar "$GITHUB_SHA" | tar -xf - -C "$release_dir"
+
+          if [[ ! -f "Library/RFramework/RFramework.Library.asmdef" ]]; then
+            echo "RFramework submodule was not checked out." >&2
+            exit 1
+          fi
+
+          if [[ ! -f "Library/RFramework/RFramework.Library.asmdef.meta" ]]; then
+            echo "RFramework submodule does not track Unity .meta files." >&2
+            exit 1
+          fi
+
+          library_sha="$(git -C Library/RFramework rev-parse HEAD)"
+          git show -s --format='%B' "$GITHUB_SHA" > "$commit_message_file"
+          printf '\nPublished from main: %s\nRFramework: %s\n' \
+            "$GITHUB_SHA" "$library_sha" >> "$commit_message_file"
+
+          mkdir -p "$release_dir/Library/RFramework"
+          git -C Library/RFramework archive --format=tar HEAD \
+            | tar -xf - -C "$release_dir/Library/RFramework"
+          # 发布分支已包含 Library 源码，不再保留需要递归克隆的子模块定义。
+          rm -f "$release_dir/.gitmodules"
+
+          if [[ ! -d "$release_dir/Samples" ]]; then
+            echo "Expected the source package to contain Samples/." >&2
+            exit 1
+          fi
+
+          mv "$release_dir/Samples" "$release_dir/Samples~"
+          # Samples.meta 仍指向重命名前的目录；保留它会让 Unity 显示空 Samples 文件夹。
+          rm -f "$release_dir/Samples.meta"
+
+          cd "$release_dir"
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit -F "$commit_message_file"
+          git branch -M upm
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin upm

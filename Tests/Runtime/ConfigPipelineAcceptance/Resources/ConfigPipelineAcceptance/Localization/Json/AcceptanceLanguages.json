@@ -1,0 +1,10 @@
+{
+  "Languages": [
+    { "Language": "en", "Items": [
+      { "Key": "acceptance_title", "Value": "Config Pipeline Acceptance" }
+    ] },
+    { "Language": "zh-CN", "Items": [
+      { "Key": "acceptance_title", "Value": "配置管线验收" }
+    ] }
+  ]
+}

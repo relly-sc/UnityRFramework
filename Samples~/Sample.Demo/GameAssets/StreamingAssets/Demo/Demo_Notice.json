@@ -1,0 +1,8 @@
+{
+  "TitleKey": "notice_title",
+  "LineKeys": [
+    "notice_line_welcome",
+    "notice_line_weekly",
+    "notice_line_settings"
+  ]
+}
