@@ -43,6 +43,12 @@
    `GameAssets/OnDemand/Elastigirl/Elastigirl.fbx` 按需验证模型。
 5. 将 ExpansionDemoBoot、DemoHall、DemoExpedition 放入 Build Settings 前三项。
 
+Demo Collector 使用 Asset GUID 生成短 Bundle 名，不把 UPM Sample 的完整安装路径写入
+文件名。这样导入到 `Assets/Samples/UnityRFramework/<版本号>/...` 后也不会因 Windows
+路径长度限制导致构建失败。Host 构建菜单会读取 YooAsset Bundle Builder 为当前 Package
+保存的文件名样式、压缩、缓存、依赖数据库、内置复制和加解密设置；正式项目仍应按资源
+规模和更新粒度设计自己的分组与打包规则。
+
 该 Builder 只写入 `Expansion.Demo/Generated`。即使同时导入并重建
 `Expansion.HybridCLR.Demo`，普通 Demo 的框架预制体、启动场景和入口脚本也不会被替换；
 再次执行本菜单会把普通 Demo 启动场景切回 Build Settings 第一项。

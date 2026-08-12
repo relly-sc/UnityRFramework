@@ -54,6 +54,9 @@ Settings 第一项。HybridCLR Demo 仍复用 Expansion.Demo 的业务资源和�
 顺序保持不变，但这些业务资源会被独立收集到 `ExpansionHybridCLRDemoPackage`；运行时
 不会依赖或加载 `ExpansionDemoPackage`。
 
+本 Sample 沿用 Expansion.Demo 的 GUID 短 Bundle 命名规则，不把 UPM Sample 完整安装
+路径写入 Bundle 文件名；热更新 DLL、AOT 元数据和代码 Manifest 也使用相同短名规则。
+
 启动入口会检查 `preload + hotupdate` 两类标签：有差量时沿用现有 UI 显示文件数、大小、
 网速和进度；资源就绪后加载 AOT 元数据与热更新 DLL，显示代码版本，再由热更新按钮进入
 现有 Demo。

@@ -159,6 +159,7 @@ namespace UnityRFramework.Expansion
             AssetDatabase.SaveAssets();
 
             string version = DateTime.Now.ToString("yyyy-MM-dd-HHmmss");
+            string pipelineName = EBuildPipeline.ScriptableBuildPipeline.ToString();
             string shaderBundleName = DefaultBundlePackRule
                 .CreateShadersPackRuleResult()
                 .GetBundleName(
@@ -168,7 +169,7 @@ namespace UnityRFramework.Expansion
             {
                 BuildOutputRoot = BundleBuilderHelper.GetDefaultBuildOutputRoot(),
                 BundledFileRoot = BundleBuilderHelper.GetStreamingAssetsRoot(),
-                BuildPipeline = EBuildPipeline.ScriptableBuildPipeline.ToString(),
+                BuildPipeline = pipelineName,
                 BuildBundleType = (int)EBundleType.AssetBundle,
                 BuildTarget = EditorUserBuildSettings.activeBuildTarget,
                 PackageName = packageName,
@@ -176,17 +177,41 @@ namespace UnityRFramework.Expansion
                 PackageNote = packageNote,
                 EnableSharePackRule = true,
                 VerifyBuildingResult = true,
-                FileNameStyle = EFileNameStyle.BundleName,
-                BundledCopyOption = EBundledCopyOption.None,
-                BundledCopyParams = string.Empty,
-                CompressOption = ECompressOption.LZ4,
-                ClearBuildCacheFiles = false,
-                UseAssetDependencyDB = true,
+                FileNameStyle = BundleBuilderSetting.GetPackageFileNameStyle(
+                    packageName,
+                    pipelineName),
+                BundledCopyOption = BundleBuilderSetting.GetPackageBundledCopyOption(
+                    packageName,
+                    pipelineName),
+                BundledCopyParams = BundleBuilderSetting.GetPackageBundledCopyParams(
+                    packageName,
+                    pipelineName),
+                CompressOption = BundleBuilderSetting.GetPackageCompressOption(
+                    packageName,
+                    pipelineName),
+                ClearBuildCacheFiles = BundleBuilderSetting.GetPackageClearBuildCache(
+                    packageName,
+                    pipelineName),
+                UseAssetDependencyDB = BundleBuilderSetting.GetPackageUseAssetDependencyDB(
+                    packageName,
+                    pipelineName),
                 WriteLinkXML = true,
                 BuiltinShadersBundleName = shaderBundleName,
-                BundleEncryptor = new EncryptionNone(),
-                ManifestEncryptor = new ManifestEncryptorNone(),
-                ManifestDecryptor = new ManifestDecryptorNone()
+                BundleEncryptor = CreateBuilderSettingInstance<IBundleEncryptor>(
+                    BundleBuilderSetting.GetPackageBundleEncryptorClassName(
+                        packageName,
+                        pipelineName),
+                    "Bundle encryptor"),
+                ManifestEncryptor = CreateBuilderSettingInstance<IManifestEncryptor>(
+                    BundleBuilderSetting.GetPackageManifestEncryptorClassName(
+                        packageName,
+                        pipelineName),
+                    "Manifest encryptor"),
+                ManifestDecryptor = CreateBuilderSettingInstance<IManifestDecryptor>(
+                    BundleBuilderSetting.GetPackageManifestDecryptorClassName(
+                        packageName,
+                        pipelineName),
+                    "Manifest decryptor")
             };
 
             ScriptableBuildPipeline pipeline = new ScriptableBuildPipeline();
@@ -213,6 +238,30 @@ namespace UnityRFramework.Expansion
             Debug.Log(
                 $"[ExpansionDemo] Host package '{version}' published to '{serverRoot}'.");
             EditorUtility.RevealInFinder(serverRoot);
+        }
+
+        private static T CreateBuilderSettingInstance<T>(
+            string className,
+            string settingName)
+            where T : class
+        {
+            Type classType = EditorAssemblyUtility
+                .GetAssignableTypes(typeof(T))
+                .FirstOrDefault(type => string.Equals(
+                    type.FullName,
+                    className,
+                    StringComparison.Ordinal));
+            if (classType == null)
+            {
+                throw new InvalidOperationException(
+                    $"ExpansionDemoBuilder: {settingName} type not found: "
+                    + $"'{className}'. Please correct it in YooAsset Bundle Builder.");
+            }
+
+            return Activator.CreateInstance(classType) as T
+                   ?? throw new InvalidOperationException(
+                       $"ExpansionDemoBuilder: failed to create {settingName} "
+                       + $"'{className}'.");
         }
 
         private static void PublishPackage(string sourceRoot, string targetRoot)
@@ -546,19 +595,19 @@ namespace UnityRFramework.Expansion
             group.Collectors.Add(CreateCollector(
                 DemoResources,
                 nameof(ExpansionDemoResourcesAddressRule),
-                nameof(PackSeparately),
+                nameof(ExpansionDemoShortPackRule),
                 nameof(CollectAll),
                 PreloadTag));
             group.Collectors.Add(CreateCollector(
                 DemoScenes,
                 nameof(AddressByFileName),
-                nameof(PackSeparately),
+                nameof(ExpansionDemoShortPackRule),
                 nameof(CollectScene),
                 PreloadTag));
             group.Collectors.Add(CreateCollector(
                 OnDemandModel,
                 nameof(ExpansionDemoOnDemandAddressRule),
-                nameof(PackSeparately),
+                nameof(ExpansionDemoShortPackRule),
                 nameof(CollectAll),
                 OnDemandTag));
 
@@ -1096,6 +1145,28 @@ namespace UnityRFramework.Expansion
         string IAddressRule.GetAssetAddress(AddressRuleData data)
         {
             return "ExpansionDemo/OnDemandModel";
+        }
+    }
+
+    /// <summary>
+    /// 使用 Unity Asset GUID 生成与 Sample 安装目录无关的短资源包名称。
+    /// </summary>
+    public sealed class ExpansionDemoShortPackRule : IBundlePackRule
+    {
+        /// <inheritdoc />
+        BundlePackRuleResult IBundlePackRule.GetPackRuleResult(
+            BundlePackRuleData data)
+        {
+            string guid = AssetDatabase.AssetPathToGUID(data.AssetPath);
+            if (string.IsNullOrEmpty(guid))
+            {
+                throw new InvalidOperationException(
+                    $"ExpansionDemo asset has no valid GUID: '{data.AssetPath}'.");
+            }
+
+            return new BundlePackRuleResult(
+                "asset_" + guid,
+                DefaultBundlePackRule.AssetBundleFileExtension);
         }
     }
 }

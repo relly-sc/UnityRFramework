@@ -153,7 +153,7 @@ namespace UnityRFramework.Editor
                 CollectorGUID = AssetDatabase.AssetPathToGUID(HotUpdateRoot),
                 CollectorType = ECollectorType.MainAssetCollector,
                 AddressRuleName = nameof(HybridCLRHotUpdateAddressRule),
-                PackRuleName = nameof(PackSeparately),
+                PackRuleName = nameof(ExpansionDemoShortPackRule),
                 FilterRuleName = nameof(CollectAll),
                 AssetTags = HotUpdateTag
             });
