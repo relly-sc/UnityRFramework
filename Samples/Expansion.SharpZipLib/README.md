@@ -16,7 +16,7 @@ DLL 会参与 Editor 和 Player 编译，以便在 Play Mode 和目标平台运�
 
 推荐在 `DownloadComponent` Inspector 的 `Archive Helper` 下拉框选择
 `UnityRFramework.Expansion.SharpZipLibArchiveHelper`。默认值为
-`RFramework.DefaultZipArchiveHelper`，导入本 Sample 不会自动改变已有项目行为。
+`RFramework.DefaultArchiveHelper`，导入本 Sample 不会自动改变已有项目行为。
 
 也可以在发起需要 ZIP 解压的下载前通过代码注入：
 
@@ -42,7 +42,8 @@ DownloadResult result = await GameEntry.Download.DownloadAsync(
     savePath,
     new DownloadOptions
     {
-        ExtractZip = true,
+        ExtractArchive = true,
+        ArchiveFormat = ArchiveFormat.Zip,
         ExtractDirectory = extractDirectory
     },
     progress,
@@ -56,4 +57,4 @@ DownloadResult result = await GameEntry.Download.DownloadAsync(
 - 保留框架要求的路径穿越防护、最大条目数和最大解压字节数限制。
 - `DownloadModule` 仍负责临时目录、正式目录替换、失败恢复和压缩包删除策略。
 - 本实现不处理 RAR；Tar、GZip、BZip2 虽然 SharpZipLib 提供底层能力，但当前
-  `DownloadOptions.ExtractZip` 契约只定义 ZIP，不在本扩展中隐式按扩展名切换格式。
+- 该 Helper 只接受 `Auto` 或 `Zip`；RAR、7z 等格式请使用 `Expansion.SharpCompress`。

@@ -909,7 +909,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e06fe4b81ad5e042bda551458516fc6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  archiveHelperTypeName: RFramework.DefaultZipArchiveHelper
+  archiveHelperTypeName: RFramework.DefaultArchiveHelper
   resumeByDefault: 1
   maxRetries: 2
   retryDelayMilliseconds: 500

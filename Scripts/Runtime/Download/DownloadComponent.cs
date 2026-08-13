@@ -14,10 +14,10 @@ namespace UnityRFramework.Runtime
     [DisallowMultipleComponent]
     public sealed class DownloadComponent : UnityRFrameworkComponent
     {
-        private const string DefaultArchiveHelperTypeName = "RFramework.DefaultZipArchiveHelper";
+        private const string DefaultArchiveHelperTypeName = "RFramework.DefaultArchiveHelper";
 
         [SerializeField]
-        [Tooltip("压缩文件解压辅助器类型全名。默认使用 .NET ZIP 实现，可选择 SharpZipLib 等扩展。")]
+        [Tooltip("压缩文件解压辅助器类型全名。默认仅支持 ZIP，可选择 SharpCompress 等多格式扩展。")]
         private string archiveHelperTypeName = DefaultArchiveHelperTypeName;
 
         [SerializeField]

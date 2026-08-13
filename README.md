@@ -14,6 +14,7 @@ Samples/Sample.Download/        ← DownloadModule 独立轻量验收示例
 Samples/Expansion.YooAsset/     ← YooAsset 资源辅助器桥接实现
 Samples/Expansion.UniTask/      ← UniTask Web 请求辅助器桥接实现
 Samples/Expansion.SharpZipLib/  ← SharpZipLib ZIP 解压辅助器桥接实现
+Samples/Expansion.SharpCompress/ ← SharpCompress 多格式解压辅助器桥接实现
 Samples/Expansion.ExcelDataReader/ ← ExcelDataReader 配置表导出工具（EditorOnly）
 Samples/Expansion.Demo/         ← 官方 Demo 的第三方资源实现覆盖层
 Samples/Expansion.HybridCLR/    ← HybridCLR 通用代码热更新加载扩展
@@ -91,6 +92,9 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 - `Expansion.SharpZipLib`：可选 ZIP 解压扩展，随 Sample 提供 SharpZipLib 1.4.2 Runtime DLL
   与 MIT 许可证。通过 `GameEntry.Download.SetArchiveHelper(...)` 注入后支持 Zip64、加密 ZIP
   和解压进度；完整用法见该 Sample 的 README。
+- `Expansion.SharpCompress`：可选多格式解压扩展，随 Sample 提供 SharpCompress 0.50.1
+  Runtime DLL、必要依赖与许可证。支持 ZIP、RAR、7z、TAR、GZip 和 BZip2；完整用法与安全边界
+  见该 Sample 的 README。
 - `Expansion.HybridCLR`：可选 HybridCLR 代码热更新加载扩展。需手动安装并通过
   `HybridCLR/Installer...` 初始化 HybridCLR；核心包和普通 Demo 不依赖它。
 - `Expansion.HybridCLR.Demo`：在 `Expansion.Demo` 的 YooAsset 资源热更闭环上叠加代码
@@ -398,7 +402,8 @@ DownloadResult result = await GameEntry.Download.DownloadAsync(
 var options = new DownloadOptions
 {
     ExpectedSha256 = manifest.Sha256,
-    ExtractZip = true,
+    ExtractArchive = true,
+    ArchiveFormat = ArchiveFormat.Auto,
     ExtractDirectory = Path.Combine(Application.persistentDataPath, "Content"),
     DeleteArchiveAfterExtraction = false,
     MaxArchiveEntries = 10000,
@@ -420,21 +425,22 @@ Download 模块依赖 WebRequest 模块，默认使用 `目标路径.part` 保�
 
 ZIP 使用 .NET 标准库在后台线程解压，不依赖第三方，并通过同一 `DownloadProgress` 报告解压阶段、
 解压后字节和当前条目。模块先解压到独立临时目录，拒绝绝对路径和 `../` 路径穿越，
-并限制条目数与解压总大小；全部成功后才替换正式目录。解压失败会清理临时目录、保留已校验的 ZIP，
-已有正式目录保持不变。默认不删除 ZIP；带密码 ZIP、7z 和 RAR 不在默认实现范围。项目可实现
-`IArchiveHelper` 并通过 `GameEntry.Download.SetArchiveHelper(...)` 注入 SharpZipLib 等第三方解压器，
+并限制条目数与解压总大小；全部成功后才替换正式目录。解压失败会清理临时目录、保留已校验的压缩文件，
+已有正式目录保持不变。默认不删除压缩文件；内置 `DefaultArchiveHelper` 只支持无密码 ZIP。项目可实现
+`IArchiveHelper` 并通过 `GameEntry.Download.SetArchiveHelper(...)` 注入第三方解压器，
 但仍须实现路径边界、条目数和解压总大小限制。
 
-可选 `Expansion.SharpZipLib` 已实现该接口。导入 Sample 后，推荐直接在 `DownloadComponent`
-Inspector 的 `Archive Helper` 下拉框选择 `UnityRFramework.Expansion.SharpZipLibArchiveHelper`。
+可选 `Expansion.SharpZipLib` 和 `Expansion.SharpCompress` 已实现该接口。前者专注 ZIP、Zip64
+和加密 ZIP；后者支持 ZIP、RAR、7z、TAR、GZip 和 BZip2。导入对应 Sample 后，推荐直接在
+`DownloadComponent` Inspector 的 `Archive Helper` 下拉框选择所需 Helper。
 它属于 Download 模块自身配置，不放在全局 Controller 上。也可以在首次下载前通过代码注入：
 
 ```csharp
 GameEntry.Download.SetArchiveHelper(new SharpZipLibArchiveHelper());
 ```
 
-它不会自动替换核心默认实现，避免仅导入 Sample 就改变现有项目行为。加密 ZIP 可通过构造参数传入密码；
-具体依赖、能力边界和用法见 `Samples/Expansion.SharpZipLib/README.md`。
+它们不会自动替换核心默认实现，避免仅导入 Sample 就改变现有项目行为。单次任务密码通过
+`DownloadOptions.ArchivePassword` 传入；具体依赖、能力边界和用法见对应 Sample 的 README。
 
 ### Config
 

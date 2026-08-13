@@ -66,6 +66,11 @@
       "path": "Samples~/Expansion.SharpZipLib"
     },
     {
+      "displayName": "Expansion.SharpCompress",
+      "description": "基于 SharpCompress 0.50.1 的 DownloadModule 可选多格式解压辅助器，支持 ZIP、RAR、7z、TAR、GZip 和 BZip2；已内置 Runtime DLL、必要依赖与许可证。",
+      "path": "Samples~/Expansion.SharpCompress"
+    },
+    {
       "displayName": "Expansion.ExcelDataReader",
       "description": "ExcelDataReader 配置表导出工具，支持从 XLSX/XLS 生成 Config 与 Localization 数据；已内置 EditorOnly 依赖 DLL。",
       "path": "Samples~/Expansion.ExcelDataReader"

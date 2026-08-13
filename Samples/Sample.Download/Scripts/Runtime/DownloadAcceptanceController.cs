@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using RFramework;
@@ -13,7 +14,7 @@ namespace UnityRFramework.Sample
 {
     /// <summary>
     /// Download Sample 的轻量验收控制器。
-    /// 负责采集界面参数、驱动下载任务并展示断点续传、校验和 ZIP 解压结果。
+    /// 负责采集界面参数、驱动下载任务并展示断点续传、校验和多格式解压结果。
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DownloadAcceptanceController : MonoBehaviour
@@ -26,10 +27,6 @@ namespace UnityRFramework.Sample
         private InputField urlInput;
 
         [SerializeField]
-        [Tooltip("保存到验收目录下的文件名。")]
-        private InputField fileNameInput;
-
-        [SerializeField]
         [Tooltip("预期文件字节数；留空表示不校验。")]
         private InputField expectedSizeInput;
 
@@ -38,15 +35,27 @@ namespace UnityRFramework.Sample
         private InputField sha256Input;
 
         [SerializeField]
-        [Tooltip("下载成功后是否按 ZIP 格式解压。")]
-        private Toggle extractZipToggle;
+        [Tooltip("下载成功后是否解压压缩文件。")]
+        private Toggle extractArchiveToggle;
 
         [SerializeField]
-        [Tooltip("ZIP 解压到验收目录下的子目录名。")]
+        [Tooltip("本次验收使用的压缩文件解压辅助器。")]
+        private Dropdown archiveHelperDropdown;
+
+        [SerializeField]
+        [Tooltip("压缩文件格式；Auto 表示由辅助器根据文件内容识别。")]
+        private Dropdown archiveFormatDropdown;
+
+        [SerializeField]
+        [Tooltip("压缩文件密码；未加密时留空。")]
+        private InputField archivePasswordInput;
+
+        [SerializeField]
+        [Tooltip("压缩文件解压到验收目录下的子目录名。")]
         private InputField extractDirectoryInput;
 
         [SerializeField]
-        [Tooltip("ZIP 解压成功后是否删除压缩包。")]
+        [Tooltip("解压成功后是否删除压缩包。")]
         private Toggle deleteArchiveToggle;
 
         [Header("Commands")]
@@ -68,12 +77,15 @@ namespace UnityRFramework.Sample
         private CancellationTokenSource downloadCts;
         private bool isDownloading;
         private bool isDestroyed;
+        private readonly List<Type> archiveHelperTypes = new List<Type>();
+        private readonly List<ArchiveFormat> archiveFormats = new List<ArchiveFormat>();
 
         /// <summary>
         /// 生命周期：启动。绑定按钮并显示验收目录。
         /// </summary>
         private void Start()
         {
+            InitializeArchiveControls();
             BindEvents();
             RefreshExtractControls();
             SetIdleState("等待下载");
@@ -104,7 +116,8 @@ namespace UnityRFramework.Sample
             deletePartButton.onClick.AddListener(OnDeletePartClicked);
             deleteResultButton.onClick.AddListener(OnDeleteResultClicked);
             restartButton.onClick.AddListener(OnRestartClicked);
-            extractZipToggle.onValueChanged.AddListener(OnExtractZipChanged);
+            extractArchiveToggle.onValueChanged.AddListener(OnExtractArchiveChanged);
+            archiveHelperDropdown.onValueChanged.AddListener(OnArchiveHelperChanged);
         }
 
         private void UnbindEvents()
@@ -115,7 +128,8 @@ namespace UnityRFramework.Sample
             deletePartButton.onClick.RemoveListener(OnDeletePartClicked);
             deleteResultButton.onClick.RemoveListener(OnDeleteResultClicked);
             restartButton.onClick.RemoveListener(OnRestartClicked);
-            extractZipToggle.onValueChanged.RemoveListener(OnExtractZipChanged);
+            extractArchiveToggle.onValueChanged.RemoveListener(OnExtractArchiveChanged);
+            archiveHelperDropdown.onValueChanged.RemoveListener(OnArchiveHelperChanged);
         }
 
         private void OnStartClicked()
@@ -149,7 +163,8 @@ namespace UnityRFramework.Sample
 
             try
             {
-                string partPath = GetSavePath() + ".part";
+                string url = GetRequiredText(urlInput, "下载 URL");
+                string partPath = GetSavePath(url) + ".part";
                 bool deleted = DeleteFileIfExists(partPath);
                 AppendLog(deleted ? "已删除分片：" + partPath : "没有可删除的 .part 分片。");
             }
@@ -168,7 +183,8 @@ namespace UnityRFramework.Sample
 
             try
             {
-                string savePath = GetSavePath();
+                string url = GetRequiredText(urlInput, "下载 URL");
+                string savePath = GetSavePath(url);
                 bool deletedFile = DeleteFileIfExists(savePath);
                 bool deletedDirectory = DeleteDirectoryIfExists(GetExtractPath());
                 AppendLog(deletedFile || deletedDirectory
@@ -187,9 +203,29 @@ namespace UnityRFramework.Sample
             GameEntry.Restart();
         }
 
-        private void OnExtractZipChanged(bool _)
+        private void OnExtractArchiveChanged(bool _)
         {
             RefreshExtractControls();
+        }
+
+        private void OnArchiveHelperChanged(int index)
+        {
+            if (index < 0 || index >= archiveHelperTypes.Count || GameEntry.Download == null)
+            {
+                return;
+            }
+
+            Type helperType = archiveHelperTypes[index];
+            try
+            {
+                GameEntry.Download.SetArchiveHelper(
+                    (IArchiveHelper)Activator.CreateInstance(helperType));
+                AppendLog("解压 Helper：" + helperType.FullName);
+            }
+            catch (Exception exception)
+            {
+                ReportCommandError("切换解压 Helper 失败", exception);
+            }
         }
 
         private async void RunDownloadAsync(bool resume)
@@ -203,7 +239,7 @@ namespace UnityRFramework.Sample
             try
             {
                 string url = GetRequiredText(urlInput, "下载 URL");
-                string savePath = GetSavePath();
+                string savePath = GetSavePath(url);
                 DownloadOptions options = CreateOptions(resume);
 
                 Directory.CreateDirectory(Path.GetDirectoryName(savePath));
@@ -275,7 +311,7 @@ namespace UnityRFramework.Sample
         private DownloadOptions CreateOptions(bool resume)
         {
             long expectedSize = ParseExpectedSize();
-            bool extractZip = extractZipToggle.isOn;
+            bool extractArchive = extractArchiveToggle.isOn;
             return new DownloadOptions
             {
                 Resume = resume,
@@ -284,10 +320,74 @@ namespace UnityRFramework.Sample
                 RetryDelayMilliseconds = 500,
                 ExpectedSize = expectedSize,
                 ExpectedSha256 = NullIfWhiteSpace(sha256Input.text),
-                ExtractZip = extractZip,
-                ExtractDirectory = extractZip ? GetExtractPath() : null,
-                DeleteArchiveAfterExtraction = extractZip && deleteArchiveToggle.isOn
+                ExtractArchive = extractArchive,
+                ArchiveFormat = GetSelectedArchiveFormat(),
+                ArchivePassword = NullIfWhiteSpace(archivePasswordInput.text),
+                ExtractDirectory = extractArchive ? GetExtractPath() : null,
+                DeleteArchiveAfterExtraction = extractArchive && deleteArchiveToggle.isOn
             };
+        }
+
+        private void InitializeArchiveControls()
+        {
+            archiveFormats.Clear();
+            archiveFormats.AddRange((ArchiveFormat[])Enum.GetValues(typeof(ArchiveFormat)));
+            archiveFormatDropdown.ClearOptions();
+            archiveFormatDropdown.AddOptions(
+                archiveFormats.Select(format => format.ToString()).ToList());
+            archiveFormatDropdown.value = archiveFormats.IndexOf(ArchiveFormat.Auto);
+            archiveFormatDropdown.RefreshShownValue();
+
+            archiveHelperTypes.Clear();
+            archiveHelperTypes.AddRange(GetArchiveHelperTypes());
+            archiveHelperDropdown.ClearOptions();
+            archiveHelperDropdown.AddOptions(
+                archiveHelperTypes.Select(GetHelperDisplayName).ToList());
+            int preferredIndex = archiveHelperTypes.FindIndex(type =>
+                type.Name == "SharpCompressArchiveHelper");
+            archiveHelperDropdown.value = preferredIndex >= 0 ? preferredIndex : 0;
+            archiveHelperDropdown.RefreshShownValue();
+            OnArchiveHelperChanged(archiveHelperDropdown.value);
+        }
+
+        private static IEnumerable<Type> GetArchiveHelperTypes()
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(GetLoadableTypes)
+                .Where(type => typeof(IArchiveHelper).IsAssignableFrom(type)
+                    && type.IsClass
+                    && !type.IsAbstract
+                    && type.GetConstructor(Type.EmptyTypes) != null)
+                .OrderBy(type => type == typeof(DefaultArchiveHelper) ? 0 : 1)
+                .ThenBy(type => type.Name, StringComparer.Ordinal);
+        }
+
+        private static IEnumerable<Type> GetLoadableTypes(System.Reflection.Assembly assembly)
+        {
+            try
+            {
+                return assembly.GetTypes();
+            }
+            catch (System.Reflection.ReflectionTypeLoadException exception)
+            {
+                return exception.Types.Where(type => type != null);
+            }
+        }
+
+        private static string GetHelperDisplayName(Type type)
+        {
+            const string suffix = "ArchiveHelper";
+            return type.Name.EndsWith(suffix, StringComparison.Ordinal)
+                ? type.Name.Substring(0, type.Name.Length - suffix.Length)
+                : type.Name;
+        }
+
+        private ArchiveFormat GetSelectedArchiveFormat()
+        {
+            int index = archiveFormatDropdown.value;
+            return index >= 0 && index < archiveFormats.Count
+                ? archiveFormats[index]
+                : ArchiveFormat.Auto;
         }
 
         private long ParseExpectedSize()
@@ -374,11 +474,15 @@ namespace UnityRFramework.Sample
             deletePartButton.interactable = !downloading;
             deleteResultButton.interactable = !downloading;
             restartButton.interactable = true;
+            RefreshExtractControls();
         }
 
         private void RefreshExtractControls()
         {
-            bool enabled = extractZipToggle.isOn;
+            bool enabled = extractArchiveToggle.isOn;
+            archiveHelperDropdown.interactable = enabled && !isDownloading;
+            archiveFormatDropdown.interactable = enabled && !isDownloading;
+            archivePasswordInput.interactable = enabled && !isDownloading;
             extractDirectoryInput.interactable = enabled;
             deleteArchiveToggle.interactable = enabled;
         }
@@ -387,12 +491,12 @@ namespace UnityRFramework.Sample
         {
             try
             {
-                string savePath = GetSavePath();
+                string savePath = GetSavePath(GetRequiredText(urlInput, "下载 URL"));
                 pathText.text = BuildPathText(savePath, GetExtractPath());
             }
             catch (Exception)
             {
-                pathText.text = "请填写有效的保存文件名。";
+                pathText.text = "请填写有效的下载 URL。";
             }
         }
 
@@ -415,12 +519,17 @@ namespace UnityRFramework.Sample
             }
         }
 
-        private string GetSavePath()
+        private static string GetSavePath(string url)
         {
-            string fileName = Path.GetFileName(GetRequiredText(fileNameInput, "保存文件名"));
+            string fileName = null;
+            if (Uri.TryCreate(url, UriKind.Absolute, out Uri uri))
+            {
+                fileName = Path.GetFileName(Uri.UnescapeDataString(uri.AbsolutePath));
+            }
+
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                throw new RFrameworkException("保存文件名无效。");
+                fileName = "download.bin";
             }
 
             return Path.Combine(GetDownloadRoot(), fileName);

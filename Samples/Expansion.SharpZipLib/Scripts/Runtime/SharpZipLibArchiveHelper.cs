@@ -16,7 +16,7 @@ namespace UnityRFramework.Expansion
         private const int BufferSize = 1024 * 1024;
 
         /// <summary>
-        /// 获取或设置 ZIP 密码。非加密 ZIP 或无需密码时保持 null。
+        /// 获取或设置默认 ZIP 密码。单次任务传入的密码优先于该值。
         /// </summary>
         public string Password { get; set; }
 
@@ -45,7 +45,15 @@ namespace UnityRFramework.Expansion
             CancellationToken ct = default)
         {
             ValidateArguments(archivePath, destinationDirectory, options);
-            string password = Password;
+            if (options.Format != ArchiveFormat.Auto && options.Format != ArchiveFormat.Zip)
+            {
+                throw new RFrameworkException(
+                    $"SharpZipLibArchiveHelper: archive format '{options.Format}' is not supported.");
+            }
+
+            string password = string.IsNullOrEmpty(options.Password)
+                ? Password
+                : options.Password;
             return Task.Run(
                 () => ExtractCore(
                     archivePath,
@@ -190,7 +198,16 @@ namespace UnityRFramework.Expansion
                 throw new RFrameworkException("SharpZipLibArchiveHelper: ZIP entry name is empty.");
             }
 
-            string entryPath = Path.GetFullPath(Path.Combine(root, entryName));
+            string normalized = entryName
+                .Replace('\\', Path.DirectorySeparatorChar)
+                .Replace('/', Path.DirectorySeparatorChar);
+            if (normalized.IndexOf(':') >= 0)
+            {
+                throw new RFrameworkException(
+                    $"SharpZipLibArchiveHelper: unsafe ZIP entry path '{entryName}'.");
+            }
+
+            string entryPath = Path.GetFullPath(Path.Combine(root, normalized));
             if (!entryPath.StartsWith(root, comparison))
             {
                 throw new RFrameworkException(

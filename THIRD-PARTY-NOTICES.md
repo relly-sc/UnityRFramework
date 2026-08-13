@@ -25,6 +25,40 @@ UnityRFramework 原创代码以项目根目录中的 Apache License 2.0 授权�
 - 完整许可证：`Samples/Expansion.SharpZipLib/Plugins/SharpZipLib/LICENSE.txt`
   （UPM 包中对应 `Samples~/Expansion.SharpZipLib/Plugins/SharpZipLib/LICENSE.txt`）
 
+### SharpCompress 0.50.1
+
+- 组件：`SharpCompress.dll`
+- 用途：Expansion.SharpCompress Sample 的可选多格式解压辅助器
+- 版权所有：SharpCompress contributors
+- 许可证：MIT License
+- 来源：https://github.com/adamhathcock/sharpcompress/tree/0.50.1
+- 完整许可证：`Samples/Expansion.SharpCompress/Plugins/SharpCompress/LICENSE.txt`
+  （UPM 包中对应 `Samples~/Expansion.SharpCompress/Plugins/SharpCompress/LICENSE.txt`）
+
+### Microsoft.Bcl.AsyncInterfaces 8.0.0
+
+- 组件：`Microsoft.Bcl.AsyncInterfaces.dll`
+- 用途：SharpCompress 运行时依赖
+- 版权所有：.NET Foundation and Contributors
+- 许可证：MIT License
+- 完整许可证与第三方声明：`Samples/Expansion.SharpCompress/Plugins/Microsoft.Bcl.AsyncInterfaces/`
+
+### System.Text.Encoding.CodePages 8.0.0
+
+- 组件：`System.Text.Encoding.CodePages.dll`
+- 用途：SharpCompress 非 UTF 编码文件名支持
+- 版权所有：.NET Foundation and Contributors
+- 许可证：MIT License
+- 完整许可证与第三方声明：`Samples/Expansion.SharpCompress/Plugins/System.Text.Encoding.CodePages/`
+
+### System.Runtime.CompilerServices.Unsafe 6.0.0
+
+- 组件：`System.Runtime.CompilerServices.Unsafe.dll`
+- 用途：SharpCompress 运行时依赖
+- 版权所有：.NET Foundation and Contributors
+- 许可证：MIT License
+- 完整许可证与第三方声明：`Samples/Expansion.SharpCompress/Plugins/System.Runtime.CompilerServices.Unsafe/`
+
 ### Noto Sans SC
 
 - 文件：`NotoSansSC-Regular.ttf`、`NotoSansSC-Medium.ttf`、`NotoSansSC-Bold.ttf`

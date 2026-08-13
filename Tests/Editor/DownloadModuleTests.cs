@@ -168,7 +168,8 @@ namespace UnityRFramework.Editor.Tests
                 new DownloadOptions
                 {
                     ExpectedSize = archive.Length,
-                    ExtractZip = true,
+                    ExtractArchive = true,
+                    ArchiveFormat = ArchiveFormat.Zip,
                     ExtractDirectory = Path.Combine(testDirectory, "content")
                 },
                 new Progress<DownloadProgress>(value =>
@@ -205,7 +206,8 @@ namespace UnityRFramework.Editor.Tests
                 new DownloadOptions
                 {
                     ExpectedSize = archive.Length,
-                    ExtractZip = true,
+                    ExtractArchive = true,
+                    ArchiveFormat = ArchiveFormat.Zip,
                     ExtractDirectory = Path.Combine(testDirectory, "content")
                 });
             yield return WaitForTask(task);
