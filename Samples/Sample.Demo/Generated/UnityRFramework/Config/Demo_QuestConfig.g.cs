@@ -8,124 +8,121 @@ using RFramework;
 using UnityEngine;
 using UnityRFramework.Runtime;
 
-namespace UnityRFramework.Sample
+/// <summary>
+/// Demo_Quest 配置行。
+/// </summary>
+[Serializable]
+[ConfigTable("Demo_Quest")]
+public sealed class Demo_QuestConfig
 {
     /// <summary>
-    /// Demo_Quest 配置行。
+    /// 主键ID（唯一标识）
     /// </summary>
-    [Serializable]
-    [ConfigTable("Demo_Quest")]
-    public sealed class Demo_QuestConfig
-    {
-        /// <summary>
-        /// 主键ID（唯一标识）
-        /// </summary>
-        public int Id;
-
-        /// <summary>
-        /// 名称本地化键
-        /// </summary>
-        public string NameKey;
-
-        /// <summary>
-        /// 描述本地化键
-        /// </summary>
-        public string DescKey;
-
-        /// <summary>
-        /// 敌人配置ID
-        /// </summary>
-        public int EnemyId;
-
-        /// <summary>
-        /// 回合数量
-        /// </summary>
-        public int Rounds;
-
-        /// <summary>
-        /// 难度等级
-        /// </summary>
-        public int Difficulty;
-
-        /// <summary>
-        /// 奖励经验
-        /// </summary>
-        public int RewardExp;
-
-        /// <summary>
-        /// 奖励金币
-        /// </summary>
-        public int RewardGold;
-    }
+    public int Id;
 
     /// <summary>
-    /// Demo_Quest 的 URFC v2 读取器。
+    /// 名称本地化键
     /// </summary>
-    internal sealed class Demo_QuestConfigBinaryCodec : IBinaryConfigCodec
-    {
-        /// <inheritdoc/>
-        public Type RowType => typeof(Demo_QuestConfig);
-
-        /// <inheritdoc/>
-        public uint TableId => 0x010AA9B9u;
-
-        /// <inheritdoc/>
-        public ulong SchemaHash => 0xBED2B063AEB3EDE5UL;
-
-        /// <inheritdoc/>
-        public object ReadTable(BinaryReader reader, int rowCount)
-        {
-            if (reader == null)
-            {
-                throw new RFrameworkException("Binary config reader is invalid.");
-            }
-
-            var table = new Dictionary<int, Demo_QuestConfig>(rowCount);
-            for (int i = 0; i < rowCount; i++)
-            {
-                var row = new Demo_QuestConfig
-                {
-                    Id = reader.ReadInt32(),
-                    NameKey = BinaryFormatUtility.ReadUtf8String(reader, false),
-                    DescKey = BinaryFormatUtility.ReadUtf8String(reader, false),
-                    EnemyId = reader.ReadInt32(),
-                    Rounds = reader.ReadInt32(),
-                    Difficulty = reader.ReadInt32(),
-                    RewardExp = reader.ReadInt32(),
-                    RewardGold = reader.ReadInt32()
-                };
-                if (table.ContainsKey(row.Id))
-                {
-                    throw new RFrameworkException(
-                        $"Binary config 'Demo_QuestConfig' contains duplicate "
-                        + $"Id '{row.Id}'.");
-                }
-
-                table.Add(row.Id, row);
-            }
-
-            return table;
-        }
-    }
+    public string NameKey;
 
     /// <summary>
-    /// Demo_Quest Codec 自动注册入口。
+    /// 描述本地化键
     /// </summary>
-    internal static class Demo_QuestConfigBinaryCodecRegistration
+    public string DescKey;
+
+    /// <summary>
+    /// 敌人配置ID
+    /// </summary>
+    public int EnemyId;
+
+    /// <summary>
+    /// 回合数量
+    /// </summary>
+    public int Rounds;
+
+    /// <summary>
+    /// 难度等级
+    /// </summary>
+    public int Difficulty;
+
+    /// <summary>
+    /// 奖励经验
+    /// </summary>
+    public int RewardExp;
+
+    /// <summary>
+    /// 奖励金币
+    /// </summary>
+    public int RewardGold;
+}
+
+/// <summary>
+/// Demo_Quest 的 URFC v2 读取器。
+/// </summary>
+internal sealed class Demo_QuestConfigBinaryCodec : IBinaryConfigCodec
+{
+    /// <inheritdoc/>
+    public Type RowType => typeof(Demo_QuestConfig);
+
+    /// <inheritdoc/>
+    public uint TableId => 0xAF7A35A9u;
+
+    /// <inheritdoc/>
+    public ulong SchemaHash => 0xBD799BBC2F0FF995UL;
+
+    /// <inheritdoc/>
+    public object ReadTable(BinaryReader reader, int rowCount)
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void RegisterRuntime()
+        if (reader == null)
         {
-            ConfigSchemaRegistry.Register(typeof(Demo_QuestConfig), 0x010AA9B9u, 0xBED2B063AEB3EDE5UL);
-            BinaryConfigCodecRegistry.Register(new Demo_QuestConfigBinaryCodec());
+            throw new RFrameworkException("Binary config reader is invalid.");
         }
+
+        var table = new Dictionary<int, Demo_QuestConfig>(rowCount);
+        for (int i = 0; i < rowCount; i++)
+        {
+            var row = new Demo_QuestConfig
+            {
+                Id = reader.ReadInt32(),
+                NameKey = BinaryFormatUtility.ReadUtf8String(reader, false),
+                DescKey = BinaryFormatUtility.ReadUtf8String(reader, false),
+                EnemyId = reader.ReadInt32(),
+                Rounds = reader.ReadInt32(),
+                Difficulty = reader.ReadInt32(),
+                RewardExp = reader.ReadInt32(),
+                RewardGold = reader.ReadInt32()
+            };
+            if (table.ContainsKey(row.Id))
+            {
+                throw new RFrameworkException(
+                    $"Binary config 'Demo_QuestConfig' contains duplicate "
+                    + $"Id '{row.Id}'.");
+            }
+
+            table.Add(row.Id, row);
+        }
+
+        return table;
+    }
+}
+
+/// <summary>
+/// Demo_Quest Codec 自动注册入口。
+/// </summary>
+internal static class Demo_QuestConfigBinaryCodecRegistration
+{
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void RegisterRuntime()
+    {
+        ConfigSchemaRegistry.Register(typeof(Demo_QuestConfig), 0xAF7A35A9u, 0xBD799BBC2F0FF995UL);
+        BinaryConfigCodecRegistry.Register(new Demo_QuestConfigBinaryCodec());
+    }
 
 #if UNITY_EDITOR
-        [UnityEditor.InitializeOnLoadMethod]
-        private static void RegisterEditor()
-        {
-            RegisterRuntime();
-        }
-#endif
+    [UnityEditor.InitializeOnLoadMethod]
+    private static void RegisterEditor()
+    {
+        RegisterRuntime();
     }
+#endif
 }
