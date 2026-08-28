@@ -30,9 +30,10 @@ namespace UnityRFramework.Editor
         SwitchTarget,
         ApplySettings,
         PrepareData,
+        PreparePlayer,
+        BuildPlayer,
         PrepareCode,
         BuildAssets,
-        BuildPlayer,
         Finalize
     }
 
@@ -240,7 +241,9 @@ namespace UnityRFramework.Editor
             foreach (KeyValuePair<string, IBuildPipelineStep> pair in registered)
             {
                 bool isCore = pair.Key.StartsWith("core.", StringComparison.OrdinalIgnoreCase);
-                if ((selectAllAvailable || isCore || enabled.Contains(pair.Key))
+                bool isAutomatic = pair.Value is IAutomaticBuildPipelineStep automatic
+                    && automatic.ShouldInclude(profile);
+                if ((selectAllAvailable || isCore || enabled.Contains(pair.Key) || isAutomatic)
                     && IncludesStage(profile.Recipe, pair.Value.Stage))
                 {
                     selected.Add(pair.Key);
@@ -403,6 +406,7 @@ namespace UnityRFramework.Editor
                     return stage == BuildPipelineStage.Validate
                         || stage == BuildPipelineStage.SwitchTarget
                         || stage == BuildPipelineStage.ApplySettings
+                        || stage == BuildPipelineStage.PreparePlayer
                         || stage == BuildPipelineStage.BuildPlayer
                         || stage == BuildPipelineStage.Finalize;
                 case BuildRecipe.Assets:

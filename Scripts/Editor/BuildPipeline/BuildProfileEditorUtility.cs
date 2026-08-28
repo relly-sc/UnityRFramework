@@ -34,7 +34,6 @@ namespace UnityRFramework.Editor
                     AssetDatabase.LoadAssetAtPath<UnityRFrameworkBuildProfile>(path);
                 if (profile != null)
                 {
-                    MigrateProfile(profile);
                     result.Add(profile);
                 }
             }
@@ -63,7 +62,6 @@ namespace UnityRFramework.Editor
 
             UnityRFrameworkBuildProfile profile =
                 AssetDatabase.LoadAssetAtPath<UnityRFrameworkBuildProfile>(path);
-            MigrateProfile(profile);
             return profile;
         }
 
@@ -105,82 +103,13 @@ namespace UnityRFramework.Editor
                 $"{UnityRFrameworkBuildProfile.DefaultAssetDirectory}/{safeName}.asset";
 
             AssetDatabase.CreateAsset(profile, path);
-            MigrateProfile(profile);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             return profile;
         }
 
         /// <summary>
-        /// 迁移 Profile 数据模型，并为已导入步骤建立独立配置子资产。
-        /// </summary>
-        public static bool MigrateProfile(UnityRFrameworkBuildProfile profile)
-        {
-            if (profile == null)
-            {
-                return false;
-            }
-
-            int previousVersion = profile.SerializedVersion;
-            profile.Migrate();
-            bool changed = previousVersion != profile.SerializedVersion;
-            if (profile.Steps == null)
-            {
-                return changed;
-            }
-
-            IReadOnlyList<IBuildPipelineStep> registered =
-                BuildPipelineStepRegistry.GetAll();
-            Dictionary<string, IBuildPipelineStep> byId =
-                new Dictionary<string, IBuildPipelineStep>(
-                    System.StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < registered.Count; i++)
-            {
-                byId[registered[i].Id] = registered[i];
-            }
-
-            bool migrateLegacyConfigurations =
-                previousVersion < UnityRFrameworkBuildProfile.CurrentSerializedVersion;
-            for (int i = 0; i < profile.Steps.Count; i++)
-            {
-                BuildStepSettings entry = profile.Steps[i];
-                if (!migrateLegacyConfigurations
-                    || entry == null
-                    || entry.Configuration != null
-                    || string.IsNullOrWhiteSpace(entry.StepId)
-                    || !byId.TryGetValue(entry.StepId, out IBuildPipelineStep step)
-                    || step.ConfigurationType == null
-                    || !typeof(ScriptableObject).IsAssignableFrom(step.ConfigurationType))
-                {
-                    continue;
-                }
-
-                ScriptableObject configuration =
-                    ScriptableObject.CreateInstance(step.ConfigurationType);
-                configuration.name = entry.StepId + " Configuration";
-                string legacyJson =
-                    profile.GetLegacyStepConfigurationJson(entry.StepId);
-                if (!string.IsNullOrEmpty(legacyJson))
-                {
-                    JsonUtility.FromJsonOverwrite(legacyJson, configuration);
-                }
-
-                entry.Configuration = configuration;
-                AttachConfigurationToProfile(profile, configuration);
-                changed = true;
-            }
-
-            if (changed)
-            {
-                EditorUtility.SetDirty(profile);
-                AssetDatabase.SaveAssets();
-            }
-
-            return changed;
-        }
-
-        /// <summary>
-        /// 为指定步骤显式创建独立配置子资产；无配置类型或已有配置时不创建。
+        /// 为指定步骤恢复或创建独立配置子资产；已有配置类型错误时自动修复引用。
         /// </summary>
         /// <param name="profile">配置所属 Profile。</param>
         /// <param name="stepId">步骤唯一 Id。</param>
@@ -200,11 +129,6 @@ namespace UnityRFramework.Editor
                 return null;
             }
 
-            if (entry.Configuration != null)
-            {
-                return entry.Configuration;
-            }
-
             IReadOnlyList<IBuildPipelineStep> registered =
                 BuildPipelineStepRegistry.GetAll();
             for (int i = 0; i < registered.Count; i++)
@@ -221,6 +145,29 @@ namespace UnityRFramework.Editor
                     continue;
                 }
 
+                if (step.ConfigurationType.IsInstanceOfType(entry.Configuration))
+                {
+                    return entry.Configuration;
+                }
+
+                if (entry.Configuration != null)
+                {
+                    entry.Configuration = null;
+                    EditorUtility.SetDirty(profile);
+                }
+
+                ScriptableObject reusable = FindReusableConfiguration(
+                    profile,
+                    step.Id,
+                    step.ConfigurationType);
+                if (reusable != null)
+                {
+                    entry.Configuration = reusable;
+                    EditorUtility.SetDirty(profile);
+                    AssetDatabase.SaveAssets();
+                    return reusable;
+                }
+
                 ScriptableObject configuration =
                     ScriptableObject.CreateInstance(step.ConfigurationType);
                 configuration.name = step.Id + " Configuration";
@@ -232,6 +179,70 @@ namespace UnityRFramework.Editor
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// 查找删除步骤条目后仍保留在 Profile 内、且尚未被其他步骤引用的同类型配置子资产。
+        /// 优先匹配标准名称，避免反复初始化产生重复配置。
+        /// </summary>
+        private static ScriptableObject FindReusableConfiguration(
+            UnityRFrameworkBuildProfile profile,
+            string stepId,
+            System.Type configurationType)
+        {
+            string profilePath = AssetDatabase.GetAssetPath(profile);
+            if (string.IsNullOrEmpty(profilePath) || configurationType == null)
+            {
+                return null;
+            }
+
+            string expectedName = stepId + " Configuration";
+            ScriptableObject fallback = null;
+            Object[] assets = AssetDatabase.LoadAllAssetsAtPath(profilePath);
+            for (int i = 0; i < assets.Length; i++)
+            {
+                ScriptableObject candidate = assets[i] as ScriptableObject;
+                if (candidate == null
+                    || candidate == profile
+                    || !configurationType.IsInstanceOfType(candidate)
+                    || IsConfigurationReferenced(profile, candidate))
+                {
+                    continue;
+                }
+
+                if (string.Equals(
+                        candidate.name,
+                        expectedName,
+                        System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return candidate;
+                }
+
+                fallback ??= candidate;
+            }
+
+            return fallback;
+        }
+
+        /// <summary>判断配置子资产是否已被 Profile 中任意步骤引用。</summary>
+        private static bool IsConfigurationReferenced(
+            UnityRFrameworkBuildProfile profile,
+            ScriptableObject configuration)
+        {
+            if (profile.Steps == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < profile.Steps.Count; i++)
+            {
+                if (profile.Steps[i]?.Configuration == configuration)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -252,20 +263,4 @@ namespace UnityRFramework.Editor
         }
     }
 
-    /// <summary>
-    /// Domain Reload 后延迟迁移现有 Profile，避免旧资产长期停留在版本 1。
-    /// </summary>
-    [InitializeOnLoad]
-    internal static class BuildProfileMigrationInitializer
-    {
-        static BuildProfileMigrationInitializer()
-        {
-            EditorApplication.delayCall += MigrateAll;
-        }
-
-        private static void MigrateAll()
-        {
-            BuildProfileEditorUtility.FindAllProfiles();
-        }
-    }
 }

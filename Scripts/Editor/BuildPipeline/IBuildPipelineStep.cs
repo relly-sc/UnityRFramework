@@ -205,20 +205,13 @@ namespace UnityRFramework.Editor
     }
 
     /// <summary>
-    /// 步骤编辑器扩展契约：由第三方扩展包实现，用于在构建窗口步骤区内
-    /// 绘制插件真实设置（只读展示）与跳转到插件设置窗口的按钮。
-    /// 框架层不直接引用任何第三方插件类型；本接口允许窗口侧通过反射
-    /// 调用步骤实例上的 DrawInspector 方法，保持核心程序集零依赖。
+    /// 无需用户单独创建步骤条目的自动步骤。实现根据 Profile 决定是否加入 Recipe，
+    /// 用于承载由已启用扩展步骤隐式要求的准备动作。
     /// </summary>
-    public interface IBuildStepInspector
+    public interface IAutomaticBuildPipelineStep
     {
-        /// <summary>
-        /// 绘制步骤内嵌参数区（Profile 层面的可编辑字段）与插件只读展示区。
-        /// 调用方负责处理异常与未安装插件的兜底提示，实现中不得向上抛异常。
-        /// </summary>
-        /// <param name="profileSO">当前 Profile 的 SerializedObject。</param>
-        /// <param name="stepId">步骤唯一 Id，用于查找对应 Profile 字段与插件上下文。</param>
-        void DrawInspector(SerializedObject profileSO, string stepId);
+        /// <summary>判断当前 Profile 是否需要自动加入该步骤。</summary>
+        bool ShouldInclude(UnityRFrameworkBuildProfile profile);
     }
 
     /// <summary>

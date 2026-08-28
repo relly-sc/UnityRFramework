@@ -4,7 +4,6 @@ using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace UnityRFramework.Editor
 {
@@ -95,11 +94,6 @@ namespace UnityRFramework.Editor
         /// <summary>公共脚本宏定义，所有平台统一追加。</summary>
         [Tooltip("公共脚本宏定义，所有平台统一追加。")]
         public List<string> DefineSymbols = new List<string>();
-
-        /// <summary>版本 2 的重复追加宏字段，仅作为一次性迁移源。</summary>
-        [FormerlySerializedAs("AdditionalDefineSymbols")]
-        [HideInInspector]
-        public List<string> LegacyAdditionalDefineSymbols = new List<string>();
 
         /// <summary>移除脚本宏定义，应用参数时从现有宏中删除。</summary>
         [Tooltip("移除脚本宏定义，应用参数时从现有宏中删除。")]

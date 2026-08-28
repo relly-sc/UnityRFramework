@@ -16,17 +16,6 @@ namespace UnityRFramework.Editor
     public sealed class BuildProfileInspector : UnityEditor.Editor
     {
         /// <summary>
-        /// Inspector 启用时迁移旧版 Profile，并为已安装步骤补齐独立配置子资产。
-        /// </summary>
-        private void OnEnable()
-        {
-            if (target is UnityRFrameworkBuildProfile profile)
-            {
-                BuildProfileEditorUtility.MigrateProfile(profile);
-            }
-        }
-
-        /// <summary>
         /// 绘制 Profile 资产 Inspector：仅步骤挂载区。
         /// 绘制期间序列化对象可能被 Unity 释放（资产删除、重新导入、切换选择、
         /// 创建配置时切换 Selection 等），统一捕获并降级为提示，不向 Console 抛错。

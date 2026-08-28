@@ -121,9 +121,9 @@ namespace UnityRFramework.Editor.Tests
                     "core.validate",
                     "core.switch-target",
                     "core.apply-profile",
+                    "core.build-player",
                     "prepare",
                     "obfuscate",
-                    "core.build-player",
                     "core.finalize"
                 },
                 plan.StepIds);

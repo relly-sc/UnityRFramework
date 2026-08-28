@@ -174,7 +174,6 @@ namespace UnityRFramework.Editor
                 return;
             }
 
-            selectedProfile.Migrate();
             validationIssues = new List<BuildValidationIssue>(
                 BuildProfileValidator.Validate(selectedProfile).Issues);
         }
@@ -574,8 +573,6 @@ namespace UnityRFramework.Editor
             }
 
             info.DrawParameters(profileSerializedObject);
-            info.DrawPluginInspector(profileSerializedObject);
-
             EditorGUILayout.Space(4f);
         }
 

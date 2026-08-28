@@ -32,9 +32,6 @@ namespace UnityRFramework.Editor
         public const string DefaultAssetDirectory =
             "Assets/BuildProfiles";
 
-        /// <summary>当前数据模型版本号，用于序列化升级迁移。</summary>
-        public const int CurrentSerializedVersion = 3;
-
         /// <summary>Profile 说明，用于窗口与报告展示。</summary>
         [Tooltip("Profile 说明。")]
         public string Description = string.Empty;
@@ -66,100 +63,6 @@ namespace UnityRFramework.Editor
         /// <summary>构建步骤配置列表，与步骤实现的唯一 Id 对应。</summary>
         [Tooltip("构建步骤配置列表。")]
         public List<BuildStepSettings> Steps = new List<BuildStepSettings>();
-
-        /// <summary>版本 1 Config 内联配置，仅作为迁移源。</summary>
-        [HideInInspector]
-        public ConfigExportBuildSettings ConfigExport = new ConfigExportBuildSettings();
-
-        /// <summary>版本 1 HybridCLR 内联配置，仅作为迁移源。</summary>
-        [HideInInspector]
-        public HybridClrBuildSettings HybridClr = new HybridClrBuildSettings();
-
-        /// <summary>版本 1 YooAsset 内联配置，仅作为迁移源。</summary>
-        [HideInInspector]
-        public YooAssetBuildSettings YooAsset = new YooAssetBuildSettings();
-
-        /// <summary>版本 1 Obfuz 内联配置，仅作为迁移源。</summary>
-        [HideInInspector]
-        public ObfuzBuildSettings Obfuz = new ObfuzBuildSettings();
-
-        /// <summary>序列化版本号，升级时用于迁移旧资产。</summary>
-        [HideInInspector]
-        public int SerializedVersion = CurrentSerializedVersion;
-
-        /// <summary>执行不涉及资产写入的数据模型升级迁移。</summary>
-        public void Migrate()
-        {
-            if (SerializedVersion >= CurrentSerializedVersion)
-            {
-                return;
-            }
-
-            if (SerializedVersion < 1)
-            {
-                // 版本 0 至 1 为初版落地，无旧数据需要处理。
-            }
-
-            if (SerializedVersion < 2)
-            {
-                Recipe = BuildRecipe.Release;
-            }
-
-            Platform ??= new BuildPlatformSettings();
-            if (SerializedVersion < 3)
-            {
-                Platform.DefineSymbols ??= new List<string>();
-
-                if (Platform.ApiCompatibilityLevel
-                    == ApiCompatibilityLevel.NET_Standard_2_0)
-                {
-                    Platform.ApiCompatibilityLevel =
-                        ApiCompatibilityLevel.NET_Standard;
-                }
-
-                if (Platform.LegacyAdditionalDefineSymbols != null)
-                {
-                    for (int i = 0;
-                         i < Platform.LegacyAdditionalDefineSymbols.Count;
-                         i++)
-                    {
-                        string symbol = Platform.LegacyAdditionalDefineSymbols[i];
-                        if (!Platform.DefineSymbols.Contains(symbol))
-                        {
-                            Platform.DefineSymbols.Add(symbol);
-                        }
-                    }
-
-                    Platform.LegacyAdditionalDefineSymbols.Clear();
-                }
-            }
-
-            Output ??= new BuildOutputSettings();
-            Scenes ??= new List<BuildSceneEntry>();
-            Steps ??= new List<BuildStepSettings>();
-
-            SerializedVersion = CurrentSerializedVersion;
-        }
-
-        /// <summary>
-        /// 获取版本 1 内联步骤配置的 JSON，仅供配置资产迁移使用。
-        /// </summary>
-        public string GetLegacyStepConfigurationJson(string stepId)
-        {
-            switch (stepId)
-            {
-                case "config":
-                    return JsonUtility.ToJson(ConfigExport);
-                case "hybridclr":
-                    return JsonUtility.ToJson(HybridClr);
-                case "yooasset":
-                    return JsonUtility.ToJson(YooAsset);
-                case "obfuz":
-                    return JsonUtility.ToJson(Obfuz);
-                default:
-                    return string.Empty;
-            }
-        }
 
         /// <summary>
         /// 汇总校验 Profile 全部配置。

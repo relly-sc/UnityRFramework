@@ -42,7 +42,8 @@ namespace UnityRFramework.Editor
             for (int i = 0; i < registered.Count; i++)
             {
                 IBuildPipelineStep step = registered[i];
-                if (step.Id.StartsWith("core.", StringComparison.OrdinalIgnoreCase))
+                if (step.Id.StartsWith("core.", StringComparison.OrdinalIgnoreCase)
+                    || step is IAutomaticBuildPipelineStep)
                 {
                     continue;
                 }

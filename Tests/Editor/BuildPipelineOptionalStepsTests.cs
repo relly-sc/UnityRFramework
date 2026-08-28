@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -109,6 +110,60 @@ namespace UnityRFramework.Editor.Tests
         }
 
         [Test]
+        public void ObfuzConfiguration_DoesNotDuplicatePluginSettings()
+        {
+            IBuildPipelineStep step = FindStep("obfuz");
+
+            Assert.That(step, Is.Not.Null);
+            Assert.That(step.ConfigurationType, Is.Not.Null);
+            FieldInfo[] fields = step.ConfigurationType.GetFields(
+                BindingFlags.Instance
+                | BindingFlags.Public
+                | BindingFlags.NonPublic
+                | BindingFlags.DeclaredOnly);
+
+            Assert.That(
+                fields,
+                Is.Empty,
+                "Obfuz 参数应只在 Obfuz Settings 中维护，构建配置资产仅作为步骤入口。 ");
+        }
+
+        [Test]
+        public void HybridClrConfiguration_ContainsOnlyFrameworkPublishingParameters()
+        {
+            IBuildPipelineStep step = FindStep("hybridclr");
+            FieldInfo[] fields = step.ConfigurationType.GetFields(
+                BindingFlags.Instance
+                | BindingFlags.Public
+                | BindingFlags.DeclaredOnly);
+
+            CollectionAssert.AreEquivalent(
+                new[]
+                {
+                    "OutputAssetRoot",
+                    "EntryTypeName",
+                    "CodeVersion",
+                    "IncludePdb"
+                },
+                Array.ConvertAll(fields, field => field.Name));
+        }
+
+        [Test]
+        public void HybridClrPlayerPreparation_IsAutomaticAndHiddenFromProfileSteps()
+        {
+            IBuildPipelineStep step = FindStep("hybridclr.prepare-player");
+
+            Assert.That(step, Is.Not.Null);
+            Assert.That(step, Is.InstanceOf<IAutomaticBuildPipelineStep>());
+            Assert.That(step.Stage, Is.EqualTo(BuildPipelineStage.PreparePlayer));
+            Assert.That(step.ConfigurationType, Is.Null);
+            Assert.That(
+                BuildStepAvailability.EnumerateKnownSteps(),
+                Has.None.Matches<(string Id, string FriendlyName)>(
+                    item => item.Id == "hybridclr.prepare-player"));
+        }
+
+        [Test]
         public void ConfigStep_MissingSourceDirectories_AddsErrors()
         {
             UnityRFrameworkBuildProfile profile = CreateProfile(BuildRecipe.Assets);
@@ -151,6 +206,47 @@ namespace UnityRFramework.Editor.Tests
             BuildRecipePlan plan = BuildRecipePlanner.Create(profile);
 
             Assert.That(plan.IsValid, Is.True);
+            Assert.That(
+                IndexOf(plan.StepIds, "hybridclr"),
+                Is.LessThan(IndexOf(plan.StepIds, "obfuz")));
+            Assert.That(
+                IndexOf(plan.StepIds, "obfuz"),
+                Is.LessThan(IndexOf(plan.StepIds, "yooasset")));
+        }
+
+        [Test]
+        public void PlayerRecipe_AutomaticallyPreparesHybridClrBeforePlayer()
+        {
+            UnityRFrameworkBuildProfile profile = CreateProfile(BuildRecipe.Player);
+            AddConfiguredStep(profile, "hybridclr");
+
+            BuildRecipePlan plan = BuildRecipePlanner.Create(profile);
+
+            Assert.That(plan.IsValid, Is.True);
+            Assert.That(plan.Contains("hybridclr.prepare-player"), Is.True);
+            Assert.That(plan.Contains("hybridclr"), Is.False);
+            Assert.That(
+                IndexOf(plan.StepIds, "hybridclr.prepare-player"),
+                Is.LessThan(IndexOf(plan.StepIds, "core.build-player")));
+        }
+
+        [Test]
+        public void ReleaseRecipe_BuildsPlayerBeforePublishingHybridClrAndAssets()
+        {
+            UnityRFrameworkBuildProfile profile = CreateProfile(BuildRecipe.Release);
+            AddConfiguredStep(profile, "hybridclr");
+            AddConfiguredStep(profile, "obfuz");
+            AddConfiguredStep(profile, "yooasset");
+
+            BuildRecipePlan plan = BuildRecipePlanner.Create(profile);
+
+            Assert.That(plan.IsValid, Is.True);
+            Assert.That(
+                IndexOf(plan.StepIds, "hybridclr.prepare-player"),
+                Is.LessThan(IndexOf(plan.StepIds, "core.build-player")));
+            Assert.That(
+                IndexOf(plan.StepIds, "core.build-player"),
+                Is.LessThan(IndexOf(plan.StepIds, "hybridclr")));
             Assert.That(
                 IndexOf(plan.StepIds, "hybridclr"),
                 Is.LessThan(IndexOf(plan.StepIds, "obfuz")));

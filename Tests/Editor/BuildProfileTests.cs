@@ -123,66 +123,18 @@ namespace UnityRFramework.Editor.Tests
         }
 
         /// <summary>
-        /// 版本 1 Profile 迁移后应升级版本并使用 Release Recipe。
+        /// 复制 Profile 资产后，步骤配置子资产必须保持独立。
         /// </summary>
         [Test]
-        public void VersionOneProfile_Migrate_UsesReleaseRecipe()
-        {
-            UnityRFrameworkBuildProfile profile = CreateValidProfile();
-            profile.SerializedVersion = 1;
-
-            profile.Migrate();
-
-            Assert.That(
-                profile.SerializedVersion,
-                Is.EqualTo(UnityRFrameworkBuildProfile.CurrentSerializedVersion));
-            Assert.That(profile.Recipe, Is.EqualTo(BuildRecipe.Release));
-        }
-
-        /// <summary>
-        /// 版本 2 Profile 应迁移废弃的 .NET Standard 2.0，
-        /// 并将旧的附加宏合并到唯一的公共宏列表。
-        /// </summary>
-        [Test]
-        public void VersionTwoProfile_Migrate_NormalizesApiAndDefines()
-        {
-            UnityRFrameworkBuildProfile profile = CreateValidProfile();
-            profile.SerializedVersion = 2;
-            profile.Platform.ApiCompatibilityLevel =
-                ApiCompatibilityLevel.NET_Standard_2_0;
-            profile.Platform.DefineSymbols = null;
-            profile.Platform.LegacyAdditionalDefineSymbols.Add("LEGACY_FEATURE");
-
-            profile.Migrate();
-
-            Assert.That(
-                profile.Platform.ApiCompatibilityLevel,
-                Is.EqualTo(ApiCompatibilityLevel.NET_Standard));
-            Assert.That(
-                profile.Platform.DefineSymbols,
-                Does.Contain("LEGACY_FEATURE"));
-            Assert.That(
-                profile.Platform.LegacyAdditionalDefineSymbols,
-                Is.Empty);
-        }
-
-        /// <summary>
-        /// 持久化的版本 1 Profile 迁移后应创建 Config 配置子资产，
-        /// 复制 Profile 资产后配置子资产也必须独立。
-        /// </summary>
-        [Test]
-        public void ProfileAsset_MigrateAndCopy_ConfigurationIsIndependent()
+        public void ProfileAsset_Copy_ConfigurationIsIndependent()
         {
             string suffix = Guid.NewGuid().ToString("N");
             string sourcePath =
-                $"{UnityRFrameworkBuildProfile.DefaultAssetDirectory}/ProfileMigration_{suffix}.asset";
+                $"{UnityRFrameworkBuildProfile.DefaultAssetDirectory}/ProfileCopy_{suffix}.asset";
             string copyPath =
-                $"{UnityRFrameworkBuildProfile.DefaultAssetDirectory}/ProfileMigration_{suffix}_Copy.asset";
+                $"{UnityRFrameworkBuildProfile.DefaultAssetDirectory}/ProfileCopy_{suffix}_Copy.asset";
             UnityRFrameworkBuildProfile source =
                 ScriptableObject.CreateInstance<UnityRFrameworkBuildProfile>();
-            source.SerializedVersion = 1;
-            source.ConfigExport.Options.ConfigSourceDirectory =
-                "Assets/ConfigSource/Migrated";
             source.Steps.Add(new BuildStepSettings
             {
                 StepId = "config",
@@ -193,14 +145,16 @@ namespace UnityRFramework.Editor.Tests
             {
                 AssetDatabase.CreateAsset(source, sourcePath);
 
-                bool changed = BuildProfileEditorUtility.MigrateProfile(source);
                 ConfigExportBuildConfiguration sourceConfiguration =
-                    BuildStepConfigLocator.GetConfiguration<ConfigExportBuildConfiguration>(
+                    BuildProfileEditorUtility.CreateStepConfiguration(
                         source,
-                        "config");
+                        "config") as ConfigExportBuildConfiguration;
 
-                Assert.That(changed, Is.True);
                 Assert.That(sourceConfiguration, Is.Not.Null);
+                sourceConfiguration.Options.ConfigSourceDirectory =
+                    "Assets/ConfigSource/Migrated";
+                EditorUtility.SetDirty(sourceConfiguration);
+                AssetDatabase.SaveAssets();
                 Assert.That(
                     sourceConfiguration.Options.ConfigSourceDirectory,
                     Is.EqualTo("Assets/ConfigSource/Migrated"));
@@ -233,25 +187,6 @@ namespace UnityRFramework.Editor.Tests
         }
 
         /// <summary>
-        /// 当前版本 Profile 缺少配置时迁移器不得隐式创建，缺失应由校验器报告。
-        /// </summary>
-        [Test]
-        public void CurrentProfile_Migrate_DoesNotCreateMissingConfiguration()
-        {
-            UnityRFrameworkBuildProfile profile = CreateValidProfile();
-            profile.Steps.Add(new BuildStepSettings
-            {
-                StepId = "config",
-                Enabled = true
-            });
-
-            bool changed = BuildProfileEditorUtility.MigrateProfile(profile);
-
-            Assert.That(changed, Is.False);
-            Assert.That(profile.Steps[0].Configuration, Is.Null);
-        }
-
-        /// <summary>
         /// 用户显式创建步骤配置时应生成归属于 Profile 的独立配置子资产。
         /// </summary>
         [Test]
@@ -279,6 +214,121 @@ namespace UnityRFramework.Editor.Tests
                 Assert.That(configuration, Is.TypeOf<ConfigExportBuildConfiguration>());
                 Assert.That(profile.Steps[0].Configuration, Is.SameAs(configuration));
                 Assert.That(AssetDatabase.GetAssetPath(configuration), Is.EqualTo(path));
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(path);
+            }
+        }
+
+        /// <summary>
+        /// 随机删除部分步骤后再次初始化全部已注册步骤时，应复用遗留配置子资产，
+        /// 且每个条目仍绑定自身声明的配置类型。
+        /// </summary>
+        [Test]
+        public void InitializeAllKnownSteps_RestoresMissingConfigurations()
+        {
+            string suffix = Guid.NewGuid().ToString("N");
+            string path =
+                $"{UnityRFrameworkBuildProfile.DefaultAssetDirectory}/ProfileInitialize_{suffix}.asset";
+            UnityRFrameworkBuildProfile profile = CreateValidProfile();
+            try
+            {
+                AssetDatabase.CreateAsset(profile, path);
+                SerializedObject serializedProfile = new SerializedObject(profile);
+                BuildStepEntriesEditor.InitializeAllKnownSteps(serializedProfile);
+
+                ScriptableObject originalObfuz =
+                    BuildStepConfigLocator.FindEntry(profile, "obfuz")
+                        ?.Configuration;
+                ScriptableObject originalYooAsset =
+                    BuildStepConfigLocator.FindEntry(profile, "yooasset")
+                        ?.Configuration;
+                Assert.That(originalObfuz, Is.Not.Null);
+                Assert.That(originalYooAsset, Is.Not.Null);
+                for (int i = profile.Steps.Count - 1; i >= 0; i--)
+                {
+                    string id = profile.Steps[i].StepId;
+                    if (string.Equals(id, "obfuz", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(id, "yooasset", StringComparison.OrdinalIgnoreCase))
+                    {
+                        BuildStepEntriesEditor.RemoveStepEntry(serializedProfile, i);
+                    }
+                }
+
+                BuildStepEntriesEditor.InitializeAllKnownSteps(serializedProfile);
+
+                Assert.That(
+                    BuildStepConfigLocator.FindEntry(profile, "obfuz")?.Configuration,
+                    Is.SameAs(originalObfuz));
+                Assert.That(
+                    BuildStepConfigLocator.FindEntry(profile, "yooasset")?.Configuration,
+                    Is.SameAs(originalYooAsset));
+
+                IReadOnlyList<IBuildPipelineStep> registered =
+                    BuildPipelineStepRegistry.GetAll();
+                for (int i = 0; i < registered.Count; i++)
+                {
+                    IBuildPipelineStep step = registered[i];
+                    if (step.ConfigurationType == null)
+                    {
+                        continue;
+                    }
+
+                    BuildStepSettings entry =
+                        BuildStepConfigLocator.FindEntry(profile, step.Id);
+                    Assert.That(entry, Is.Not.Null, step.Id);
+                    Assert.That(entry.Configuration, Is.Not.Null, step.Id);
+                    Assert.That(
+                        step.ConfigurationType.IsInstanceOfType(entry.Configuration),
+                        Is.True,
+                        step.Id);
+                    Assert.That(
+                        AssetDatabase.GetAssetPath(entry.Configuration),
+                        Is.EqualTo(path),
+                        step.Id);
+                }
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(path);
+            }
+        }
+
+        /// <summary>
+        /// SerializedProperty 扩大 Steps 数组时不得让新条目继承最后一项的配置引用。
+        /// </summary>
+        [Test]
+        public void AppendStepEntry_ClearsCopiedConfigurationReference()
+        {
+            string suffix = Guid.NewGuid().ToString("N");
+            string path =
+                $"{UnityRFrameworkBuildProfile.DefaultAssetDirectory}/ProfileAppend_{suffix}.asset";
+            UnityRFrameworkBuildProfile profile = CreateValidProfile();
+            ConfigExportBuildConfiguration existingConfiguration =
+                ScriptableObject.CreateInstance<ConfigExportBuildConfiguration>();
+            profile.Steps.Add(new BuildStepSettings
+            {
+                StepId = "hybridclr",
+                Enabled = true,
+                Configuration = existingConfiguration
+            });
+
+            try
+            {
+                AssetDatabase.CreateAsset(profile, path);
+                AssetDatabase.AddObjectToAsset(existingConfiguration, profile);
+                AssetDatabase.SaveAssets();
+                SerializedObject serializedProfile = new SerializedObject(profile);
+
+                BuildStepEntriesEditor.AppendStepEntry(
+                    serializedProfile,
+                    "obfuz",
+                    true);
+
+                BuildStepSettings appended = profile.Steps[1];
+                Assert.That(appended.StepId, Is.EqualTo("obfuz"));
+                Assert.That(appended.Configuration, Is.Null);
             }
             finally
             {

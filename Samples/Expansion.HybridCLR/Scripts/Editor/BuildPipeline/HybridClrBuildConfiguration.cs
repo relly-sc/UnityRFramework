@@ -19,7 +19,5 @@ namespace UnityRFramework.Editor
         [Tooltip("是否包含 Portable PDB。")]
         public bool IncludePdb;
 
-        [Tooltip("是否只生成桥接代码。")]
-        public bool GenerateOnly;
     }
 }

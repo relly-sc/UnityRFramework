@@ -6,9 +6,8 @@ using UnityEngine;
 namespace UnityRFramework.Editor
 {
     /// <summary>
-    /// Profile 步骤条目（Steps 数组）的数据操作共享实现：追加空条目、初始化全部
-    /// 已注册步骤与按索引移除条目。构建工具窗口与 Profile 资产 Inspector 共用，
-    /// 保证两处挂载操作行为一致。
+    /// Profile 步骤条目（Steps 数组）的数据操作实现：追加条目、初始化全部
+    /// 已注册步骤与按索引移除条目，由构建工具窗口统一调用。
     /// </summary>
     internal static class BuildStepEntriesEditor
     {
@@ -41,6 +40,8 @@ namespace UnityRFramework.Editor
 
             SerializedProperty id = entry.FindPropertyRelative("StepId");
             SerializedProperty enabled = entry.FindPropertyRelative("Enabled");
+            SerializedProperty configuration =
+                entry.FindPropertyRelative("Configuration");
             if (id != null)
             {
                 id.stringValue = stepId ?? string.Empty;
@@ -51,14 +52,12 @@ namespace UnityRFramework.Editor
                 enabled.boolValue = enabledByDefault;
             }
 
-            serializedObject.ApplyModifiedProperties();
-
-            if (!string.IsNullOrWhiteSpace(stepId)
-                && serializedObject.targetObject is UnityRFrameworkBuildProfile profile)
+            if (configuration != null)
             {
-                BuildProfileEditorUtility.MigrateProfile(profile);
-                serializedObject.Update();
+                configuration.objectReferenceValue = null;
             }
+
+            serializedObject.ApplyModifiedProperties();
         }
 
         /// <summary>
@@ -87,8 +86,9 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 按 BuildStepAvailability 已知步骤清单一键追加全部条目；同 Id 已存在则跳过，
-        /// 默认状态按步骤是否已导入决定：已导入默认启用，未导入默认关闭以便后续按需启用。
+        /// 按 BuildStepAvailability 已知步骤清单一键追加全部条目；同 Id 已存在则保留，
+        /// 并为全部已注册可配置步骤恢复或创建配置子资产。默认状态按步骤是否已导入决定：
+        /// 已导入默认启用，未导入默认关闭以便后续按需启用。
         /// </summary>
         /// <param name="serializedObject">Profile 资产的序列化对象。</param>
         public static void InitializeAllKnownSteps(SerializedObject serializedObject)
@@ -126,10 +126,36 @@ namespace UnityRFramework.Editor
                 appended++;
             }
 
+            int configured = 0;
+            if (serializedObject.targetObject is UnityRFrameworkBuildProfile profile)
+            {
+                for (int i = 0; i < known.Count; i++)
+                {
+                    string id = known[i].Id;
+                    BuildStepSettings entry =
+                        BuildStepConfigLocator.FindEntry(profile, id);
+                    if (entry == null)
+                    {
+                        continue;
+                    }
+
+                    ScriptableObject previous = entry.Configuration;
+                    ScriptableObject current =
+                        BuildProfileEditorUtility.CreateStepConfiguration(
+                            profile,
+                            id);
+                    if (current != null && current != previous)
+                    {
+                        configured++;
+                    }
+                }
+
+                serializedObject.Update();
+            }
+
             Debug.Log(
-                appended == 0
-                    ? "构建步骤: 初始化完成，未追加新条目（已存在的步骤已跳过）。"
-                    : $"构建步骤: 一键初始化追加 {appended} 个步骤条目。");
+                $"构建步骤: 初始化完成，追加 {appended} 个步骤条目，"
+                + $"恢复、修复或创建 {configured} 个配置资产。");
         }
 
         /// <summary>

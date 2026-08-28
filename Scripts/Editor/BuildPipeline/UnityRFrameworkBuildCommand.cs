@@ -107,8 +107,6 @@ namespace UnityRFramework.Editor
                 return BuildCommandExitCodes.ArgumentError;
             }
 
-            profile.Migrate();
-
             // 覆盖项只作用于运行期，结束后恢复 Profile 原值。
             BuildProfileOverrideScope overrideScope =
                 new BuildProfileOverrideScope(profile, arguments);

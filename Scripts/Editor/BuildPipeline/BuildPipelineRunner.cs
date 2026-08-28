@@ -396,7 +396,7 @@ namespace UnityRFramework.Editor
         /// <summary>
         /// 过滤出可用于当前上下文的步骤；可用性判断抛出异常时按不可用处理。
         /// 步骤同时满足 CanRun 且未被 Profile.Steps 显式禁用时才会进入执行列表；
-        /// Profile 未配置该步骤条目时按可用处理（兼容旧 Profile）。
+        /// Profile 未配置该步骤条目时按可用处理，使核心步骤与自动步骤正常执行。
         /// </summary>
         /// <param name="ordered">排序后的步骤列表。</param>
         /// <param name="context">构建上下文。</param>
@@ -435,7 +435,7 @@ namespace UnityRFramework.Editor
         /// <summary>
         /// 判断步骤是否被 Profile.Steps 显式禁用。
         /// 步骤 Id 按大小写不敏感匹配，与 <see cref="BuildStepConfigLocator"/> 保持一致；
-        /// Profile 未配置该步骤条目时返回 false（兼容旧 Profile）。
+        /// Profile 未配置该步骤条目时返回 false；只有显式配置的条目才能禁用步骤。
         /// </summary>
         /// <param name="stepId">步骤唯一 Id。</param>
         /// <param name="profile">构建配置，可为空。</param>

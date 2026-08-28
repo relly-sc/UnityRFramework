@@ -1,25 +1,82 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using HybridCLR.Editor;
 using HybridCLR.Editor.Settings;
 using RFramework;
-using UnityEditor;
-using UnityEngine;
 
 namespace UnityRFramework.Editor
 {
     /// <summary>
-    /// HybridCLR 热更准备步骤：生成桥接代码、编译热更程序集并暂存到资源目录。
+    /// HybridCLR Player 构建准备步骤。启用 hybridclr 后由 Player 与 Release Recipe
+    /// 自动加入，在 Player 构建前执行官方 Generate/All，不单独暴露步骤条目或配置。
+    /// </summary>
+    public sealed class HybridCLRPlayerPrepareStep : BuildPipelineStepBase,
+        IAutomaticBuildPipelineStep
+    {
+        private const string HybridClrStepId = "hybridclr";
+
+        public override string Id => "hybridclr.prepare-player";
+
+        public override string DisplayName => "HybridCLR Player 准备";
+
+        public override BuildPipelineStage Stage => BuildPipelineStage.PreparePlayer;
+
+        public override int Order => 24;
+
+        public override bool TriggersCompilation => true;
+
+        public bool ShouldInclude(UnityRFrameworkBuildProfile profile)
+        {
+            return profile != null
+                && (profile.Recipe == BuildRecipe.Player
+                    || profile.Recipe == BuildRecipe.Release)
+                && BuildStepConfigLocator.HasEnabledEntry(profile, HybridClrStepId);
+        }
+
+        public override bool CanRun(BuildPipelineContext context)
+        {
+            return context != null && ShouldInclude(context.Profile);
+        }
+
+        public override void Validate(
+            BuildPipelineContext context,
+            ICollection<BuildValidationIssue> issues)
+        {
+            // Release 还会选择热更发布步骤，由发布步骤统一报告插件配置问题，
+            // 避免同一校验结果在窗口中重复出现。
+            if (context?.Profile?.Recipe == BuildRecipe.Player)
+            {
+                HybridCLRBuildValidation.ValidatePluginSettings(issues);
+            }
+        }
+
+        public override BuildStepResult Execute(BuildPipelineContext context)
+        {
+            try
+            {
+                HybridCLRArtifactBuilder.ConfigureAndValidate();
+                HybridCLRArtifactBuilder.GenerateCurrentTarget();
+                return BuildStepResult.Succeeded(
+                    $"HybridCLR Player 代码产物已生成，目标：{context.Target}。");
+            }
+            catch (Exception exception)
+            {
+                return BuildStepResult.Failed(
+                    $"HybridCLR Player 准备失败：{exception.Message}",
+                    exception);
+            }
+        }
+    }
+
+    /// <summary>
+    /// HybridCLR 热更发布步骤：编译热更程序集并暂存到资源目录。
     /// 复用 <see cref="HybridCLRArtifactBuilder"/> 与 <see cref="HybridCLRPlayerBaseline"/>，
     /// 不复制第三方逻辑。仅当 Profile 配置并启用了 hybridclr 步骤条目时参与构建；
     /// 未配置条目时跳过，避免导入 Expansion.HybridCLR 但未配置 Profile 时意外执行。
-    /// 完整流程要求最近一次 Player 构建的 AOT 基线存在，以保证热更产物与 Player 匹配；
-    /// 首次构建请先在步骤配置中开启 GenerateOnly，或先构建 IL2CPP Player 建立基线。
-    /// 本步骤会生成代码并触发脚本编译，属于参数应用之后的主动作步骤。
+    /// HotUpdate Recipe 使用最近一次 Player 基线；Release Recipe 则先由自动准备步骤生成代码
+    /// 并构建 Player，再由本步骤基于新基线整理热更产物。
     /// </summary>
-    public sealed class HybridCLRBuildStep : BuildPipelineStepBase, IBuildStepInspector
+    public sealed class HybridCLRBuildStep : BuildPipelineStepBase
     {
         /// <summary>错误码：HybridCLR 热更准备。</summary>
         private const string StepCode = "HYBRIDCLR";
@@ -136,35 +193,11 @@ namespace UnityRFramework.Editor
                     StepGroup));
             }
 
-            // 插件设置为唯一事实源：程序集清单缺失时在此前置校验阶段报错，
-            // 引导到 HybridCLR 设置窗口，而不是等执行阶段才失败。
-            string[] hotUpdateAssemblies = SettingsUtil
-                .HotUpdateAssemblyNamesExcludePreserved
-                .ToArray();
-            if (hotUpdateAssemblies.Length == 0)
-            {
-                issues.Add(BuildValidationIssue.Error(
-                    StepCode,
-                    "HybridCLR 未配置热更新程序集（hotUpdateAssemblyDefinitions），"
-                    + "请在 HybridCLR Settings 中配置。",
-                    StepGroup));
-            }
-
-            string[] patchAotAssemblies =
-                HybridCLRSettings.Instance.patchAOTAssemblies;
-            if (patchAotAssemblies == null || patchAotAssemblies.Length == 0)
-            {
-                issues.Add(BuildValidationIssue.Error(
-                    StepCode,
-                    "HybridCLR 未配置 AOT 补充元数据程序集（patchAOTAssemblies），"
-                    + "请在 HybridCLR Settings 中配置。",
-                    StepGroup));
-            }
+            HybridCLRBuildValidation.ValidatePluginSettings(issues);
         }
 
         /// <summary>
-        /// 执行 HybridCLR 热更准备：仅生成模式生成桥接代码；
-        /// 完整模式额外编译热更程序集并暂存产物（含 AOT 基线校验）。
+        /// 执行 HybridCLR 热更发布：编译热更程序集并暂存产物，包含 AOT 基线校验。
         /// </summary>
         /// <param name="context">构建上下文。</param>
         /// <returns>成功返回生成结果；配置缺失或执行失败返回失败结果。</returns>
@@ -192,16 +225,6 @@ namespace UnityRFramework.Editor
             {
                 // 校验并启用 HybridCLR 设置；要求已配置热更与 AOT 程序集。
                 HybridCLRArtifactBuilder.ConfigureAndValidate();
-
-                if (settings.GenerateOnly)
-                {
-                    // 仅生成桥接代码：供首次 Player 构建使用，不编译热更程序集。
-                    HybridCLRArtifactBuilder.GenerateCurrentTarget();
-                    return BuildStepResult.Succeeded(
-                        $"HybridCLR 桥接代码已生成（仅生成模式，未编译热更），"
-                        + $"目标：{context.Target}。请构建 IL2CPP Player 后关闭 GenerateOnly "
-                        + "再执行完整热更准备。");
-                }
 
                 string codeVersion = string.IsNullOrWhiteSpace(settings.CodeVersion)
                     ? DateTime.Now.ToString("yyyy-MM-dd-HHmmss")
@@ -253,77 +276,39 @@ namespace UnityRFramework.Editor
             }
         }
 
-        /// <summary>
-        /// 绘制 HybridCLR 步骤编辑器区：Profile 内嵌字段（输出目录、入口类型、版本、PDB、仅生成）
-        /// 与 HybridCLR Settings 只读展示区，底部附「打开 HybridCLR 设置」按钮。
-        /// </summary>
-        /// <param name="profileSO">当前 Profile 的 SerializedObject。</param>
-        /// <param name="stepId">步骤唯一 Id。</param>
-        public void DrawInspector(SerializedObject profileSO, string stepId)
+    }
+
+    internal static class HybridCLRBuildValidation
+    {
+        private const string StepCode = "HYBRIDCLR";
+        private const string StepGroup = "构建步骤";
+
+        public static void ValidatePluginSettings(
+            ICollection<BuildValidationIssue> issues)
         {
-            EditorGUILayout.Space(4f);
-            DrawHybridCLRSettingsReadonly();
-            EditorGUILayout.Space(8f);
-            if (GUILayout.Button("打开 HybridCLR 设置", GUILayout.Height(24f)))
+            if (issues == null)
             {
-                MenuProvider.OpenSettings();
+                return;
             }
-        }
 
-        /// <summary>
-        /// 绘制 HybridCLR Settings 只读展示区，从插件 Instance 读取真实配置并显示。
-        /// </summary>
-        private static void DrawHybridCLRSettingsReadonly()
-        {
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            if (SettingsUtil.HotUpdateAssemblyNamesExcludePreserved.Count == 0)
             {
-                GUILayout.Label("HybridCLR Settings（只读）", EditorStyles.boldLabel);
-
-                HybridCLRSettings settings = HybridCLRSettings.Instance;
-                EditorGUILayout.LabelField("enable", settings.enable.ToString());
-                EditorGUILayout.LabelField("热更新程序集数",
-                    settings.hotUpdateAssemblyDefinitions?.Length.ToString() ?? "0");
-                EditorGUILayout.LabelField("AOT 补充元数据程序集数",
-                    settings.patchAOTAssemblies?.Length.ToString() ?? "0");
-                EditorGUILayout.LabelField("热更 DLL 输出目录", settings.hotUpdateDllCompileOutputRootDir);
-                EditorGUILayout.LabelField("AOT 基线目录", settings.strippedAOTDllOutputRootDir);
-                EditorGUILayout.LabelField("link.xml 输出", settings.outputLinkFile);
-                EditorGUILayout.LabelField("AOTGenericReferences 输出", settings.outputAOTGenericReferenceFile);
+                issues.Add(BuildValidationIssue.Error(
+                    StepCode,
+                    "HybridCLR 未配置热更新程序集（hotUpdateAssemblyDefinitions），"
+                    + "请在 HybridCLR Settings 中配置。",
+                    StepGroup));
             }
-        }
 
-        /// <summary>
-        /// 绘制 Assets/ 相对路径字段：左侧标签 + 文本框 + 「选择」按钮。
-        /// </summary>
-        private static void DrawAssetFolderField(SerializedProperty property, GUIContent label)
-        {
-            if (property == null) return;
-            float labelWidth = EditorGUIUtility.labelWidth;
-            float buttonWidth = 48f;
-            float buttonSpacing = 4f;
-            Rect lineRect = EditorGUILayout.GetControlRect(true, EditorGUIUtility.singleLineHeight);
-            Rect labelRect = new Rect(lineRect.x, lineRect.y, labelWidth, lineRect.height);
-            float fieldWidth = lineRect.width - labelWidth - buttonWidth - buttonSpacing;
-            Rect fieldRect = new Rect(lineRect.x + labelWidth, lineRect.y, fieldWidth, lineRect.height);
-            Rect buttonRect = new Rect(fieldRect.xMax + buttonSpacing, lineRect.y, buttonWidth, lineRect.height);
-            EditorGUI.PrefixLabel(labelRect, label);
-            string value = property.stringValue;
-            string newValue = EditorGUI.TextField(fieldRect, value);
-            if (!string.Equals(newValue, value, StringComparison.Ordinal))
-                property.stringValue = newValue;
-            if (GUI.Button(buttonRect, new GUIContent("选择")))
+            string[] patchAotAssemblies =
+                HybridCLRSettings.Instance.patchAOTAssemblies;
+            if (patchAotAssemblies == null || patchAotAssemblies.Length == 0)
             {
-                string startDir = string.IsNullOrWhiteSpace(value)
-                    ? Application.dataPath
-                    : Path.Combine(Application.dataPath, value.Replace("Assets/", string.Empty).TrimStart('/'));
-                string picked = EditorUtility.OpenFolderPanel(label.text, startDir, string.Empty);
-                if (!string.IsNullOrEmpty(picked))
-                {
-                    if (picked.StartsWith(Application.dataPath, StringComparison.OrdinalIgnoreCase))
-                        property.stringValue = "Assets" + picked.Substring(Application.dataPath.Length).Replace('\\', '/');
-                    else
-                        EditorUtility.DisplayDialog("路径超出 Assets", "请选择工程 Assets 目录内的文件夹。", "确定");
-                }
+                issues.Add(BuildValidationIssue.Error(
+                    StepCode,
+                    "HybridCLR 未配置 AOT 补充元数据程序集（patchAOTAssemblies），"
+                    + "请在 HybridCLR Settings 中配置。",
+                    StepGroup));
             }
         }
     }

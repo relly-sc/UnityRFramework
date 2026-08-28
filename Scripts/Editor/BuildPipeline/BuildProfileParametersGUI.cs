@@ -205,8 +205,8 @@ namespace UnityRFramework.Editor
             switch (recipe)
             {
                 case BuildRecipe.Player:
-                    return "Player：只应用 Profile 参数并构建 Player；不导出 Config，"
-                        + "不准备热更代码，也不构建 YooAsset 资源包。";
+                    return "Player：应用 Profile 参数并构建 Player；启用 HybridCLR 时会先执行 "
+                        + "Generate/All，但不发布热更资源包。";
                 case BuildRecipe.Assets:
                     return "Assets：导出 Config 并构建 YooAsset 资源包；"
                         + "不准备 HybridCLR/Obfuz 热更代码，也不构建 Player。";
@@ -214,7 +214,8 @@ namespace UnityRFramework.Editor
                     return "HotUpdate：准备 HybridCLR/Obfuz 热更代码并构建 YooAsset 资源包；"
                         + "不导出 Config，也不构建 Player。";
                 case BuildRecipe.Release:
-                    return "Release：执行配置导出、热更代码准备、资源构建和 Player 构建的完整发布流程。";
+                    return "Release：执行配置导出、HybridCLR Player 准备、Player 构建、"
+                        + "热更代码发布和资源构建的完整流程。";
                 default:
                     return "未知 Recipe，无法确定构建范围。";
             }

@@ -99,13 +99,6 @@ namespace UnityRFramework.Editor
             }
         }
 
-        /// <summary>
-        /// 旧插件内联 Inspector 入口已由配置资产 Inspector 替代。
-        /// </summary>
-        public void DrawPluginInspector(SerializedObject profileSerializedObject)
-        {
-        }
-
         public static bool TryGet(string stepId, out BuildProfileStepInfo info)
         {
             info = null;

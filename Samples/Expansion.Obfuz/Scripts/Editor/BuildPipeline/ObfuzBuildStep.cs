@@ -4,9 +4,7 @@ using System.IO;
 using HybridCLR.Editor;
 using Obfuz.Settings;
 using Obfuz4HybridCLR;
-using Obfuz.ObfusPasses;
 using UnityEditor;
-using UnityEngine;
 
 namespace UnityRFramework.Editor
 {
@@ -18,12 +16,11 @@ namespace UnityRFramework.Editor
     /// 不复制第三方逻辑，也不重复编译热更程序集（编译由 hybridclr 步骤完成）。
     /// 门控：仅当 Profile 启用了 obfuz 步骤条目，且 hybridclr 步骤条目已启用并
     /// 配置输出目录时参与构建，避免导入扩展包但未配置 Profile 时意外执行。
-    /// 自动跳过：HybridCLR 步骤以 GenerateOnly（首次基线）模式运行时未暂存热更
-    /// 程序集，本步骤检测到暂存目录无热更 DLL 时直接成功跳过，不报错。
+    /// 暂存目录无热更 DLL 时直接成功跳过，不对 Player 准备流程产生额外副作用。
     /// 混淆清单在 Obfuz Settings（第三方窗口）中手动配置，须同时包含 AOT 与
     /// 热更程序集名称；本步骤不侵入第三方设置。
     /// </summary>
-    public sealed class ObfuzBuildStep : BuildPipelineStepBase, IBuildStepInspector
+    public sealed class ObfuzBuildStep : BuildPipelineStepBase
     {
         /// <summary>错误码：Obfuz 热更混淆。</summary>
         private const string StepCode = "OBFUZ";
@@ -155,21 +152,14 @@ namespace UnityRFramework.Editor
                 return;
             }
 
-            ObfuzBuildConfiguration configuration =
-                BuildStepConfigLocator.GetConfiguration<ObfuzBuildConfiguration>(
+            if (BuildStepConfigLocator.GetConfiguration<ObfuzBuildConfiguration>(
                     context.Profile,
-                    Id);
-            if (configuration == null)
+                    Id) == null)
             {
                 issues.Add(BuildValidationIssue.Error(
                     StepCode,
                     "Obfuz 步骤未绑定 ObfuzBuildConfiguration 配置资产。",
                     StepGroup));
-                return;
-            }
-
-            if (!configuration.Enable)
-            {
                 return;
             }
 
@@ -216,28 +206,19 @@ namespace UnityRFramework.Editor
         /// <summary>
         /// 执行热更混淆：混淆 HybridCLR 步骤编译出的热更程序集，基于混淆后程序集
         /// 重生成 MethodBridge 与 AOT 泛型引用，并将混淆产物同名覆盖暂存目录。
-        /// 暂存目录无热更 DLL（GenerateOnly 基线场景）时直接成功跳过。
+        /// 暂存目录无热更 DLL 时直接成功跳过。
         /// </summary>
         /// <param name="context">构建上下文。</param>
         /// <returns>成功返回混淆结果；异常返回失败结果。</returns>
         public override BuildStepResult Execute(BuildPipelineContext context)
         {
-            ObfuzBuildConfiguration configuration =
-                BuildStepConfigLocator.GetConfiguration<ObfuzBuildConfiguration>(
+            if (BuildStepConfigLocator.GetConfiguration<ObfuzBuildConfiguration>(
                     context.Profile,
-                    Id);
-            if (configuration == null)
+                    Id) == null)
             {
                 return BuildStepResult.Failed(
                     "Obfuz 步骤未绑定 ObfuzBuildConfiguration 配置资产。",
                     null);
-            }
-
-            SyncProfileToObfuzSettings(configuration);
-            if (!configuration.Enable)
-            {
-                return BuildStepResult.Succeeded(
-                    "Obfuz 已按 Profile 配置关闭，本次跳过混淆。");
             }
 
             HybridClrBuildConfiguration hybridSettings =
@@ -256,7 +237,7 @@ namespace UnityRFramework.Editor
             {
                 return BuildStepResult.Succeeded(
                     $"Obfuz 热更混淆跳过：暂存目录 {stagedDir} 无热更 DLL，"
-                    + "当前为 GenerateOnly 首次基线或 HybridCLR 步骤尚未执行。");
+                    + "HybridCLR 热更发布步骤尚未生成产物。");
             }
 
             try
@@ -302,7 +283,7 @@ namespace UnityRFramework.Editor
         /// 计算 HybridCLR 步骤暂存的热更程序集磁盘目录。
         /// </summary>
         /// <param name="context">构建上下文。</param>
-        /// <param name="hybridSettings">HybridCLR 内嵌配置。</param>
+        /// <param name="hybridSettings">HybridCLR 步骤配置资产。</param>
         /// <returns>暂存目录绝对路径。</returns>
         private static string GetStagedAssembliesDir(
             BuildPipelineContext context,
@@ -416,154 +397,5 @@ namespace UnityRFramework.Editor
             return count;
         }
 
-        /// <summary>
-        /// 将 Profile 中 Obfuz 内嵌配置同步到 ObfuzSettings.Instance，
-        /// 使构建参数以 Profile 为唯一事实源，无需手动打开插件设置窗口。
-        /// 仅在 Obfuz 包已导入时执行；同步失败或插件缺失时静默跳过，
-        /// 不阻塞构建流程。
-        /// </summary>
-        /// <param name="obfuzSettings">Profile 中的 Obfuz 内嵌配置。</param>
-        private static void SyncProfileToObfuzSettings(
-            ObfuzBuildConfiguration obfuzSettings)
-        {
-            if (obfuzSettings == null)
-            {
-                return;
-            }
-
-            ObfuzSettings pluginSettings = ObfuzSettings.Instance;
-            if (pluginSettings == null)
-            {
-                return;
-            }
-
-            // 同步启用开关
-            pluginSettings.buildPipelineSettings.enable = obfuzSettings.Enable;
-
-            // 同步混淆 Pass 类型；支持逗号分隔的枚举名称与"All"/"None"关键字
-            if (!string.IsNullOrWhiteSpace(obfuzSettings.EnabledPasses))
-            {
-                ObfuscationPassType passes = ParseObfuscationPasses(obfuzSettings.EnabledPasses);
-                pluginSettings.obfuscationPassSettings.enabledPasses = passes;
-            }
-
-            // 持久化变更，确保后续插件逻辑读取到最新值
-            ObfuzSettings.Save();
-        }
-
-        /// <summary>
-        /// 解析逗号分隔的混淆 Pass 枚举名称字符串为 <see cref="ObfuscationPassType"/> 位掩码。
-        /// 支持关键字 "All"（全 Pass）与 "None"（无 Pass），也支持逗号分隔的单个枚举名。
-        /// </summary>
-        /// <param name="value">枚举名称字符串。</param>
-        /// <returns>解析后的混淆 Pass 位掩码。</returns>
-        private static ObfuscationPassType ParseObfuscationPasses(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return ObfuscationPassType.None;
-            }
-
-            string trimmed = value.Trim();
-            if (string.Equals(trimmed, "All", StringComparison.OrdinalIgnoreCase))
-            {
-                return ObfuscationPassType.All;
-            }
-            if (string.Equals(trimmed, "None", StringComparison.OrdinalIgnoreCase))
-            {
-                return ObfuscationPassType.None;
-            }
-
-            ObfuscationPassType result = ObfuscationPassType.None;
-            // 注意：StringSplitOptions.TrimEntries 在 .NET Standard 2.0（Unity 2022.3）中不存在，
-            // 因此单独对每个分段做 Trim，等价于 RemoveEmptyEntries | TrimEntries 的行为。
-            string[] parts = trimmed.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 0; i < parts.Length; i++)
-            {
-                string part = parts[i].Trim();
-                if (string.IsNullOrEmpty(part))
-                {
-                    continue;
-                }
-
-                if (Enum.TryParse<ObfuscationPassType>(part, ignoreCase: true, out var pass))
-                {
-                    result |= pass;
-                }
-                else
-                {
-                    Debug.LogWarning($"[Obfuz] 未知的混淆 Pass 类型 '{part}'，已忽略。");
-                }
-            }
-
-            return result;
-        }
-
-        /// <summary>
-        /// 绘制 Obfuz 步骤编辑器区：Profile 内嵌可编辑字段（启用开关 + 混淆 Pass）
-        /// 与 Obfuz Settings 只读展示区，底部附「打开 Obfuz 设置」按钮跳转到插件设置面板。
-        /// </summary>
-        /// <param name="profileSO">当前 Profile 的 SerializedObject。</param>
-        /// <param name="stepId">步骤唯一 Id。</param>
-        public void DrawInspector(SerializedObject profileSO, string stepId)
-        {
-            try
-            {
-                // 绘制 Profile 内嵌可编辑字段
-                SerializedProperty obfuzProp = profileSO.FindProperty("Obfuz");
-                if (obfuzProp != null)
-                {
-                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                    {
-                        GUILayout.Label("Obfuz 步骤配置（可编辑）", EditorStyles.boldLabel);
-                        EditorGUILayout.PropertyField(
-                            obfuzProp.FindPropertyRelative("Enable"),
-                            new GUIContent("启用混淆", "关闭后整个混淆步骤跳过。"));
-                        EditorGUILayout.PropertyField(
-                            obfuzProp.FindPropertyRelative("EnabledPasses"),
-                            new GUIContent("混淆 Pass", "逗号分隔枚举名，如 \"SymbolObfus,CallObfus\"；留空 \"All\" 表示全部。"));
-                    }
-                }
-
-                EditorGUILayout.Space(8f);
-
-                // 只读展示：从 ObfuzSettings.Instance 读取真实配置供参考
-                ObfuzSettings obfuzSettings = ObfuzSettings.Instance;
-                if (obfuzSettings != null)
-                {
-                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                    {
-                        GUILayout.Label("Obfuz Settings（只读参考）", EditorStyles.boldLabel);
-                        EditorGUILayout.LabelField(
-                            "构建管线启用",
-                            obfuzSettings.buildPipelineSettings?.enable.ToString() ?? "null");
-                        EditorGUILayout.LabelField(
-                            "混淆清单程序集数",
-                            obfuzSettings.assemblySettings?.GetAssembliesToObfuscate()?.Count.ToString() ?? "0");
-                        EditorGUILayout.LabelField(
-                            "混淆 Pass 类型",
-                            obfuzSettings.obfuscationPassSettings?.enabledPasses.ToString() ?? "null");
-                        EditorGUILayout.LabelField(
-                            "Obfuz 根目录",
-                            obfuzSettings.ObfuzRootDir);
-                    }
-                }
-                else
-                {
-                    EditorGUILayout.HelpBox("Obfuz 未导入或 Settings 实例缺失，请确认 Obfuz 包已正确安装。", MessageType.Warning);
-                }
-            }
-            catch (Exception ex)
-            {
-                EditorGUILayout.HelpBox($"绘制 Obfuz 步骤区失败：{ex.Message}", MessageType.Error);
-            }
-
-            EditorGUILayout.Space(8f);
-
-            if (GUILayout.Button("打开 Obfuz 设置", GUILayout.Height(24f)))
-            {
-                SettingsService.OpenProjectSettings("Project/Obfuz Settings");
-            }
-        }
     }
 }
