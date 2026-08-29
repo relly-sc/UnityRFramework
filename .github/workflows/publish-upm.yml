@@ -19,6 +19,7 @@ jobs:
       - name: Check out main source
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
           submodules: recursive
 
@@ -31,7 +32,8 @@ jobs:
 
           release_dir="$(mktemp -d)"
           commit_message_file="$RUNNER_TEMP/upm-commit-message.txt"
-          git archive --format=tar "$GITHUB_SHA" | tar -xf - -C "$release_dir"
+          source_sha="$(git rev-parse HEAD)"
+          git archive --format=tar "$source_sha" | tar -xf - -C "$release_dir"
 
           if [[ ! -f "Library/RFramework/RFramework.Library.asmdef" ]]; then
             echo "RFramework submodule was not checked out." >&2
@@ -44,9 +46,9 @@ jobs:
           fi
 
           library_sha="$(git -C Library/RFramework rev-parse HEAD)"
-          git show -s --format='%B' "$GITHUB_SHA" > "$commit_message_file"
+          git show -s --format='%B' "$source_sha" > "$commit_message_file"
           printf '\nPublished from main: %s\nRFramework: %s\n' \
-            "$GITHUB_SHA" "$library_sha" >> "$commit_message_file"
+            "$source_sha" "$library_sha" >> "$commit_message_file"
 
           mkdir -p "$release_dir/Library/RFramework"
           git -C Library/RFramework archive --format=tar HEAD \
