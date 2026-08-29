@@ -35,12 +35,14 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 校验输出目录模板的隔离维度：必须包含 Profile、平台、脚本后端与版本
-        /// 四个占位符，保证任一维度不同时不会复用同一 Player 目录。
-        /// 任一维度缺失均按 Error 处理，阻止构建，避免旧输出目录污染。
+        /// 按输出策略校验目录模板的隔离维度：
+        /// Versioned 必须包含 Profile、平台、脚本后端与版本四个占位符；
+        /// Overwrite 仍要求平台与脚本后端隔离，防跨平台与 Mono/IL2CPP 误复用；
+        /// Custom 不强制占位符，只保留目录边界与冲突校验。
+        /// 任一必需维度缺失均按 Error 处理，阻止构建。
         /// </summary>
         /// <param name="profile">构建配置，可为空。</param>
-        /// <returns>隔离问题列表；模板满足隔离要求时返回空列表。</returns>
+        /// <returns>隔离问题列表；模板满足当前策略要求时返回空列表。</returns>
         public static List<BuildValidationIssue> ValidateIsolation(
             UnityRFrameworkBuildProfile profile)
         {
@@ -61,26 +63,48 @@ namespace UnityRFramework.Editor
                 return issues;
             }
 
-            ValidatePlaceholder(
-                template,
-                BuildOutputSettings.ProfilePlaceholder,
-                "不同构建配置会复用同一目录",
-                issues);
-            ValidatePlaceholder(
-                template,
-                BuildOutputSettings.PlatformPlaceholder,
-                "不同平台会复用同一目录",
-                issues);
-            ValidatePlaceholder(
-                template,
-                BuildOutputSettings.ScriptBackendPlaceholder,
-                "Mono 与 IL2CPP 构建会复用同一目录",
-                issues);
-            ValidatePlaceholder(
-                template,
-                BuildOutputSettings.VersionPlaceholder,
-                "不同版本会复用同一目录",
-                issues);
+            switch (profile.Output.Strategy)
+            {
+                case BuildOutputStrategy.Overwrite:
+                    ValidatePlaceholder(
+                        template,
+                        BuildOutputSettings.PlatformPlaceholder,
+                        "不同平台会复用同一目录",
+                        issues);
+                    ValidatePlaceholder(
+                        template,
+                        BuildOutputSettings.ScriptBackendPlaceholder,
+                        "Mono 与 IL2CPP 构建会复用同一目录",
+                        issues);
+                    break;
+
+                case BuildOutputStrategy.Custom:
+                    // 自定义模板不做占位符强制；目录边界由输出根校验保证。
+                    break;
+
+                default:
+                    ValidatePlaceholder(
+                        template,
+                        BuildOutputSettings.ProfilePlaceholder,
+                        "不同构建配置会复用同一目录",
+                        issues);
+                    ValidatePlaceholder(
+                        template,
+                        BuildOutputSettings.PlatformPlaceholder,
+                        "不同平台会复用同一目录",
+                        issues);
+                    ValidatePlaceholder(
+                        template,
+                        BuildOutputSettings.ScriptBackendPlaceholder,
+                        "Mono 与 IL2CPP 构建会复用同一目录",
+                        issues);
+                    ValidatePlaceholder(
+                        template,
+                        BuildOutputSettings.VersionPlaceholder,
+                        "不同版本会复用同一目录",
+                        issues);
+                    break;
+            }
 
             return issues;
         }

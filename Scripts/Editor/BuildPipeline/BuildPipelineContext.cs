@@ -46,6 +46,12 @@ namespace UnityRFramework.Editor
         /// <summary>取消令牌；步骤在执行中应定期检查。</summary>
         public CancellationToken CancellationToken { get; }
 
+        /// <summary>
+        /// 设置事务；承载"临时应用、结束恢复"的快照。
+        /// "应用构建参数"步骤在写入设置前调用 <see cref="BuildSettingsTransaction.MarkApplied"/>。
+        /// </summary>
+        public BuildSettingsTransaction SettingsTransaction { get; }
+
         /// <summary>任务创建时刻。</summary>
         public DateTime StartedAt { get; }
 
@@ -65,6 +71,7 @@ namespace UnityRFramework.Editor
         /// <param name="cancellationToken">取消令牌。</param>
         /// <param name="startedAt">任务创建时刻。</param>
         /// <param name="outputError">输出解析失败原因，可为空。</param>
+        /// <param name="settingsTransaction">设置事务，可为空（测试场景）。</param>
         public BuildPipelineContext(
             UnityRFrameworkBuildProfile profile,
             BuildTarget target,
@@ -75,7 +82,8 @@ namespace UnityRFramework.Editor
             IReadOnlyDictionary<string, IBuildPipelineStep> steps,
             CancellationToken cancellationToken,
             DateTime startedAt,
-            string outputError)
+            string outputError,
+            BuildSettingsTransaction settingsTransaction = null)
         {
             Profile = profile;
             Target = target;
@@ -86,22 +94,27 @@ namespace UnityRFramework.Editor
             Steps = steps ?? new Dictionary<string, IBuildPipelineStep>(
                 StringComparer.Ordinal);
             CancellationToken = cancellationToken;
+            SettingsTransaction = settingsTransaction;
             StartedAt = startedAt;
             OutputError = outputError ?? string.Empty;
         }
 
         /// <summary>
-        /// 创建构建上下文：解析工程根目录与输出路径。
+        /// 创建构建上下文：解析工程根目录与输出路径，并捕获设置事务快照。
         /// 输出解析失败时记录到 <see cref="OutputError"/>，输出字段保持为空字符串。
         /// </summary>
         /// <param name="profile">构建配置，可为空。</param>
         /// <param name="steps">步骤实例字典。</param>
         /// <param name="cancellationToken">取消令牌。</param>
+        /// <param name="taskId">任务 Id，用于快照归属；为空时使用"未命名任务"。</param>
+        /// <param name="persistenceRoot">任务状态目录；为空时使用工程默认目录。</param>
         /// <returns>构建上下文。</returns>
         public static BuildPipelineContext Create(
             UnityRFrameworkBuildProfile profile,
             IReadOnlyDictionary<string, IBuildPipelineStep> steps,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            string taskId = null,
+            string persistenceRoot = null)
         {
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string outputRoot = string.Empty;
@@ -139,6 +152,21 @@ namespace UnityRFramework.Editor
                 ? profile.Platform.Target
                 : EditorUserBuildSettings.activeBuildTarget;
 
+            BuildSettingsTransaction transaction = null;
+            try
+            {
+                transaction = BuildSettingsTransaction.Capture(
+                    new BuildPipelinePersistence(persistenceRoot),
+                    taskId ?? "未命名任务");
+            }
+            catch (Exception exception)
+            {
+                outputError = string.IsNullOrEmpty(outputError)
+                    ? $"设置事务快照捕获失败：{exception.Message}"
+                    : outputError;
+                transaction = null;
+            }
+
             return new BuildPipelineContext(
                 profile,
                 target,
@@ -149,7 +177,8 @@ namespace UnityRFramework.Editor
                 steps,
                 cancellationToken,
                 DateTime.Now,
-                outputError);
+                outputError,
+                transaction);
         }
 
         /// <summary>

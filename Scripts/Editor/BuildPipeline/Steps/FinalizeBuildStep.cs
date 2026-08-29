@@ -5,9 +5,9 @@ namespace UnityRFramework.Editor
 {
     /// <summary>
     /// 构建收尾步骤：验证构建产物真实存在并输出产物信息。
-    /// 默认保留已应用的 PlayerSettings（不还原），并在结果中显式说明该策略，
-    /// 保证产物与编辑器参数一致；构建号递增归属阶段 7 版本管理，本步骤不修改
-    /// Profile 资产，天然幂等，恢复重跑不会产生副作用。
+    /// 构建命令使用临时设置事务，任务结束后由运行器按快照恢复"应用参数"
+    /// 写入的临时设置（活动构建平台按契约保留）；本步骤不修改 Profile 资产，
+    /// 天然幂等，恢复重跑不会产生副作用。
     /// </summary>
     public sealed class FinalizeBuildStep : BuildPipelineStepBase
     {
@@ -87,7 +87,7 @@ namespace UnityRFramework.Editor
                 return BuildStepResult.Succeeded(
                     $"构建收尾：iOS Xcode 工程目录已就绪：{productPath}。"
                     + "最终签名请在 macOS/Xcode 中完成。"
-                    + "PlayerSettings 保持已应用状态（默认保留策略）。");
+                    + "临时构建设置将在任务结束后按快照恢复（活动平台保留）。");
             }
 
             if (!File.Exists(productPath))
@@ -101,7 +101,7 @@ namespace UnityRFramework.Editor
             return BuildStepResult.Succeeded(
                 $"构建收尾：产物已就绪：{productPath}"
                 + $"（{FormatSize(info.Length)}）。"
-                + "PlayerSettings 保持已应用状态（默认保留策略）。");
+                + "临时构建设置将在任务结束后按快照恢复（活动平台保留）。");
         }
 
         /// <summary>

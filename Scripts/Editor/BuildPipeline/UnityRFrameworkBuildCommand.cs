@@ -27,50 +27,116 @@ namespace UnityRFramework.Editor
 
     /// <summary>
     /// BatchMode 构建命令入口，与构建工具窗口共用同一套
-    /// Validator、Runner、步骤与报告实现，仅入口与退出方式不同。
-    /// 命令行用法示例：
+    /// Validator、Runner（update 驱动内核）、步骤与报告实现，仅入口与退出方式不同。
+    /// 命令行用法示例（不要携带 -quit，任务终态由命令自行退出进程）：
     /// Unity.exe -batchmode -projectPath &lt;工程路径&gt;
     ///   -executeMethod UnityRFramework.Editor.UnityRFrameworkBuildCommand.ExecuteFromCommandLine
     ///   -urfProfile WindowsRelease -urfCleanBuild true
     /// 密码与密钥只允许通过环境变量提供（Profile 中保存环境变量名），
     /// 出现在命令行中的密码类参数会被直接拒绝并以参数错误退出。
-    /// Domain Reload 语义：同会话残留任务同步续跑（不等待人工确认）；
-    /// 跨进程残留任务在 BatchMode 下直接作废并按构建失败退出。
+    /// Domain Reload 语义：同会话残留任务由恢复检查自动续跑；任务到达终态后
+    /// 由 <see cref="AttachBatchExit"/> 以对应退出码结束进程；跨进程残留任务在
+    /// BatchMode 下直接作废并按构建失败退出。
     /// </summary>
     public static class UnityRFrameworkBuildCommand
     {
         /// <summary>
-        /// -executeMethod 入口：解析命令行、执行构建并按结果退出进程。
-        /// 仅在 BatchMode 下调用 EditorApplication.Exit 结束进程；
+        /// -executeMethod 入口：解析命令行、启动构建任务；
+        /// BatchMode 下任务由编辑器更新驱动，终态后按结果退出进程；
         /// 非批处理环境（误触发）只记录错误，不关闭编辑器。
         /// </summary>
         public static void ExecuteFromCommandLine()
         {
             BuildCommandLineArguments arguments = BuildCommandLineArguments.Parse(
                 Environment.GetCommandLineArgs());
-            int exitCode = Run(arguments);
-            if (Application.isBatchMode)
+            if (!Application.isBatchMode)
             {
+                int interactiveExitCode = Run(arguments);
+                Debug.Log(
+                    $"构建命令在非批处理环境中触发，已执行并返回退出码 {interactiveExitCode}，"
+                    + "不会关闭编辑器。");
+                return;
+            }
+
+            int exitCode = TryStartBatchBuild(
+                arguments,
+                out BuildPipelineRunner runner,
+                out bool asyncInProgress);
+            if (runner == null && !asyncInProgress)
+            {
+                // 参数错误、校验失败或残留任务处理完成，直接按结果退出。
                 EditorApplication.Exit(exitCode);
             }
-            else
-            {
-                Debug.Log(
-                    $"构建命令在非批处理环境中触发，已执行并返回退出码 {exitCode}，"
-                    + "不会关闭编辑器。");
-            }
+
+            // 任务已启动（或同会话残留已续跑）：内核由编辑器更新驱动，
+            // 终态后 AttachBatchExit 以对应退出码结束进程。
         }
 
         /// <summary>
-        /// 执行一次完整构建：参数校验 → 残留任务守卫 → Profile 解析 →
-        /// 应用覆盖项 → 构建前校验 → 流水线执行 → 恢复覆盖项。
-        /// 覆盖项只在本次命令的运行期生效，结束后恢复 Profile 原值；
-        /// 构建号未被覆盖时保留成功后的自动递增结果。
+        /// 尝试在 BatchMode 下启动构建任务。
         /// </summary>
         /// <param name="arguments">已解析的命令行参数。</param>
-        /// <returns>进程退出码，见 <see cref="BuildCommandExitCodes"/>。</returns>
-        public static int Run(BuildCommandLineArguments arguments)
+        /// <param name="runner">本次新启动的运行器；未新启动时为空。</param>
+        /// <param name="asyncInProgress">同会话残留任务已由内核续跑时为 true，
+        /// 进程将在任务终态退出。</param>
+        /// <returns>未启动时的进程退出码；已启动时该值无意义。</returns>
+        private static int TryStartBatchBuild(
+            BuildCommandLineArguments arguments,
+            out BuildPipelineRunner runner,
+            out bool asyncInProgress)
         {
+            runner = null;
+            int preparation = PrepareBatchBuild(
+                arguments,
+                out UnityRFrameworkBuildProfile profile,
+                out asyncInProgress);
+            if (profile == null)
+            {
+                return preparation;
+            }
+
+            BuildProfileOverrideScope overrideScope =
+                new BuildProfileOverrideScope(profile, arguments);
+            BuildValidationResult validation = BuildProfileValidator.Validate(profile);
+            if (!validation.CanBuild)
+            {
+                LogValidationIssues(validation);
+                return BuildCommandExitCodes.ValidationFailure;
+            }
+
+            try
+            {
+                runner = BuildPipelineRunner.StartNew(profile);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError($"构建任务启动失败：{exception.Message}");
+                return BuildCommandExitCodes.BuildFailure;
+            }
+
+            // 覆盖项在任务终态后恢复，先于退出进程执行。
+            BuildPipelineRunner.TaskCompleted += completed =>
+            {
+                overrideScope.Restore();
+                EditorApplication.Exit(MapResultToExitCode(completed.FinalResult));
+            };
+            return BuildCommandExitCodes.Success;
+        }
+
+        /// <summary>
+        /// BatchMode 启动前置：活动任务守卫、残留任务守卫与 Profile 解析。
+        /// </summary>
+        /// <param name="arguments">已解析的命令行参数。</param>
+        /// <param name="profile">解析成功的 Profile；失败时为空。</param>
+        /// <param name="asyncInProgress">同会话残留任务已恢复续跑时为 true，
+        /// 此时 profile 为空且不应再启动新任务。</param>
+        /// <returns>失败退出码；成功时返回 Success。</returns>
+        private static int PrepareBatchBuild(
+            BuildCommandLineArguments arguments,
+            out UnityRFrameworkBuildProfile profile,
+            out bool asyncInProgress)
+        {
+            profile = null;
             if (arguments == null || !arguments.IsValid)
             {
                 LogErrors(arguments == null
@@ -80,6 +146,7 @@ namespace UnityRFramework.Editor
                     "命令行用法：-urfProfile &lt;GUID|资产路径|唯一名称&gt; "
                     + "[-urfOutputRoot 路径] [-urfVersion 版本] "
                     + "[-urfBuildNumber 正整数] [-urfCleanBuild true|false]");
+                asyncInProgress = false;
                 return BuildCommandExitCodes.ArgumentError;
             }
 
@@ -87,46 +154,94 @@ namespace UnityRFramework.Editor
             if (BuildPipelineRunner.HasActiveTask)
             {
                 Debug.LogError("当前进程已存在活动构建任务，不能重复启动。");
+                asyncInProgress = false;
                 return BuildCommandExitCodes.BuildFailure;
             }
 
-            // 残留任务守卫：处理上次中断的任务（恢复 / 作废 / 清理）。
-            // 同会话残留任务的续跑结果已在内部直接返回，不再启动新构建。
-            int leftoverResult = HandleLeftoverTask();
+            // 残留任务守卫：处理上次中断的任务（同会话自动续跑 / 作废 / 清理）。
+            // 同会话残留任务的续跑已由恢复检查启动，本命令按其完成结果退出。
+            int leftoverResult = HandleLeftoverTask(out asyncInProgress);
             if (leftoverResult != BuildCommandExitCodes.Success)
             {
                 return leftoverResult;
             }
 
+            if (asyncInProgress)
+            {
+                return BuildCommandExitCodes.Success;
+            }
+
             string profileError;
-            UnityRFrameworkBuildProfile profile =
-                ResolveProfile(arguments.ProfileReference, out profileError);
+            profile = ResolveProfile(arguments.ProfileReference, out profileError);
             if (profile == null)
             {
                 Debug.LogError(profileError);
                 return BuildCommandExitCodes.ArgumentError;
             }
 
-            // 覆盖项只作用于运行期，结束后恢复 Profile 原值。
+            return BuildCommandExitCodes.Success;
+        }
+
+        /// <summary>
+        /// 为任务附加 BatchMode 终态退出：任务到达终态后按退出码结束进程。
+        /// 非批处理环境为无操作。供命令入口与恢复检查共用，
+        /// 保证 Domain Reload 后由初始化入口续跑的任务也能在终态退出。
+        /// </summary>
+        /// <param name="runner">已启动的任务运行器。</param>
+        public static void AttachBatchExit(BuildPipelineRunner runner)
+        {
+            if (runner == null || !Application.isBatchMode)
+            {
+                return;
+            }
+
+            BuildPipelineRunner.TaskCompleted += completed =>
+            {
+                EditorApplication.Exit(MapResultToExitCode(completed.FinalResult));
+            };
+        }
+
+        /// <summary>
+        /// 非批处理环境的命令入口：启动构建任务后立即返回，任务由内核异步推进。
+        /// </summary>
+        /// <param name="arguments">已解析的命令行参数。</param>
+        /// <returns>进程退出码，见 <see cref="BuildCommandExitCodes"/>。</returns>
+        public static int Run(BuildCommandLineArguments arguments)
+        {
+            int preparation = PrepareBatchBuild(
+                arguments,
+                out UnityRFrameworkBuildProfile profile,
+                out bool asyncInProgress);
+            if (profile == null)
+            {
+                return asyncInProgress
+                    ? BuildCommandExitCodes.Success
+                    : preparation;
+            }
+
             BuildProfileOverrideScope overrideScope =
                 new BuildProfileOverrideScope(profile, arguments);
+            BuildValidationResult validation = BuildProfileValidator.Validate(profile);
+            if (!validation.CanBuild)
+            {
+                LogValidationIssues(validation);
+                return BuildCommandExitCodes.ValidationFailure;
+            }
+
             try
             {
-                BuildValidationResult validation =
-                    BuildProfileValidator.Validate(profile);
-                if (!validation.CanBuild)
-                {
-                    LogValidationIssues(validation);
-                    return BuildCommandExitCodes.ValidationFailure;
-                }
-
                 BuildPipelineRunner runner = BuildPipelineRunner.StartNew(profile);
-                BuildRunResult result = runner.Execute();
-                return MapResultToExitCode(result);
+                BuildPipelineRunner.TaskCompleted += completed =>
+                    overrideScope.Restore();
+                Debug.Log(
+                    $"构建任务已启动（{runner.CurrentState.TaskId}），"
+                    + "由编辑器更新驱动推进，可在构建工具窗口查看进度。");
+                return BuildCommandExitCodes.Success;
             }
-            finally
+            catch (Exception exception)
             {
-                overrideScope.Restore();
+                Debug.LogError($"构建任务启动失败：{exception.Message}");
+                return BuildCommandExitCodes.BuildFailure;
             }
         }
 
@@ -244,34 +359,65 @@ namespace UnityRFramework.Editor
 
         /// <summary>
         /// 处理上次中断的残留任务：
-        /// - 已完成任务：清理残留状态与锁后继续；
-        /// - 同会话未完成任务（Domain Reload）：同步续跑并返回其结果；
-        /// - 跨进程未完成任务：BatchMode 直接作废按构建失败退出，
-        ///   GUI 模式不弹窗等待，同样按构建失败退出（请通过窗口处理）。
+        /// - 已终态任务：清理残留状态与锁后继续；
+        /// - 同会话未完成任务（Domain Reload，会话 TaskId 匹配）：启动内核续跑，
+        ///   BatchMode 下终态自动退出进程；
+        /// - 跨进程未完成任务：先验证锁归属——持锁进程存活且工程匹配时不干预按失败退出，
+        ///   锁残留时 BatchMode 直接作废按构建失败退出；GUI 模式不弹窗等待，
+        ///   同样按构建失败退出（请通过窗口处理）。
         /// </summary>
+        /// <param name="asyncInProgress">同会话残留任务已恢复续跑时为 true，
+        /// 调用方不得再启动新任务，进程将在任务终态退出。</param>
         /// <returns>退出码；Success 表示可以继续启动新构建。</returns>
-        private static int HandleLeftoverTask()
+        private static int HandleLeftoverTask(out bool asyncInProgress)
         {
+            asyncInProgress = false;
             BuildPipelinePersistence persistence = new BuildPipelinePersistence();
+            BuildPipelineStateLoadResult loadResult;
             BuildPipelineState leftover;
             try
             {
-                leftover = persistence.LoadState();
+                loadResult = persistence.LoadStateDetailed(out leftover);
             }
             catch (Exception exception)
             {
                 Debug.LogError($"构建任务状态读取失败：{exception.Message}");
+                asyncInProgress = false;
                 return BuildCommandExitCodes.BuildFailure;
             }
 
-            if (leftover == null)
+            if (loadResult == BuildPipelineStateLoadResult.Missing)
             {
+                if (persistence.HasLock)
+                {
+                    Debug.LogError(
+                        "构建任务状态已丢失但残留锁文件，BatchMode 下直接作废该残留锁。");
+                    BuildPipelineRecovery.AbandonTask(null, persistence);
+                }
+                asyncInProgress = false;
                 return BuildCommandExitCodes.Success;
             }
 
+            if (loadResult == BuildPipelineStateLoadResult.Corrupt
+                || loadResult == BuildPipelineStateLoadResult.VersionMismatch)
+            {
+                Debug.LogError(
+                    $"构建任务状态文件无法读取（{loadResult}），"
+                    + "为避免吞掉损坏状态，本次命令按构建失败退出；"
+                    + "请在图形界面中处理或手动作废残留文件。");
+                asyncInProgress = false;
+                return BuildCommandExitCodes.BuildFailure;
+            }
+
+            persistence.ReadLockInfo(out BuildPipelineLockInfo lockInfo);
             BuildRecoveryAction action = BuildPipelineRecovery.Evaluate(
                 leftover,
-                BuildPipelineRecovery.IsActiveInSession(),
+                BuildPipelineRecovery.GetActiveTaskId(),
+                lockInfo,
+                lockInfo != null && lockInfo.IsHolderProcessAlive(),
+                lockInfo != null
+                    && lockInfo.MatchesProject(
+                        BuildPipelinePersistence.GetProjectIdentity()),
                 Application.isBatchMode);
             switch (action)
             {
@@ -280,28 +426,39 @@ namespace UnityRFramework.Editor
                     return BuildCommandExitCodes.Success;
 
                 case BuildRecoveryAction.Resume:
-                    // 同会话残留（Domain Reload 中断）：同步续跑，不等待人工确认。
+                    // 同会话残留（Domain Reload 中断）：启动内核续跑，
+                    // BatchMode 下任务终态由 AttachBatchExit 退出进程。
                     Debug.Log(
                         $"检测到同会话未完成构建任务（{leftover.TaskId}），"
                         + "将直接从检查点续跑。");
                     try
                     {
                         BuildPipelineRunner runner = BuildPipelineRunner.Resume(leftover);
-                        BuildRunResult result = runner.Execute();
-                        return MapResultToExitCode(result);
+                        AttachBatchExit(runner);
+                        asyncInProgress = true;
+                        return BuildCommandExitCodes.Success;
                     }
                     catch (Exception exception)
                     {
                         Debug.LogError($"残留任务恢复失败：{exception.Message}");
                         CleanupLeftover(persistence);
+                        asyncInProgress = false;
                         return BuildCommandExitCodes.BuildFailure;
                     }
+
+                case BuildRecoveryAction.Busy:
+                    Debug.LogError(
+                        $"构建任务（{leftover.TaskId}）正由其他 Unity 进程执行"
+                        + $"（PID {lockInfo.ProcessId}），本次命令按构建失败退出。");
+                    asyncInProgress = false;
+                    return BuildCommandExitCodes.BuildFailure;
 
                 case BuildRecoveryAction.Abandon:
                     Debug.LogError(
                         $"检测到跨进程残留构建任务（{leftover.TaskId}），"
                         + "BatchMode 下不等待人工确认，任务作废，本次命令按构建失败退出。");
-                    CleanupLeftover(persistence);
+                    BuildPipelineRecovery.AbandonTask(leftover, persistence);
+                    asyncInProgress = false;
                     return BuildCommandExitCodes.BuildFailure;
 
                 case BuildRecoveryAction.Prompt:
@@ -309,9 +466,11 @@ namespace UnityRFramework.Editor
                         $"检测到跨进程残留构建任务（{leftover.TaskId}），"
                         + "命令入口不弹窗等待人工确认，本次命令按构建失败退出，"
                         + "请打开构建工具窗口处理。");
+                    asyncInProgress = false;
                     return BuildCommandExitCodes.BuildFailure;
 
                 default:
+                    asyncInProgress = false;
                     return BuildCommandExitCodes.BuildFailure;
             }
         }

@@ -4,27 +4,50 @@ using System.Collections.Generic;
 namespace UnityRFramework.Editor
 {
     /// <summary>
-    /// 构建流水线任务的当前阶段。
+    /// 构建流水线任务的当前状态。状态机共七态：
+    /// 运行、等待编辑器、失败、取消、成功、人工处理和作废。
     /// </summary>
     public enum BuildPipelinePhase
     {
         /// <summary>任务进行中（含等待步骤执行）。</summary>
         Running,
 
-        /// <summary>任务等待脚本重载或编译结束后恢复。</summary>
-        WaitingForReload,
+        /// <summary>任务等待编辑器完成编译、资源导入或 Domain Reload 后恢复。</summary>
+        WaitingForEditor,
 
-        /// <summary>任务已成功完成。</summary>
+        /// <summary>任务已成功完成；成功后清理状态与锁。</summary>
         Succeeded,
 
-        /// <summary>任务已失败，流水线停止。</summary>
+        /// <summary>任务已失败；失败任务保留状态与锁，等待重试、继续或作废。</summary>
         Failed,
 
-        /// <summary>任务已被取消。</summary>
+        /// <summary>任务已被用户取消；保留状态与锁，等待继续或作废。</summary>
         Cancelled,
 
-        /// <summary>任务已被作废（用户放弃或无法安全恢复）。</summary>
+        /// <summary>任务进入人工处理状态（如回滚失败），需要维护者处理后才能继续。</summary>
+        ManualIntervention,
+
+        /// <summary>任务已被作废（用户放弃或无法安全恢复）；作废后清理状态与锁。</summary>
         Abandoned
+    }
+
+    /// <summary>
+    /// 构建设置回滚状态。记录设置事务的回滚进展，
+    /// 供阶段 4 的设置事务消费；回滚失败时任务进入人工处理状态。
+    /// </summary>
+    public enum BuildRollbackState
+    {
+        /// <summary>本任务没有需要回滚的设置事务。</summary>
+        NotRequired,
+
+        /// <summary>已应用临时设置，构建结束后待回滚。</summary>
+        Pending,
+
+        /// <summary>设置已成功恢复。</summary>
+        Succeeded,
+
+        /// <summary>恢复失败，需要人工处理。</summary>
+        Failed
     }
 
     /// <summary>
@@ -59,17 +82,18 @@ namespace UnityRFramework.Editor
     /// <summary>
     /// 构建流水线任务状态，持久化为 Library/UnityRFramework/BuildPipeline/task.json。
     /// 全部字段使用可序列化基元类型与字符串，JsonUtility 可直接往返。
+    /// 状态绑定唯一 TaskId；会话标记同时保存该 TaskId，恢复前必须匹配。
     /// </summary>
     [Serializable]
     public sealed class BuildPipelineState
     {
-        /// <summary>当前序列化版本号，升级迁移时递增。</summary>
-        public const int CurrentSerializedVersion = 1;
+        /// <summary>当前序列化版本号。版本 2 引入七态状态机、等待原因与回滚状态字段。</summary>
+        public const int CurrentSerializedVersion = 2;
 
-        /// <summary>序列化版本号。</summary>
+        /// <summary>序列化版本号；加载时低于当前版本会执行字段迁移。</summary>
         public int SerializedVersion = CurrentSerializedVersion;
 
-        /// <summary>任务唯一 Id（Guid 无连字符形式）。</summary>
+        /// <summary>任务唯一 Id（Guid 无连字符形式）；会话标记与锁文件都引用该 Id。</summary>
         public string TaskId = string.Empty;
 
         /// <summary>构建配置资产的 GUID；资产缺失时为空字符串。</summary>
@@ -108,8 +132,17 @@ namespace UnityRFramework.Editor
         /// <summary>任务最近更新时刻（ISO 8601 字符串）。</summary>
         public string UpdatedAt = string.Empty;
 
-        /// <summary>任务阶段名称（BuildPipelinePhase 名称）。</summary>
+        /// <summary>任务状态名称（BuildPipelinePhase 名称）。</summary>
         public string PhaseName = string.Empty;
+
+        /// <summary>
+        /// 任务处于等待编辑器状态时的原因说明
+        /// （如"等待脚本编译"、"等待资源导入"、步骤返回的等待消息）；非等待状态为空字符串。
+        /// </summary>
+        public string WaitingReason = string.Empty;
+
+        /// <summary>设置回滚状态名称（BuildRollbackState 名称）。</summary>
+        public string RollbackStateName = BuildRollbackState.NotRequired.ToString();
 
         /// <summary>按执行顺序排列的全部步骤 Id。</summary>
         public List<string> StepIds = new List<string>();
@@ -117,16 +150,18 @@ namespace UnityRFramework.Editor
         /// <summary>下一个待执行步骤在 StepIds 中的索引。</summary>
         public int CurrentStepIndex;
 
-        /// <summary>已完成步骤的执行记录，按完成顺序排列。</summary>
+        /// <summary>已完成（已提交）步骤的执行记录，按完成顺序排列。</summary>
         public List<BuildStepRecord> CompletedSteps = new List<BuildStepRecord>();
 
         /// <summary>失败步骤的执行记录；未失败时为空。</summary>
         public BuildStepRecord FailedStep;
 
-        /// <summary>任务失败原因的用户可见描述。</summary>
+        /// <summary>
+        /// 失败、人工处理或作废原因的用户可见描述；其他状态为空字符串。
+        /// </summary>
         public string ErrorMessage = string.Empty;
 
-        /// <summary>获取任务阶段。</summary>
+        /// <summary>获取或设置任务状态。</summary>
         public BuildPipelinePhase Phase
         {
             get
@@ -143,17 +178,74 @@ namespace UnityRFramework.Editor
             }
         }
 
-        /// <summary>任务是否已进入终态（成功、失败、取消或作废）。</summary>
-        public bool IsFinished
+        /// <summary>获取或设置设置回滚状态。</summary>
+        public BuildRollbackState RollbackState
+        {
+            get
+            {
+                if (Enum.TryParse(RollbackStateName, out BuildRollbackState value))
+                {
+                    return value;
+                }
+                return BuildRollbackState.NotRequired;
+            }
+            set
+            {
+                RollbackStateName = value.ToString();
+            }
+        }
+
+        /// <summary>
+        /// 任务是否已进入终态。终态任务不再执行任何步骤：
+        /// 成功或作废；失败、取消与人工处理保留状态等待后续决策，不属于终态。
+        /// </summary>
+        public bool IsTerminal
         {
             get
             {
                 BuildPipelinePhase phase = Phase;
                 return phase == BuildPipelinePhase.Succeeded
-                    || phase == BuildPipelinePhase.Failed
-                    || phase == BuildPipelinePhase.Cancelled
                     || phase == BuildPipelinePhase.Abandoned;
             }
+        }
+
+        /// <summary>
+        /// 本次运行是否已结束（既非运行也非等待编辑器）。
+        /// 失败、取消、人工处理与终态任务都满足该条件，可以重新启动新任务决策流程。
+        /// </summary>
+        public bool HasEndedRun
+        {
+            get
+            {
+                BuildPipelinePhase phase = Phase;
+                return phase != BuildPipelinePhase.Running
+                    && phase != BuildPipelinePhase.WaitingForEditor;
+            }
+        }
+
+        /// <summary>
+        /// 应用旧版本状态到当前版本的迁移；只在内存中生效，
+        /// 下一次保存检查点时以当前版本格式落盘。
+        /// </summary>
+        public void MigrateToCurrentVersion()
+        {
+            if (SerializedVersion > CurrentSerializedVersion)
+            {
+                return;
+            }
+
+            if (SerializedVersion < 2)
+            {
+                // 版本 1 → 2：新增等待原因与回滚状态字段，保持默认值即可；
+                // 失败与取消任务的旧语义（自动清理）由运行器按新契约接管。
+                WaitingReason ??= string.Empty;
+                if (string.IsNullOrEmpty(RollbackStateName))
+                {
+                    RollbackStateName = BuildRollbackState.NotRequired.ToString();
+                }
+            }
+
+            SerializedVersion = CurrentSerializedVersion;
         }
     }
 }

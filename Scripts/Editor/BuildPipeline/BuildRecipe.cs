@@ -95,11 +95,21 @@ namespace UnityRFramework.Editor
         private const string IssueCode = "BUILD_RECIPE";
         private const string IssueGroup = "构建方案";
 
+        /// <summary>
+        /// 将 Profile、Recipe 和已注册步骤解析为确定执行计划。
+        /// </summary>
+        /// <param name="profile">构建配置。</param>
+        /// <param name="availableSteps">可用步骤集合；为空时从注册表获取。</param>
+        /// <param name="requireCoreSteps">是否强制校验 Recipe 必备核心步骤。</param>
+        /// <param name="recipeOverride">运行期 Recipe 覆盖；为空时使用 Profile 保存的 Recipe，不修改 Profile 资产。</param>
+        /// <returns>Recipe 执行计划。</returns>
         public static BuildRecipePlan Create(
             UnityRFrameworkBuildProfile profile,
             IEnumerable<IBuildPipelineStep> availableSteps = null,
-            bool requireCoreSteps = true)
+            bool requireCoreSteps = true,
+            BuildRecipe? recipeOverride = null)
         {
+            BuildRecipe recipe = recipeOverride ?? profile.Recipe;
             List<BuildValidationIssue> issues = new List<BuildValidationIssue>();
             List<IBuildPipelineStep> empty = new List<IBuildPipelineStep>();
             if (profile == null)
@@ -118,11 +128,12 @@ namespace UnityRFramework.Editor
             HashSet<string> selectedIds = SelectStepIds(
                 profile,
                 registered,
+                recipe,
                 selectAllAvailable: !requireCoreSteps);
             if (requireCoreSteps)
             {
                 ValidateRequiredCoreSteps(
-                    profile.Recipe,
+                    recipe,
                     registered,
                     selectedIds,
                     issues);
@@ -222,6 +233,7 @@ namespace UnityRFramework.Editor
         private static HashSet<string> SelectStepIds(
             UnityRFrameworkBuildProfile profile,
             IReadOnlyDictionary<string, IBuildPipelineStep> registered,
+            BuildRecipe recipe,
             bool selectAllAvailable)
         {
             HashSet<string> enabled = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -244,7 +256,7 @@ namespace UnityRFramework.Editor
                 bool isAutomatic = pair.Value is IAutomaticBuildPipelineStep automatic
                     && automatic.ShouldInclude(profile);
                 if ((selectAllAvailable || isCore || enabled.Contains(pair.Key) || isAutomatic)
-                    && IncludesStage(profile.Recipe, pair.Value.Stage))
+                    && IncludesStage(recipe, pair.Value.Stage))
                 {
                     selected.Add(pair.Key);
                 }

@@ -9,13 +9,14 @@ namespace UnityRFramework.Editor
 {
     /// <summary>
     /// 构建工具主窗口：Profile 选择、Profile 全参数编辑（平台 / 输出 / 场景）、
-    /// 步骤挂载与步骤配置参数编辑、差异预览、校验与命令区。
+    /// 步骤挂载与步骤配置参数编辑、差异预览、校验、任务控制与状态展示。
     /// 本窗口是全部构建参数的编辑主场：Profile 参数在「Profile 参数」分区内联编辑，
     /// 步骤配置参数在步骤区嵌套编辑器编辑，即改即存；
     /// Profile 资产 Inspector 只负责步骤条目的挂载、启停与类型识别。
-    /// 窗口只调用构建服务与配置模型，不实现任何具体构建步骤逻辑。
-    /// 校验、应用参数、资源构建、Player 构建与完整构建命令均已接入流水线运行器，
-    /// 执行期间锁定命令区，仅「取消任务」保持可用。
+    /// 窗口只调用构建服务与配置模型，不实现任何具体构建步骤逻辑，
+    /// 也不直接同步执行流水线：构建命令经 <see cref="BuildPipelineRunner"/>
+    /// 状态机内核异步推进，窗口提供 Profile/Recipe 选择、校验、开始、取消、
+    /// 恢复、重试、作废与报告入口，并实时展示当前任务状态。
     /// </summary>
     public sealed class UnityRFrameworkBuildWindow : EditorWindow
     {
@@ -30,6 +31,9 @@ namespace UnityRFramework.Editor
 
         /// <summary>分区折叠键：最近构建。</summary>
         private const string FoldLastBuild = "LastBuild";
+
+        /// <summary>分区折叠键：当前任务。</summary>
+        private const string FoldCurrentTask = "CurrentTask";
 
         /// <summary>窗口状态持久化实例。</summary>
         [SerializeField]
@@ -48,12 +52,6 @@ namespace UnityRFramework.Editor
         private List<BuildValidationIssue> validationIssues =
             new List<BuildValidationIssue>();
 
-        /// <summary>是否处于构建执行中；流水线执行期间置位，用于锁定可能改变任务语义的控件。</summary>
-        private bool isBusy;
-
-        /// <summary>当前正在执行的流水线运行器；仅执行期间非空，供「取消任务」使用。</summary>
-        private BuildPipelineRunner currentRunner;
-
         /// <summary>资源类步骤 Id；窗口按此集合判断「构建资源」可用性与执行范围。</summary>
         private static readonly string[] ResourceStepIds =
         {
@@ -63,6 +61,15 @@ namespace UnityRFramework.Editor
 
         /// <summary>分区折叠头样式：保留 Foldout 箭头并使用粗体字体。</summary>
         private static GUIStyle sectionFoldoutStyle;
+
+        /// <summary>是否存在活动构建任务。</summary>
+        private static bool IsTaskActive
+        {
+            get
+            {
+                return BuildPipelineRunner.HasActiveTask;
+            }
+        }
 
         /// <summary>
         /// 打开构建工具窗口。
@@ -90,8 +97,48 @@ namespace UnityRFramework.Editor
         /// </summary>
         private void OnDisable()
         {
+            BuildPipelineRunner.TaskCompleted -= OnWindowTaskCompleted;
             windowState.SelectedProfileGuid = BuildProfileEditorUtility.GetGuid(selectedProfile);
             windowState.Save();
+        }
+
+        /// <summary>
+        /// 编辑器更新：存在活动任务时持续重绘窗口，保证状态实时刷新。
+        /// </summary>
+        private void Update()
+        {
+            if (IsTaskActive)
+            {
+                Repaint();
+            }
+        }
+
+        /// <summary>
+        /// 订阅下一条任务完成通知（仅窗口自己启动或恢复的任务）。
+        /// 完成后自动退订并记录摘要、弹窗展示结果；
+        /// 测试或恢复检查驱动的其他任务完成不会触发本窗口弹窗。
+        /// </summary>
+        private void SubscribeNextTaskCompletion()
+        {
+            BuildPipelineRunner.TaskCompleted -= OnWindowTaskCompleted;
+            BuildPipelineRunner.TaskCompleted += OnWindowTaskCompleted;
+        }
+
+        /// <summary>
+        /// 窗口任务终态回调：记录最近构建摘要并弹窗提示结果。
+        /// </summary>
+        /// <param name="runner">完成的任务运行器。</param>
+        private void OnWindowTaskCompleted(BuildPipelineRunner runner)
+        {
+            BuildPipelineRunner.TaskCompleted -= OnWindowTaskCompleted;
+            if (runner == null || runner.FinalResult == null)
+            {
+                return;
+            }
+
+            RecordLastBuild(runner.FinalResult);
+            ShowBuildResultDialog(runner.FinalResult);
+            Repaint();
         }
 
         /// <summary>
@@ -116,6 +163,7 @@ namespace UnityRFramework.Editor
                 }
 
                 windowState.ScrollPosition = EditorGUILayout.BeginScrollView(windowState.ScrollPosition);
+                DrawCurrentTaskSection();
                 DrawProfileParametersSection();
                 DrawStepsSection();
                 DrawValidationSection();
@@ -421,15 +469,179 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 绘制命令区：校验、应用参数、构建命令与取消。
-        /// 构建命令经 <see cref="BuildPipelineRunner"/> 同步执行；执行期间锁定命令区，
-        /// 仅「取消任务」保持可用。
+        /// 绘制当前任务分区：活动任务实时状态，或残留任务的恢复/重试/作废入口。
+        /// </summary>
+        private void DrawCurrentTaskSection()
+        {
+            DrawSectionHeader("当前任务", FoldCurrentTask, () =>
+            {
+                if (IsTaskActive)
+                {
+                    BuildPipelineRunner active = BuildPipelineRunner.Active;
+                    BuildPipelineState state = active != null
+                        ? active.CurrentState
+                        : null;
+                    if (state == null)
+                    {
+                        EditorGUILayout.HelpBox("构建任务正在初始化…", MessageType.Info);
+                        return;
+                    }
+
+                    EditorGUILayout.HelpBox(
+                        $"任务 {state.TaskId} 正在执行。\n"
+                        + $"状态：{GetPhaseText(state.Phase)}\n"
+                        + $"进度：{state.CompletedSteps.Count} / {state.StepIds.Count} 个步骤"
+                        + (state.StepIds.Count > state.CompletedSteps.Count
+                            ? $"（下一步：{state.StepIds[state.CompletedSteps.Count]}）"
+                            : string.Empty)
+                        + (string.IsNullOrEmpty(state.WaitingReason)
+                            ? string.Empty
+                            : $"\n等待：{state.WaitingReason}")
+                        + (string.IsNullOrEmpty(state.ErrorMessage)
+                            ? string.Empty
+                            : $"\n错误：{state.ErrorMessage}"),
+                        MessageType.Warning);
+                    return;
+                }
+
+                BuildPipelineState leftover = LoadLeftoverState();
+                if (leftover == null)
+                {
+                    EditorGUILayout.LabelField("（无活动或残留任务）");
+                    return;
+                }
+
+                EditorGUILayout.HelpBox(
+                    $"发现未完成任务 {leftover.TaskId}（{leftover.ProfileName}）。\n"
+                    + $"状态：{GetPhaseText(leftover.Phase)}\n"
+                    + $"进度：{leftover.CompletedSteps.Count} / {leftover.StepIds.Count} 个步骤"
+                    + (string.IsNullOrEmpty(leftover.ErrorMessage)
+                        ? string.Empty
+                        : $"\n错误：{leftover.ErrorMessage}")
+                    + (leftover.Phase == BuildPipelinePhase.Failed
+                        ? "\n可修复配置后「恢复」以重试失败步骤。"
+                        : "\n可「恢复」从检查点继续，或「作废」放弃该任务。"),
+                    MessageType.Warning);
+
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("恢复", GUILayout.Height(26f)))
+                    {
+                        ResumeLeftoverTask(leftover);
+                    }
+
+                    if (GUILayout.Button("作废", GUILayout.Height(26f)))
+                    {
+                        AbandonLeftoverTask(leftover);
+                    }
+                }
+            });
+        }
+
+        /// <summary>
+        /// 加载残留任务状态；损坏状态返回空并保持现场等待恢复检查处理。
+        /// </summary>
+        /// <returns>非终态残留状态；无可恢复任务时为空。</returns>
+        private static BuildPipelineState LoadLeftoverState()
+        {
+            BuildPipelinePersistence persistence = new BuildPipelinePersistence();
+            try
+            {
+                BuildPipelineStateLoadResult result =
+                    persistence.LoadStateDetailed(out BuildPipelineState state);
+                if ((result == BuildPipelineStateLoadResult.Success
+                        || result == BuildPipelineStateLoadResult.LoadedFromBackup)
+                    && state != null
+                    && !state.IsTerminal)
+                {
+                    return state;
+                }
+            }
+            catch
+            {
+                // 读取失败按无残留处理，具体原因由恢复检查与控制台输出。
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 恢复残留任务：启动内核继续执行（失败任务重试失败步骤，其余从检查点继续）。
+        /// </summary>
+        /// <param name="leftover">残留任务状态。</param>
+        private void ResumeLeftoverTask(BuildPipelineState leftover)
+        {
+            try
+            {
+                BuildPipelineRunner.Resume(leftover);
+                SubscribeNextTaskCompletion();
+            }
+            catch (Exception exception)
+            {
+                EditorUtility.DisplayDialog(
+                    "恢复失败",
+                    $"无法恢复构建任务：{exception.Message}",
+                    "确定");
+            }
+        }
+
+        /// <summary>
+        /// 作废残留任务并清理状态与锁。
+        /// </summary>
+        /// <param name="leftover">残留任务状态。</param>
+        private void AbandonLeftoverTask(BuildPipelineState leftover)
+        {
+            if (!EditorUtility.DisplayDialog(
+                    "作废构建任务",
+                    $"确认作废任务 {leftover.TaskId}（{leftover.ProfileName}）？"
+                    + "作废后将清理状态与锁，已完成步骤的产物保留。",
+                    "作废",
+                    "取消"))
+            {
+                return;
+            }
+
+            BuildPipelineRecovery.AbandonTask(
+                leftover,
+                new BuildPipelinePersistence());
+        }
+
+        /// <summary>
+        /// 获取任务状态的中文显示名。
+        /// </summary>
+        /// <param name="phase">任务状态。</param>
+        /// <returns>中文显示名。</returns>
+        private static string GetPhaseText(BuildPipelinePhase phase)
+        {
+            switch (phase)
+            {
+                case BuildPipelinePhase.Running:
+                    return "运行中";
+                case BuildPipelinePhase.WaitingForEditor:
+                    return "等待编辑器";
+                case BuildPipelinePhase.Succeeded:
+                    return "成功";
+                case BuildPipelinePhase.Failed:
+                    return "失败";
+                case BuildPipelinePhase.Cancelled:
+                    return "已取消";
+                case BuildPipelinePhase.ManualIntervention:
+                    return "人工处理";
+                default:
+                    return "已作废";
+            }
+        }
+
+        /// <summary>
+        /// 绘制命令区：校验、应用参数与构建命令；构建命令经
+        /// <see cref="BuildPipelineRunner"/> 内核异步执行。任务活动期间锁定
+        /// 构建命令，仅「取消任务」保持可用。
         /// </summary>
         private void DrawCommandSection()
         {
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("命令", EditorStyles.boldLabel);
-            using (new EditorGUI.DisabledScope(isBusy))
+            using (new EditorGUI.DisabledScope(IsTaskActive))
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -452,7 +664,7 @@ namespace UnityRFramework.Editor
                                 new GUIContent("构建资源", GetBuildAssetsTooltip()),
                                 GUILayout.Height(30f)))
                         {
-                            BuildAssets();
+                            StartBuildWithRecipe(BuildRecipe.Assets);
                         }
                     }
 
@@ -462,7 +674,7 @@ namespace UnityRFramework.Editor
                                 "执行校验 → 切换目标 → 应用参数 → Player 构建，不构建资源。"),
                             GUILayout.Height(30f)))
                     {
-                        BuildPlayerOnly();
+                        StartBuildWithRecipe(BuildRecipe.Player);
                     }
 
                     if (GUILayout.Button(
@@ -471,7 +683,7 @@ namespace UnityRFramework.Editor
                                 "执行 Profile 当前选择的 Recipe。"),
                             GUILayout.Height(30f)))
                     {
-                        RunFullBuild();
+                        StartBuildWithRecipe(selectedProfile.Recipe);
                     }
                 }
             }
@@ -483,15 +695,15 @@ namespace UnityRFramework.Editor
                     OpenOutputDirectory();
                 }
 
-                using (new EditorGUI.DisabledScope(!isBusy || currentRunner == null))
+                using (new EditorGUI.DisabledScope(!IsTaskActive))
                 {
                     if (GUILayout.Button(
                             new GUIContent(
                                 "取消任务",
-                                "停止尚未开始的后续步骤，已完成步骤保留。"),
+                                "停止尚未开始的后续步骤，已完成步骤保留；取消任务保留状态与锁。"),
                             GUILayout.Height(30f)))
                     {
-                        currentRunner.Cancel();
+                        BuildPipelineRunner.Active?.Cancel();
                     }
                 }
             }
@@ -500,7 +712,9 @@ namespace UnityRFramework.Editor
             EditorGUILayout.HelpBox(
                 "构建资源执行 Assets Recipe；构建 Player 执行 Player Recipe；"
                 + "按 Recipe 构建执行 Profile 当前选择的 Recipe。"
-                + "所有入口均由统一规划器校验阶段、依赖和步骤配置。构建中可点击「取消任务」。",
+                + "所有入口均由统一规划器校验阶段、依赖和步骤配置。"
+                + "构建命令使用临时设置事务：任务结束（成功、失败、取消）后自动恢复项目设置，"
+                + "活动构建平台按契约保留。构建中可点击「取消任务」。",
                 MessageType.Info);
         }
 
@@ -638,79 +852,12 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 执行资源构建 Recipe。
-        /// </summary>
-        private void BuildAssets()
-        {
-            QueueBuildWithRecipe(BuildRecipe.Assets);
-        }
-
-        /// <summary>
-        /// 执行 Player 构建 Recipe。
-        /// </summary>
-        private void BuildPlayerOnly()
-        {
-            QueueBuildWithRecipe(BuildRecipe.Player);
-        }
-
-        /// <summary>
-        /// 执行 Profile 当前选择的 Recipe。
-        /// </summary>
-        private void RunFullBuild()
-        {
-            QueueBuildWithRecipe(selectedProfile.Recipe);
-        }
-
-        /// <summary>
-        /// 将构建延迟到当前 OnGUI 事件结束后执行，避免同步构建期间的编辑器重绘
-        /// 破坏当前布局栈并产生 BeginLayoutGroup/EndLayoutGroup 失配。
+        /// 以指定 Recipe 启动构建任务：前置校验 → 活动任务守卫 → 内核启动。
+        /// Recipe 覆盖只作用于本次任务，不修改 Profile 资产；
+        /// 任务由状态机内核异步推进，本方法立即返回。
         /// </summary>
         /// <param name="recipe">本次执行使用的 Recipe。</param>
-        private void QueueBuildWithRecipe(BuildRecipe recipe)
-        {
-            if (isBusy)
-            {
-                return;
-            }
-
-            isBusy = true;
-            Repaint();
-            EditorApplication.delayCall += () =>
-            {
-                if (this == null)
-                {
-                    return;
-                }
-
-                isBusy = false;
-                RunBuildWithRecipe(recipe);
-            };
-        }
-
-        /// <summary>
-        /// 使用指定 Recipe 执行统一流水线，不修改 Profile 资产的持久化选择。
-        /// </summary>
-        /// <param name="recipe">本次执行使用的 Recipe。</param>
-        private void RunBuildWithRecipe(BuildRecipe recipe)
-        {
-            BuildRecipe originalRecipe = selectedProfile.Recipe;
-            try
-            {
-                selectedProfile.Recipe = recipe;
-                RunBuild(null);
-            }
-            finally
-            {
-                selectedProfile.Recipe = originalRecipe;
-            }
-        }
-
-        /// <summary>
-        /// 启动并同步执行构建流水线：先做前置校验，失败时弹窗阻断；
-        /// 执行期间锁定命令区，结束后记录最近构建摘要。
-        /// </summary>
-        /// <param name="steps">显式步骤列表；为空时从注册表自动发现。</param>
-        private void RunBuild(IReadOnlyList<IBuildPipelineStep> steps)
+        private void StartBuildWithRecipe(BuildRecipe recipe)
         {
             BuildValidationResult validation =
                 BuildProfileValidator.Validate(selectedProfile);
@@ -733,7 +880,7 @@ namespace UnityRFramework.Editor
                 return;
             }
 
-            if (BuildPipelineRunner.HasActiveTask)
+            if (IsTaskActive)
             {
                 EditorUtility.DisplayDialog(
                     "已有构建任务",
@@ -742,45 +889,44 @@ namespace UnityRFramework.Editor
                 return;
             }
 
-            isBusy = true;
-            System.Diagnostics.Stopwatch stopwatch =
-                System.Diagnostics.Stopwatch.StartNew();
+            BuildPipelineState leftover = LoadLeftoverState();
+            if (leftover != null)
+            {
+                EditorUtility.DisplayDialog(
+                    "存在未完成任务",
+                    $"存在未完成的构建任务（{leftover.ProfileName}，{leftover.TaskId}，"
+                    + $"状态 {GetPhaseText(leftover.Phase)}）。\n"
+                    + "请先在「当前任务」分区恢复或作废后再启动新任务。",
+                    "确定");
+                return;
+            }
+
             try
             {
-                currentRunner = BuildPipelineRunner.StartNew(
+                BuildPipelineRunner.StartNew(
                     selectedProfile,
                     null,
-                    steps);
-                BuildRunResult result = currentRunner.Execute();
-                stopwatch.Stop();
-                RecordLastBuild(result, stopwatch.Elapsed.TotalSeconds);
-                ShowBuildResultDialog(result);
+                    null,
+                    recipe);
+                SubscribeNextTaskCompletion();
+                Repaint();
             }
             catch (Exception exception)
             {
-                stopwatch.Stop();
                 Debug.LogError($"[构建工具] 构建启动失败：{exception}");
                 EditorUtility.DisplayDialog(
                     "构建启动失败",
                     $"无法启动构建任务：\n{exception.Message}",
                     "确定");
             }
-            finally
-            {
-                currentRunner = null;
-                isBusy = false;
-                windowState.Save();
-                Repaint();
-            }
         }
 
         /// <summary>
-        /// 将执行结果写入窗口「最近构建」分区并持久化。
+        /// 将终态结果写入窗口「最近构建」分区并持久化。
         /// 版本号取任务创建时冻结的值，与实际产物路径保持一致。
         /// </summary>
-        /// <param name="result">流水线执行结果。</param>
-        /// <param name="durationSeconds">执行耗时（秒）。</param>
-        private void RecordLastBuild(BuildRunResult result, double durationSeconds)
+        /// <param name="result">流水线终态结果。</param>
+        private void RecordLastBuild(BuildRunResult result)
         {
             BuildPipelineState state = result.FinalState;
             BuildWindowLastBuild last = windowState.LastBuild;
@@ -789,12 +935,58 @@ namespace UnityRFramework.Editor
             last.Platform = state.TargetName;
             last.Version =
                 $"{state.PublicVersion}（构建号 {state.BuildNumber}）";
-            last.Status = result.Succeeded
+            last.Status = state.Phase == BuildPipelinePhase.Succeeded
                 ? "成功"
-                : (result.Cancelled ? "已取消" : "失败");
-            last.DurationSeconds = (float)durationSeconds;
+                : (state.Phase == BuildPipelinePhase.Cancelled
+                    ? "已取消"
+                    : (state.Phase == BuildPipelinePhase.ManualIntervention
+                        ? "人工处理"
+                        : "失败"));
+            last.DurationSeconds = 0f;
             last.OutputPath = ResolveOutputDirectory(state);
             last.TimeText = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            windowState.Save();
+        }
+
+        /// <summary>
+        /// 弹出构建结果对话框；报告过长时截断提示，完整报告见 Console。
+        /// 失败与取消任务保留状态，提示可恢复或作废。
+        /// </summary>
+        /// <param name="result">流水线终态结果。</param>
+        private static void ShowBuildResultDialog(BuildRunResult result)
+        {
+            const int maxLength = 1500;
+            string report = result.ReportText;
+            if (report.Length > maxLength)
+            {
+                report = report.Substring(0, maxLength)
+                    + "\n…（完整报告见 Console）";
+            }
+
+            if (result.FinalState.Phase == BuildPipelinePhase.ManualIntervention)
+            {
+                EditorUtility.DisplayDialog(
+                    "构建任务需要人工处理",
+                    report,
+                    "确定");
+                return;
+            }
+
+            if (result.Succeeded)
+            {
+                EditorUtility.DisplayDialog("构建成功", report, "确定");
+            }
+            else if (result.Cancelled)
+            {
+                EditorUtility.DisplayDialog("构建已取消", report, "确定");
+            }
+            else
+            {
+                EditorUtility.DisplayDialog(
+                    "构建失败",
+                    report + "\n\n任务状态已保留，可在「当前任务」分区重试或作废。",
+                    "确定");
+            }
         }
 
         /// <summary>
@@ -813,34 +1005,6 @@ namespace UnityRFramework.Editor
             return string.IsNullOrEmpty(state.OutputDirectory)
                 ? root
                 : Path.Combine(root, state.OutputDirectory);
-        }
-
-        /// <summary>
-        /// 弹出构建结果对话框；报告过长时截断提示，完整报告见 Console。
-        /// </summary>
-        /// <param name="result">流水线执行结果。</param>
-        private static void ShowBuildResultDialog(BuildRunResult result)
-        {
-            const int maxLength = 1500;
-            string report = result.ReportText;
-            if (report.Length > maxLength)
-            {
-                report = report.Substring(0, maxLength)
-                    + "\n…（完整报告见 Console）";
-            }
-
-            if (result.Succeeded)
-            {
-                EditorUtility.DisplayDialog("构建成功", report, "确定");
-            }
-            else if (result.Cancelled)
-            {
-                EditorUtility.DisplayDialog("构建已取消", report, "确定");
-            }
-            else
-            {
-                EditorUtility.DisplayDialog("构建失败", report, "确定");
-            }
         }
 
         /// <summary>

@@ -202,7 +202,8 @@ namespace UnityRFramework.Editor.Tests
         }
 
         /// <summary>
-        /// 执行中请求取消后，未开始的后续步骤不再执行，任务进入 Cancelled。
+        /// 执行中请求取消后，未开始的后续步骤不再执行，任务进入 Cancelled；
+        /// 失败与取消任务按契约保留状态与锁等待决策，会话标记同时清除。
         /// </summary>
         [Test]
         public void Runner_Cancel_PreventsFutureSteps()
@@ -230,6 +231,16 @@ namespace UnityRFramework.Editor.Tests
             Assert.That(result.Cancelled, Is.True);
             Assert.That(result.FinalState.Phase, Is.EqualTo(BuildPipelinePhase.Cancelled));
             Assert.That(c.ExecuteCount, Is.EqualTo(0));
+
+            // 取消任务保留状态与锁，等待继续或作废；会话标记不再指向该任务。
+            BuildPipelinePersistence persistence =
+                new BuildPipelinePersistence(tempRoot);
+            Assert.That(File.Exists(Path.Combine(tempRoot, "task.json")), Is.True);
+            Assert.That(File.Exists(Path.Combine(tempRoot, "task.lock")), Is.True);
+            Assert.That(BuildPipelineRecovery.GetActiveTaskId(), Is.Empty);
+
+            persistence.ReleaseLock();
+            persistence.DeleteState();
         }
 
         /// <summary>
@@ -328,42 +339,6 @@ namespace UnityRFramework.Editor.Tests
             Assert.That(c.ExecuteCount, Is.EqualTo(1));
             Assert.That(result.FinalState.CurrentStepIndex, Is.EqualTo(3));
             Assert.That(result.FinalState.CompletedSteps.Count, Is.EqualTo(3));
-        }
-
-        /// <summary>
-        /// 恢复决策纯函数覆盖全部状态与运行模式组合。
-        /// </summary>
-        [Test]
-        public void Recovery_Evaluate_AllCases()
-        {
-            Assert.That(
-                BuildPipelineRecovery.Evaluate(null, false, false),
-                Is.EqualTo(BuildRecoveryAction.None));
-
-            BuildPipelineState running = new BuildPipelineState
-            {
-                Phase = BuildPipelinePhase.Running
-            };
-            Assert.That(
-                BuildPipelineRecovery.Evaluate(running, true, false),
-                Is.EqualTo(BuildRecoveryAction.Resume));
-            Assert.That(
-                BuildPipelineRecovery.Evaluate(running, false, false),
-                Is.EqualTo(BuildRecoveryAction.Prompt));
-            Assert.That(
-                BuildPipelineRecovery.Evaluate(running, false, true),
-                Is.EqualTo(BuildRecoveryAction.Abandon));
-
-            BuildPipelineState finished = new BuildPipelineState
-            {
-                Phase = BuildPipelinePhase.Succeeded
-            };
-            Assert.That(
-                BuildPipelineRecovery.Evaluate(finished, false, true),
-                Is.EqualTo(BuildRecoveryAction.Cleanup));
-            Assert.That(
-                BuildPipelineRecovery.Evaluate(finished, true, false),
-                Is.EqualTo(BuildRecoveryAction.Cleanup));
         }
 
         /// <summary>

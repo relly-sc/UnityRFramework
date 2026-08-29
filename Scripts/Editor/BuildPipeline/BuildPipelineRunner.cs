@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using UnityEditor;
 using UnityEngine;
+using Process = System.Diagnostics.Process;
 
 namespace UnityRFramework.Editor
 {
@@ -45,19 +46,42 @@ namespace UnityRFramework.Editor
     }
 
     /// <summary>
-    /// 可恢复构建流水线运行器：负责步骤排序、执行、检查点落盘、取消与项目级锁。
-    /// 通过 SessionState 标记区分 Domain Reload（同进程可自动恢复）与进程重启
-    /// （需人工确认或作废）；恢复决策由 <see cref="BuildPipelineRecovery"/> 负责。
+    /// 可恢复构建流水线状态机内核：由 <see cref="EditorApplication.update"/>
+    /// 单步推进，每次更新只启动或推进一个阶段；有副作用的步骤执行前落盘检查点，
+    /// 声明会切换平台、触发编译或 Domain Reload 的步骤完成后进入等待编辑器状态，
+    /// 归还 Unity 控制权，编辑器恢复空闲（或 Domain Reload 后由恢复检查）再继续。
+    /// 通过 SessionState 会话标记（保存 TaskId）区分 Domain Reload（同进程自动恢复）
+    /// 与进程重启（按锁归属决定提示、接管或不干预）；恢复决策由
+    /// <see cref="BuildPipelineRecovery"/> 负责。
     /// 执行语义：
-    /// - 每个步骤开始前与完成后均落盘检查点；
-    /// - 失败立即停止，记录失败步骤与完整异常；
-    /// - 取消只停止尚未开始的后续步骤，已完成步骤保留；
-    /// - 完成后释放锁、清理状态与进度条相关标记。
+    /// - 每个步骤开始前与完成后均落盘检查点（安全替换 + 备份）；
+    /// - 失败立即停止，记录失败步骤与完整异常；失败任务保留状态与锁，
+    ///   恢复时重新执行失败步骤（重试）；
+    /// - 取消只停止尚未开始的后续步骤，已完成步骤保留；取消任务同样保留状态与锁；
+    /// - 步骤返回等待编辑器或声明会触发重载时保存等待原因并归还控制权，会话标记保留；
+    /// - 设置事务：任务开始捕获快照，结束（成功、失败、取消）时恢复"应用参数"
+    ///   写入的临时设置；恢复失败任务进入人工处理状态；
+    /// - 仅任务成功后才释放锁并清理状态；作废经 <see cref="BuildPipelineRecovery.AbandonTask"/>。
     /// </summary>
     public sealed class BuildPipelineRunner
     {
+        /// <summary>等待编辑器空闲后的稳定确认更新帧数：busy 结束后需连续空闲该帧数才续跑。</summary>
+        private const int ResumeIdleTicks = 5;
+
+        /// <summary>未观察到编译忙时，直接续跑前需要的空闲帧数（放宽确认，避免误判）。</summary>
+        private const int FreshIdleTicks = 30;
+
         /// <summary>当前进程是否存在活动构建任务。</summary>
         public static bool HasActiveTask { get; private set; }
+
+        /// <summary>当前进程的活动运行器；无活动任务时为空。</summary>
+        public static BuildPipelineRunner Active { get; private set; }
+
+        /// <summary>
+        /// 任务到达终态（成功、失败、取消或人工处理）后触发；窗口与 BatchMode
+        /// 通过该事件收尾（记录摘要、恢复覆盖项、退出进程）。事件在收尾清理前触发。
+        /// </summary>
+        public static event Action<BuildPipelineRunner> TaskCompleted;
 
         /// <summary>构建上下文。</summary>
         public BuildPipelineContext Context { get; }
@@ -65,20 +89,63 @@ namespace UnityRFramework.Editor
         /// <summary>当前任务状态（执行过程中持续更新）。</summary>
         public BuildPipelineState CurrentState { get; }
 
+        /// <summary>任务是否已到达终态（成功、失败、取消或人工处理）。</summary>
+        public bool IsFinished { get; private set; }
+
+        /// <summary>任务终态结果；未结束时为空。</summary>
+        public BuildRunResult FinalResult { get; private set; }
+
+        /// <summary>持久化实例。</summary>
         private readonly BuildPipelinePersistence persistence;
+
+        /// <summary>取消令牌源。</summary>
         private readonly CancellationTokenSource cts;
 
+        /// <summary>状态机内部阶段。</summary>
+        private KernelPhase kernelPhase;
+
+        /// <summary>报告缓冲。</summary>
+        private readonly StringBuilder report = new StringBuilder();
+
+        /// <summary>当前步骤开始时刻（ISO 8601）。</summary>
+        private string currentStepStartedAt = string.Empty;
+
+        /// <summary>等待编辑器期间是否观察到过编译/导入忙。</summary>
+        private bool sawEditorBusy;
+
+        /// <summary>等待编辑器期间已连续空闲的更新帧数。</summary>
+        private int idleTicks;
+
+        /// <summary>内核内部阶段。</summary>
+        private enum KernelPhase
+        {
+            /// <summary>步骤间：准备执行下一步骤。</summary>
+            BetweenSteps,
+
+            /// <summary>正在执行当前步骤（同步代码段）。</summary>
+            ExecuteStep,
+
+            /// <summary>等待编辑器完成编译、导入或 Domain Reload。</summary>
+            WaitingEditor,
+
+            /// <summary>已结束。</summary>
+            Done
+        }
+
         /// <summary>
-        /// 启动新构建任务。
+        /// 启动新构建任务：加锁、捕获设置事务快照、落盘初始检查点并注册到
+        /// EditorApplication.update 驱动。任务由内核异步推进，本方法立即返回。
         /// </summary>
         /// <param name="profile">待执行的构建配置，不能为空。</param>
         /// <param name="persistenceRoot">持久化根目录；为空时使用工程默认目录（测试注入临时目录）。</param>
         /// <param name="steps">显式步骤列表；为空时从注册表自动发现。</param>
+        /// <param name="recipeOverride">运行期 Recipe 覆盖；为空时使用 Profile 保存的 Recipe。</param>
         /// <returns>已加锁并落盘初始检查点的运行器。</returns>
         public static BuildPipelineRunner StartNew(
             UnityRFrameworkBuildProfile profile,
             string persistenceRoot = null,
-            IReadOnlyList<IBuildPipelineStep> steps = null)
+            IReadOnlyList<IBuildPipelineStep> steps = null,
+            BuildRecipe? recipeOverride = null)
         {
             if (profile == null)
             {
@@ -92,22 +159,56 @@ namespace UnityRFramework.Editor
                 BuildRecipePlanner.Create(
                     profile,
                     available,
-                    requireCoreSteps: steps == null);
+                    requireCoreSteps: steps == null,
+                    recipeOverride: recipeOverride);
             if (!recipePlan.IsValid)
             {
                 throw new InvalidOperationException(
                     FormatRecipeErrors(recipePlan.Issues));
             }
 
+            // 启动前检查残留任务：非终态状态与锁必须先恢复、重试或作废，
+            // 不允许静默覆盖上一任务的检查点。
+            BuildPipelineStateLoadResult leftoverResult =
+                persistence.LoadStateDetailed(out BuildPipelineState leftover);
+            if (leftoverResult == BuildPipelineStateLoadResult.Success
+                || leftoverResult == BuildPipelineStateLoadResult.LoadedFromBackup)
+            {
+                if (leftover != null && !leftover.IsTerminal)
+                {
+                    throw new InvalidOperationException(
+                        $"存在未完成的构建任务（{leftover.ProfileName}，{leftover.TaskId}，"
+                        + $"状态 {leftover.Phase}），请先恢复、重试或作废后再启动新任务。");
+                }
+
+                // 终态残留由本次启动前的锁获取与后续清理兜底，直接覆盖。
+            }
+            else if (leftoverResult == BuildPipelineStateLoadResult.Corrupt
+                || leftoverResult == BuildPipelineStateLoadResult.VersionMismatch)
+            {
+                throw new InvalidOperationException(
+                    "构建任务状态文件无法读取（"
+                    + $"{leftoverResult}），为避免吞掉损坏状态已阻止启动；"
+                    + "请重启 Unity 由恢复检查处理，或手动作废 Library/UnityRFramework/"
+                    + "BuildPipeline 下的状态与锁文件。");
+            }
+
+            string taskId = Guid.NewGuid().ToString("N");
             List<IBuildPipelineStep> ordered =
                 new List<IBuildPipelineStep>(recipePlan.Steps);
             CancellationTokenSource source = new CancellationTokenSource();
             BuildPipelineContext context = BuildPipelineContext.Create(
                 profile,
                 ToStepDictionary(ordered),
-                source.Token);
+                source.Token,
+                taskId,
+                persistenceRoot);
             List<IBuildPipelineStep> usable = FilterUsable(ordered, context);
-            BuildPipelineState state = CreateState(profile, context, usable);
+            BuildPipelineState state = CreateState(
+                profile,
+                context,
+                usable,
+                taskId);
 
             string lockError;
             if (!persistence.TryAcquireLock(state, out lockError))
@@ -118,19 +219,20 @@ namespace UnityRFramework.Editor
             }
 
             persistence.SaveState(state);
-            MarkActive();
             return new BuildPipelineRunner(
                 context,
                 persistence,
                 source,
-                state);
+                state,
+                reportHeader: $"构建任务开始：{state.ProfileName}（{state.TaskId}）");
         }
 
         /// <summary>
-        /// 从检查点恢复构建任务。
-        /// 同进程恢复（Domain Reload）复用现有锁；跨进程恢复时清理残留锁后重新获取。
+        /// 从检查点恢复构建任务。失败与取消任务可恢复以重试失败步骤或继续后续步骤。
+        /// 同进程恢复（会话 TaskId 匹配）复用现有锁；跨进程恢复时校验残留锁：
+        /// 持锁进程仍存活且工程匹配则拒绝恢复，锁残留时清理后重新获取。
         /// </summary>
-        /// <param name="state">待恢复的任务状态，不能为空且不能是终态。</param>
+        /// <param name="state">待恢复的任务状态，不能为空、不能是终态且必须绑定 TaskId。</param>
         /// <param name="persistenceRoot">持久化根目录；为空时使用工程默认目录。</param>
         /// <param name="steps">显式步骤列表；为空时从注册表自动发现。</param>
         /// <param name="profile">构建配置；为空时从状态中的资产路径重新加载。</param>
@@ -145,10 +247,15 @@ namespace UnityRFramework.Editor
             {
                 throw new ArgumentNullException(nameof(state));
             }
-            if (state.IsFinished)
+            if (state.IsTerminal)
             {
                 throw new InvalidOperationException(
-                    "已结束的构建任务不能恢复。");
+                    "已结束（成功或作废）的构建任务不能恢复。");
+            }
+            if (string.IsNullOrEmpty(state.TaskId))
+            {
+                throw new InvalidOperationException(
+                    "任务状态未绑定 TaskId，无法恢复。");
             }
 
             BuildPipelinePersistence persistence =
@@ -161,160 +268,60 @@ namespace UnityRFramework.Editor
 
             RestoreMissingBuildIdentity(state, profile);
 
-            CancellationTokenSource source = new CancellationTokenSource();
-            BuildPipelineContext context = BuildPipelineContext.Create(
-                profile,
-                ToStepDictionary(ordered),
-                source.Token);
-
-            if (!BuildPipelineRecovery.IsActiveInSession())
+            bool sameSession =
+                string.Equals(
+                    BuildPipelineRecovery.GetActiveTaskId(),
+                    state.TaskId,
+                    StringComparison.Ordinal);
+            if (!sameSession)
             {
-                // 跨进程恢复：旧进程的锁文件为残留，先清理再重新获取。
+                // 跨进程恢复：验证残留锁归属；持锁进程为其他存活 Unity 进程且工程匹配时
+                // 拒绝并发恢复；锁残留（含本进程上次运行遗留、进程已退出或工程不匹配）
+                // 则清理后重新获取。
+                if (persistence.ReadLockInfo(out BuildPipelineLockInfo holder))
+                {
+                    int currentProcessId = Process.GetCurrentProcess().Id;
+                    if (holder.TaskId == state.TaskId
+                        && holder.ProcessId != currentProcessId
+                        && holder.MatchesProject(
+                            BuildPipelinePersistence.GetProjectIdentity())
+                        && holder.IsHolderProcessAlive())
+                    {
+                        throw new InvalidOperationException(
+                            $"任务 {state.TaskId} 正由其他 Unity 进程执行"
+                            + $"（PID {holder.ProcessId}），不能并发恢复。");
+                    }
+                }
+
                 persistence.ReleaseLock();
                 string lockError;
                 if (!persistence.TryAcquireLock(state, out lockError))
                 {
-                    source.Dispose();
                     throw new InvalidOperationException(
                         $"无法恢复构建任务：{lockError}");
                 }
             }
 
+            CancellationTokenSource source = new CancellationTokenSource();
+            BuildPipelineContext context = BuildPipelineContext.Create(
+                profile,
+                ToStepDictionary(ordered),
+                source.Token,
+                state.TaskId,
+                persistenceRoot);
+
             state.Phase = BuildPipelinePhase.Running;
+            state.WaitingReason = string.Empty;
             state.UpdatedAt = NowIso();
             persistence.SaveState(state);
-            MarkActive();
             return new BuildPipelineRunner(
                 context,
                 persistence,
                 source,
-                state);
-        }
-
-        /// <summary>
-        /// 执行整个流水线（同步阻塞）。
-        /// 执行过程中每步开始前与完成后均落盘检查点；
-        /// 失败立即停止，取消后不再启动后续步骤。
-        /// </summary>
-        /// <returns>流水线执行结果。</returns>
-        public BuildRunResult Execute()
-        {
-            StringBuilder report = new StringBuilder();
-            report.AppendLine(
-                $"构建任务开始：{CurrentState.ProfileName}（{CurrentState.TaskId}）");
-
-            while (CurrentState.CurrentStepIndex < CurrentState.StepIds.Count)
-            {
-                if (cts.IsCancellationRequested)
-                {
-                    CurrentState.Phase = BuildPipelinePhase.Cancelled;
-                    CurrentState.UpdatedAt = NowIso();
-                    persistence.SaveState(CurrentState);
-                    report.AppendLine(
-                        "构建任务已被取消，未开始的步骤不再执行。");
-                    break;
-                }
-
-                string stepId = CurrentState.StepIds[CurrentState.CurrentStepIndex];
-                IBuildPipelineStep step;
-                if (!Context.Steps.TryGetValue(stepId, out step))
-                {
-                    CurrentState.Phase = BuildPipelinePhase.Failed;
-                    CurrentState.ErrorMessage =
-                        $"步骤 '{stepId}' 的实现缺失，任务无法继续。";
-                    CurrentState.UpdatedAt = NowIso();
-                    persistence.SaveState(CurrentState);
-                    report.AppendLine(
-                        $"步骤 '{stepId}' 的实现缺失，任务失败。");
-                    break;
-                }
-
-                // 步骤开始前落盘检查点（包含当前步骤索引）。
-                string startedAt = NowIso();
-                CurrentState.UpdatedAt = startedAt;
-                persistence.SaveState(CurrentState);
-
-                BuildStepResult result;
-                try
-                {
-                    result = step.Execute(Context);
-                }
-                catch (Exception exception)
-                {
-                    result = BuildStepResult.Failed(
-                        $"步骤 {step.DisplayName} 抛出异常：{exception.Message}",
-                        exception);
-                }
-
-                string finishedAt = NowIso();
-                BuildStepRecord record = new BuildStepRecord
-                {
-                    StepId = stepId,
-                    Status = result.Status.ToString(),
-                    Message = result.Message,
-                    OutputPath = result.OutputPath,
-                    ExceptionText = result.Exception != null
-                        ? result.Exception.ToString()
-                        : string.Empty,
-                    StartedAt = startedAt,
-                    FinishedAt = finishedAt
-                };
-
-                if (result.Status == BuildStepStatus.Succeeded)
-                {
-                    report.AppendLine(
-                        $"[{finishedAt}] 步骤 {step.DisplayName}（{stepId}）成功：{result.Message}");
-                    CurrentState.CompletedSteps.Add(record);
-                    CurrentState.CurrentStepIndex++;
-                    CurrentState.UpdatedAt = NowIso();
-                    persistence.SaveState(CurrentState);
-                }
-                else if (result.Status == BuildStepStatus.Failed)
-                {
-                    report.AppendLine(
-                        $"[{finishedAt}] 步骤 {step.DisplayName}（{stepId}）失败：{result.Message}");
-                    CurrentState.FailedStep = record;
-                    CurrentState.Phase = BuildPipelinePhase.Failed;
-                    CurrentState.ErrorMessage = result.Message;
-                    CurrentState.UpdatedAt = NowIso();
-                    persistence.SaveState(CurrentState);
-                    break;
-                }
-                else
-                {
-                    report.AppendLine(
-                        $"[{finishedAt}] 步骤 {step.DisplayName}（{stepId}）已取消：{result.Message}");
-                    CurrentState.Phase = BuildPipelinePhase.Cancelled;
-                    CurrentState.UpdatedAt = NowIso();
-                    persistence.SaveState(CurrentState);
-                    break;
-                }
-            }
-
-            if (CurrentState.Phase == BuildPipelinePhase.Running)
-            {
-                CurrentState.Phase = BuildPipelinePhase.Succeeded;
-                CurrentState.UpdatedAt = NowIso();
-                persistence.SaveState(CurrentState);
-                report.AppendLine("构建任务成功完成。");
-            }
-
-            bool succeeded = CurrentState.Phase == BuildPipelinePhase.Succeeded;
-            bool cancelled = CurrentState.Phase == BuildPipelinePhase.Cancelled;
-            WriteExecutionReport(succeeded, cancelled);
-            if (succeeded)
-            {
-                // 构建号只在完整成功后提交；失败与取消不消耗正式版本号。
-                CommitBuildNumberSafely();
-            }
-
-            BuildRunResult resultObject = new BuildRunResult(
-                succeeded,
-                cancelled,
-                report.ToString(),
-                CurrentState);
-            Finish(resultObject);
-            return resultObject;
+                state,
+                reportHeader:
+                    $"构建任务恢复：{state.ProfileName}（{state.TaskId}），"
+                    + $"从步骤 {state.CurrentStepIndex + 1}/{state.StepIds.Count} 继续。");
         }
 
         /// <summary>
@@ -328,31 +335,450 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
+        /// 推进一次状态机：每次调用最多启动或推进一个阶段。
+        /// 由 EditorApplication.update 自动驱动；测试可手动循环调用。
+        /// </summary>
+        public void Tick()
+        {
+            if (IsFinished || !ReferenceEquals(Active, this))
+            {
+                return;
+            }
+
+            try
+            {
+                switch (kernelPhase)
+                {
+                    case KernelPhase.BetweenSteps:
+                        TickBetweenSteps();
+                        break;
+                    case KernelPhase.ExecuteStep:
+                        TickExecuteStep();
+                        break;
+                    case KernelPhase.WaitingEditor:
+                        TickWaitingEditor();
+                        break;
+                }
+            }
+            catch (Exception exception)
+            {
+                // 内核自身异常按任务失败处理，保留检查点供重试。
+                FailTask($"构建内核异常：{exception.Message}", exception.ToString());
+                kernelPhase = KernelPhase.Done;
+                Complete(new BuildRunResult(
+                    false,
+                    false,
+                    report.ToString(),
+                    CurrentState));
+            }
+        }
+
+        /// <summary>
+        /// 驱动当前进程的活动运行器推进一次（无活动任务时无操作）。
+        /// </summary>
+        public static void TickActive()
+        {
+            Active?.Tick();
+        }
+
+        /// <summary>
+        /// 同步泵：阻塞推进状态机直至任务到达终态。
+        /// 仅适用于测试与确认不会触发 Domain Reload 的轻量场景；
+        /// 窗口与 BatchMode 应使用 update 驱动与完成事件。
+        /// </summary>
+        /// <returns>任务终态结果。</returns>
+        public BuildRunResult Execute()
+        {
+            int guard = 0;
+            while (!IsFinished)
+            {
+                Tick();
+                guard++;
+                if (guard > 100000)
+                {
+                    throw new InvalidOperationException(
+                        "构建状态机推进超过保护上限，可能存在死循环步骤。");
+                }
+            }
+
+            return FinalResult;
+        }
+
+        /// <summary>
         /// 清除活动任务标记（任务结束或作废时调用）。
         /// </summary>
         public static void ClearActive()
         {
+            if (Active != null)
+            {
+                EditorApplication.update -= Active.Tick;
+                Active.kernelPhase = KernelPhase.Done;
+                Active.IsFinished = true;
+                Active = null;
+            }
+
             HasActiveTask = false;
             BuildPipelineRecovery.ClearSessionMark();
         }
 
         /// <summary>
-        /// 创建运行器实例。
+        /// 创建运行器实例并注册到编辑器更新驱动。
         /// </summary>
         /// <param name="context">构建上下文。</param>
         /// <param name="persistence">持久化实例。</param>
         /// <param name="cts">取消令牌源。</param>
         /// <param name="state">任务状态。</param>
+        /// <param name="reportHeader">报告首行。</param>
         private BuildPipelineRunner(
             BuildPipelineContext context,
             BuildPipelinePersistence persistence,
             CancellationTokenSource cts,
-            BuildPipelineState state)
+            BuildPipelineState state,
+            string reportHeader)
         {
             Context = context;
             this.persistence = persistence;
             this.cts = cts;
             CurrentState = state;
+            kernelPhase = KernelPhase.BetweenSteps;
+            report.AppendLine(reportHeader);
+
+            Active = this;
+            HasActiveTask = true;
+            BuildPipelineRecovery.MarkActiveInSession(state.TaskId);
+            EditorApplication.update += Tick;
+        }
+
+        /// <summary>
+        /// 步骤间阶段：处理取消、完成、步骤缺失，并登记下一步骤的开始检查点。
+        /// </summary>
+        private void TickBetweenSteps()
+        {
+            if (cts.IsCancellationRequested)
+            {
+                CurrentState.Phase = BuildPipelinePhase.Cancelled;
+                CurrentState.UpdatedAt = NowIso();
+                persistence.SaveState(CurrentState);
+                report.AppendLine("构建任务已被取消，未开始的步骤不再执行。");
+                kernelPhase = KernelPhase.Done;
+                Complete(new BuildRunResult(
+                    false,
+                    true,
+                    report.ToString(),
+                    CurrentState));
+                return;
+            }
+
+            if (CurrentState.CurrentStepIndex >= CurrentState.StepIds.Count)
+            {
+                CurrentState.Phase = BuildPipelinePhase.Succeeded;
+                CurrentState.UpdatedAt = NowIso();
+                persistence.SaveState(CurrentState);
+                report.AppendLine("构建任务成功完成。");
+                kernelPhase = KernelPhase.Done;
+                Complete(new BuildRunResult(
+                    true,
+                    false,
+                    report.ToString(),
+                    CurrentState));
+                return;
+            }
+
+            string stepId = CurrentState.StepIds[CurrentState.CurrentStepIndex];
+            if (!Context.Steps.TryGetValue(stepId, out IBuildPipelineStep step))
+            {
+                FailTask(
+                    $"步骤 '{stepId}' 的实现缺失，任务无法继续。",
+                    string.Empty);
+                kernelPhase = KernelPhase.Done;
+                Complete(new BuildRunResult(
+                    false,
+                    false,
+                    report.ToString(),
+                    CurrentState));
+                return;
+            }
+
+            // 步骤开始前落盘检查点（包含当前步骤索引）。
+            currentStepStartedAt = NowIso();
+            CurrentState.UpdatedAt = currentStepStartedAt;
+            persistence.SaveState(CurrentState);
+            kernelPhase = KernelPhase.ExecuteStep;
+        }
+
+        /// <summary>
+        /// 执行阶段：执行当前步骤并根据结果提交记录、失败、取消或等待。
+        /// </summary>
+        private void TickExecuteStep()
+        {
+            string stepId = CurrentState.StepIds[CurrentState.CurrentStepIndex];
+            IBuildPipelineStep step = Context.Steps[stepId];
+            BuildStepResult result;
+            try
+            {
+                result = step.Execute(Context);
+            }
+            catch (Exception exception)
+            {
+                result = BuildStepResult.Failed(
+                    $"步骤 {step.DisplayName} 抛出异常：{exception.Message}",
+                    exception);
+            }
+
+            string finishedAt = NowIso();
+            BuildStepRecord record = new BuildStepRecord
+            {
+                StepId = stepId,
+                Status = result.Status.ToString(),
+                Message = result.Message,
+                OutputPath = result.OutputPath,
+                ExceptionText = result.Exception != null
+                    ? result.Exception.ToString()
+                    : string.Empty,
+                StartedAt = currentStepStartedAt,
+                FinishedAt = finishedAt
+            };
+
+            if (result.Status == BuildStepStatus.Succeeded)
+            {
+                report.AppendLine(
+                    $"[{finishedAt}] 步骤 {step.DisplayName}（{stepId}）成功：{result.Message}");
+                CurrentState.CompletedSteps.Add(record);
+                CurrentState.CurrentStepIndex++;
+                CurrentState.UpdatedAt = NowIso();
+                persistence.SaveState(CurrentState);
+
+                if (step.SwitchesTarget
+                    || step.TriggersCompilation
+                    || step.TriggersDomainReload)
+                {
+                    // 有副作用的步骤完成后归还 Unity 控制权：
+                    // 等待编译与资源导入结束（或 Domain Reload 后由恢复检查接管）。
+                    EnterWaitingEditor("步骤触发平台切换、编译或 Domain Reload，等待编辑器稳定。");
+                    return;
+                }
+
+                kernelPhase = KernelPhase.BetweenSteps;
+                return;
+            }
+
+            if (result.Status == BuildStepStatus.Failed)
+            {
+                report.AppendLine(
+                    $"[{finishedAt}] 步骤 {step.DisplayName}（{stepId}）失败：{result.Message}");
+                CurrentState.FailedStep = record;
+                FailTask(result.Message, record.ExceptionText);
+                kernelPhase = KernelPhase.Done;
+                Complete(new BuildRunResult(
+                    false,
+                    false,
+                    report.ToString(),
+                    CurrentState));
+                return;
+            }
+
+            if (result.Status == BuildStepStatus.WaitingForEditor)
+            {
+                report.AppendLine(
+                    $"[{finishedAt}] 步骤 {step.DisplayName}（{stepId}）等待编辑器：{result.Message}");
+                CurrentState.CompletedSteps.Add(record);
+                CurrentState.CurrentStepIndex++;
+                CurrentState.UpdatedAt = NowIso();
+                persistence.SaveState(CurrentState);
+                EnterWaitingEditor(result.Message);
+                return;
+            }
+
+            report.AppendLine(
+                $"[{finishedAt}] 步骤 {step.DisplayName}（{stepId}）已取消：{result.Message}");
+            CurrentState.Phase = BuildPipelinePhase.Cancelled;
+            CurrentState.UpdatedAt = NowIso();
+            persistence.SaveState(CurrentState);
+            kernelPhase = KernelPhase.Done;
+            Complete(new BuildRunResult(
+                false,
+                true,
+                report.ToString(),
+                CurrentState));
+        }
+
+        /// <summary>
+        /// 等待阶段：观察编译与资源导入状态，稳定空闲后续跑；
+        /// Domain Reload 会终止本运行器，由恢复检查在重载后自动续跑。
+        /// </summary>
+        private void TickWaitingEditor()
+        {
+            if (cts.IsCancellationRequested)
+            {
+                CurrentState.Phase = BuildPipelinePhase.Cancelled;
+                CurrentState.UpdatedAt = NowIso();
+                persistence.SaveState(CurrentState);
+                report.AppendLine("构建任务在等待编辑器期间被取消。");
+                kernelPhase = KernelPhase.Done;
+                Complete(new BuildRunResult(
+                    false,
+                    true,
+                    report.ToString(),
+                    CurrentState));
+                return;
+            }
+
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                sawEditorBusy = true;
+                idleTicks = 0;
+                return;
+            }
+
+            idleTicks++;
+            int required = sawEditorBusy ? ResumeIdleTicks : FreshIdleTicks;
+            if (idleTicks < required)
+            {
+                return;
+            }
+
+            // 编辑器已恢复稳定：继续执行。
+            CurrentState.Phase = BuildPipelinePhase.Running;
+            CurrentState.WaitingReason = string.Empty;
+            CurrentState.UpdatedAt = NowIso();
+            persistence.SaveState(CurrentState);
+            sawEditorBusy = false;
+            idleTicks = 0;
+            kernelPhase = KernelPhase.BetweenSteps;
+        }
+
+        /// <summary>
+        /// 进入等待编辑器状态：保存等待原因检查点并归还控制权。
+        /// </summary>
+        /// <param name="reason">等待原因。</param>
+        private void EnterWaitingEditor(string reason)
+        {
+            CurrentState.Phase = BuildPipelinePhase.WaitingForEditor;
+            CurrentState.WaitingReason = reason;
+            CurrentState.UpdatedAt = NowIso();
+            persistence.SaveState(CurrentState);
+            sawEditorBusy = false;
+            idleTicks = 0;
+            kernelPhase = KernelPhase.WaitingEditor;
+        }
+
+        /// <summary>
+        /// 将任务置为失败状态并落盘检查点。
+        /// </summary>
+        /// <param name="message">用户可见失败原因。</param>
+        /// <param name="exceptionText">完整异常文本；可为空。</param>
+        private void FailTask(string message, string exceptionText)
+        {
+            CurrentState.Phase = BuildPipelinePhase.Failed;
+            CurrentState.ErrorMessage = message;
+            if (!string.IsNullOrEmpty(exceptionText)
+                && CurrentState.FailedStep != null
+                && string.IsNullOrEmpty(CurrentState.FailedStep.ExceptionText))
+            {
+                CurrentState.FailedStep.ExceptionText = exceptionText;
+            }
+
+            CurrentState.UpdatedAt = NowIso();
+            persistence.SaveState(CurrentState);
+        }
+
+        /// <summary>
+        /// 任务终态收尾：恢复设置事务、写报告、提交构建号，
+        /// 按"成功或明确作废后才清理"的契约处理状态与锁，并广播完成事件。
+        /// </summary>
+        /// <param name="result">终态结果。</param>
+        private void Complete(BuildRunResult result)
+        {
+            if (IsFinished)
+            {
+                return;
+            }
+
+            IsFinished = true;
+            FinalResult = result;
+            EditorApplication.update -= Tick;
+
+            RestoreTransactionIfNeeded();
+
+            bool succeeded = FinalResult.Succeeded;
+            bool cancelled = FinalResult.Cancelled;
+            WriteExecutionReport(succeeded, cancelled);
+            if (succeeded)
+            {
+                // 构建号只在完整成功后提交；失败与取消不消耗正式版本号。
+                CommitBuildNumberSafely();
+            }
+
+            if (succeeded)
+            {
+                persistence.ReleaseLock();
+                persistence.DeleteState();
+                ClearActive();
+            }
+            else if (CurrentState.Phase == BuildPipelinePhase.ManualIntervention)
+            {
+                // 回滚失败：保留状态与锁等待人工处理；会话标记清除。
+                HasActiveTask = false;
+                BuildPipelineRecovery.ClearSessionMarkIfMatches(CurrentState.TaskId);
+            }
+            else
+            {
+                // 失败与取消：保留状态与锁等待重试、继续或作废。
+                HasActiveTask = false;
+                BuildPipelineRecovery.ClearSessionMarkIfMatches(CurrentState.TaskId);
+            }
+
+            if (succeeded)
+            {
+                Debug.Log(FinalResult.ReportText);
+            }
+            else if (cancelled)
+            {
+                Debug.Log(FinalResult.ReportText);
+            }
+            else
+            {
+                Debug.LogError(FinalResult.ReportText);
+            }
+
+            TaskCompleted?.Invoke(this);
+        }
+
+        /// <summary>
+        /// 按契约恢复设置事务：已生效的事务在任务结束（成功、失败、取消）时恢复；
+        /// 恢复失败将任务置为人工处理状态并重写终态结果。
+        /// </summary>
+        private void RestoreTransactionIfNeeded()
+        {
+            BuildSettingsTransaction transaction = Context.SettingsTransaction;
+            if (transaction == null || !transaction.HasChanges)
+            {
+                CurrentState.RollbackState = BuildRollbackState.NotRequired;
+                return;
+            }
+
+            try
+            {
+                transaction.Restore();
+                CurrentState.RollbackState = BuildRollbackState.Succeeded;
+                report.AppendLine("临时构建设置已按快照恢复（活动平台按契约保留）。");
+            }
+            catch (Exception exception)
+            {
+                CurrentState.Phase = BuildPipelinePhase.ManualIntervention;
+                CurrentState.RollbackState = BuildRollbackState.Failed;
+                CurrentState.ErrorMessage =
+                    $"设置恢复失败，需要人工处理：{exception.Message}";
+                CurrentState.UpdatedAt = NowIso();
+                persistence.SaveState(CurrentState);
+                report.AppendLine(
+                    $"[错误] {CurrentState.ErrorMessage}；状态已保留，请检查项目设置后重试或作废。");
+                FinalResult = new BuildRunResult(
+                    false,
+                    false,
+                    report.ToString(),
+                    CurrentState);
+            }
         }
 
         /// <summary>
@@ -492,15 +918,17 @@ namespace UnityRFramework.Editor
         /// <param name="profile">构建配置。</param>
         /// <param name="context">构建上下文。</param>
         /// <param name="usable">可用步骤列表。</param>
+        /// <param name="taskId">预生成的任务 Id。</param>
         /// <returns>初始状态。</returns>
         private static BuildPipelineState CreateState(
             UnityRFrameworkBuildProfile profile,
             BuildPipelineContext context,
-            List<IBuildPipelineStep> usable)
+            List<IBuildPipelineStep> usable,
+            string taskId)
         {
             BuildPipelineState state = new BuildPipelineState
             {
-                TaskId = Guid.NewGuid().ToString("N"),
+                TaskId = taskId,
                 ProfileGuid = AssetDatabase.AssetPathToGUID(
                     AssetDatabase.GetAssetPath(profile)),
                 ProfileAssetPath = AssetDatabase.GetAssetPath(profile),
@@ -568,15 +996,6 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 标记当前进程存在活动构建任务。
-        /// </summary>
-        private static void MarkActive()
-        {
-            HasActiveTask = true;
-            BuildPipelineRecovery.MarkActiveInSession();
-        }
-
-        /// <summary>
         /// 组装并写入构建报告；成功、失败与取消均会写报告，保证失败构建
         /// 有可定位的步骤与原因。报告写入失败只警告，不阻断任务收尾。
         /// </summary>
@@ -586,13 +1005,13 @@ namespace UnityRFramework.Editor
         {
             try
             {
-                BuildExecutionReport report = BuildExecutionReport.Create(
+                BuildExecutionReport reportModel = BuildExecutionReport.Create(
                     Context,
                     CurrentState,
                     succeeded,
                     cancelled);
                 string reportPath = BuildReportWriter.Write(
-                    report,
+                    reportModel,
                     CurrentState.OutputRootAbsolute,
                     CurrentState.OutputDirectory,
                     CurrentState.TaskId);
@@ -616,29 +1035,6 @@ namespace UnityRFramework.Editor
             catch (Exception exception)
             {
                 Debug.Log($"构建号自动递增失败：{exception.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 收尾：释放锁、清理状态、清除活动标记并输出报告日志。
-        /// </summary>
-        /// <param name="result">执行结果。</param>
-        private void Finish(BuildRunResult result)
-        {
-            persistence.ReleaseLock();
-            persistence.DeleteState();
-            ClearActive();
-            if (result.Succeeded)
-            {
-                Debug.Log(result.ReportText);
-            }
-            else if (result.Cancelled)
-            {
-                Debug.Log(result.ReportText);
-            }
-            else
-            {
-                Debug.LogError(result.ReportText);
             }
         }
 

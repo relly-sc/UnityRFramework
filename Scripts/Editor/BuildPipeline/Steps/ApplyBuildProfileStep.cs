@@ -84,6 +84,11 @@ namespace UnityRFramework.Editor
                     "应用构建参数已取消。");
             }
 
+            // 构建命令使用临时设置事务：标记事务生效，
+            // 任务结束（成功、失败、取消）时由运行器按快照恢复。
+            // "应用到项目"永久生效路径不经过本步骤。
+            context.SettingsTransaction?.MarkApplied();
+
             BuildApplyResult result =
                 BuildProfileApplier.Apply(context.Profile);
             if (result.Succeeded)

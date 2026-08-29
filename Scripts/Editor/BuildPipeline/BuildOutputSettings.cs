@@ -6,6 +6,22 @@ using UnityEngine;
 namespace UnityRFramework.Editor
 {
     /// <summary>
+    /// 输出策略。Versioned 按配置、平台、后端与版本隔离（正式发布默认）；
+    /// Overwrite 使用固定目录覆盖（日常开发）；Custom 使用用户自定义模板。
+    /// </summary>
+    public enum BuildOutputStrategy
+    {
+        /// <summary>正式发布：按 Profile、平台、脚本后端、版本与构建号隔离目录。</summary>
+        Versioned,
+
+        /// <summary>日常开发：固定目录覆盖，仍要求平台与脚本后端隔离维度。</summary>
+        Overwrite,
+
+        /// <summary>项目自定义：使用用户模板，只执行目录边界与冲突校验。</summary>
+        Custom
+    }
+
+    /// <summary>
     /// 构建输出目录与文件名配置，包含占位符模板解析与目录边界校验。
     /// 输出根目录禁止落在 Assets、Packages 或项目关键源码目录，防止污染工程。
     /// </summary>
@@ -47,6 +63,10 @@ namespace UnityRFramework.Editor
                 "Temp",
                 "Logs"
             };
+
+        /// <summary>输出策略；决定目录模板的隔离维度要求。</summary>
+        [Tooltip("输出策略：Versioned 正式发布隔离目录；Overwrite 开发固定目录覆盖；Custom 自定义模板。")]
+        public BuildOutputStrategy Strategy = BuildOutputStrategy.Versioned;
 
         /// <summary>输出根目录，相对项目根目录解析；禁止落在 Assets、Packages 等关键目录。</summary>
         [Tooltip("输出根目录，相对项目根目录解析。")]
