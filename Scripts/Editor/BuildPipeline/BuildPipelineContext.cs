@@ -16,6 +16,9 @@ namespace UnityRFramework.Editor
         /// <summary>构建配置；恢复时从资产路径重新加载，加载失败时为空。</summary>
         public UnityRFrameworkBuildProfile Profile { get; }
 
+        /// <summary>本任务实际执行的 Recipe，可与 Profile 保存值不同。</summary>
+        public BuildRecipe Recipe { get; }
+
         /// <summary>目标平台。</summary>
         public BuildTarget Target { get; }
 
@@ -71,7 +74,8 @@ namespace UnityRFramework.Editor
         /// <param name="cancellationToken">取消令牌。</param>
         /// <param name="startedAt">任务创建时刻。</param>
         /// <param name="outputError">输出解析失败原因，可为空。</param>
-        /// <param name="settingsTransaction">设置事务，可为空（测试场景）。</param>
+        /// <param name="settingsTransaction">设置事务，可为空（预览、校验或测试场景）。</param>
+        /// <param name="recipe">本任务实际 Recipe；为空时使用 Profile 保存值。</param>
         public BuildPipelineContext(
             UnityRFrameworkBuildProfile profile,
             BuildTarget target,
@@ -83,9 +87,11 @@ namespace UnityRFramework.Editor
             CancellationToken cancellationToken,
             DateTime startedAt,
             string outputError,
-            BuildSettingsTransaction settingsTransaction = null)
+            BuildSettingsTransaction settingsTransaction = null,
+            BuildRecipe? recipe = null)
         {
             Profile = profile;
+            Recipe = recipe ?? profile?.Recipe ?? BuildRecipe.Player;
             Target = target;
             ProjectRoot = projectRoot ?? string.Empty;
             OutputRootAbsolute = outputRootAbsolute ?? string.Empty;
@@ -100,7 +106,9 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 创建构建上下文：解析工程根目录与输出路径，并捕获设置事务快照。
+        /// 创建构建上下文：解析工程根目录与输出路径。
+        /// 默认为只读预览上下文，不捕获设置快照；只有持锁的
+        /// Runner 才可将 <paramref name="captureSettingsTransaction"/> 设为 true。
         /// 输出解析失败时记录到 <see cref="OutputError"/>，输出字段保持为空字符串。
         /// </summary>
         /// <param name="profile">构建配置，可为空。</param>
@@ -108,13 +116,17 @@ namespace UnityRFramework.Editor
         /// <param name="cancellationToken">取消令牌。</param>
         /// <param name="taskId">任务 Id，用于快照归属；为空时使用"未命名任务"。</param>
         /// <param name="persistenceRoot">任务状态目录；为空时使用工程默认目录。</param>
+        /// <param name="recipeOverride">任务级 Recipe 覆盖。</param>
+        /// <param name="captureSettingsTransaction">是否捕获并持久化设置事务。</param>
         /// <returns>构建上下文。</returns>
         public static BuildPipelineContext Create(
             UnityRFrameworkBuildProfile profile,
             IReadOnlyDictionary<string, IBuildPipelineStep> steps,
             CancellationToken cancellationToken,
             string taskId = null,
-            string persistenceRoot = null)
+            string persistenceRoot = null,
+            BuildRecipe? recipeOverride = null,
+            bool captureSettingsTransaction = false)
         {
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string outputRoot = string.Empty;
@@ -153,18 +165,20 @@ namespace UnityRFramework.Editor
                 : EditorUserBuildSettings.activeBuildTarget;
 
             BuildSettingsTransaction transaction = null;
-            try
+            if (captureSettingsTransaction)
             {
-                transaction = BuildSettingsTransaction.Capture(
-                    new BuildPipelinePersistence(persistenceRoot),
-                    taskId ?? "未命名任务");
-            }
-            catch (Exception exception)
-            {
-                outputError = string.IsNullOrEmpty(outputError)
-                    ? $"设置事务快照捕获失败：{exception.Message}"
-                    : outputError;
-                transaction = null;
+                try
+                {
+                    transaction = BuildSettingsTransaction.Capture(
+                        new BuildPipelinePersistence(persistenceRoot),
+                        taskId ?? "未命名任务");
+                }
+                catch (Exception exception)
+                {
+                    outputError = string.IsNullOrEmpty(outputError)
+                        ? $"设置事务快照捕获失败：{exception.Message}"
+                        : outputError;
+                }
             }
 
             return new BuildPipelineContext(
@@ -178,7 +192,8 @@ namespace UnityRFramework.Editor
                 cancellationToken,
                 DateTime.Now,
                 outputError,
-                transaction);
+                transaction,
+                recipeOverride);
         }
 
         /// <summary>

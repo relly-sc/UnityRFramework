@@ -13,7 +13,7 @@ namespace UnityRFramework.Editor.Tests
 {
     /// <summary>
     /// 阶段 2 状态、锁与持久化专项测试：
-    /// 状态往返与版本迁移、备份恢复、损坏文件、锁身份与陈旧锁判定、
+    /// 状态往返与版本拒绝、备份恢复、损坏文件、锁身份与陈旧锁判定、
     /// 恢复决策矩阵、失败/取消任务保留状态、等待编辑器与重复启动。
     /// 全部用例使用临时持久化目录与内存假步骤，不触碰真实 Library 状态与构建管线。
     /// </summary>
@@ -132,10 +132,10 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
-        // ==================== 状态与版本迁移 ====================
+        // ==================== 状态与版本契约 ====================
 
         /// <summary>
-        /// 状态保存与加载往返一致，包含版本 2 新增字段（等待原因、回滚状态）。
+        /// 状态保存与加载往返一致，包含实际 Recipe、任务覆盖与恢复字段。
         /// </summary>
         [Test]
         public void Persistence_StateRoundTrip_PreservesData()
@@ -149,6 +149,11 @@ namespace UnityRFramework.Editor.Tests
                 Phase = BuildPipelinePhase.WaitingForEditor,
                 WaitingReason = "等待脚本编译",
                 RollbackState = BuildRollbackState.Pending,
+                TaskOverrides = new BuildTaskOverrides
+                {
+                    HasBuildNumber = true,
+                    BuildNumber = 42
+                },
                 StepIds = new List<string> { "a", "b" },
                 CurrentStepIndex = 1,
                 CreatedAt = DateTime.Now.ToString("o"),
@@ -172,7 +177,9 @@ namespace UnityRFramework.Editor.Tests
                 persistence.LoadStateDetailed(out BuildPipelineState loaded),
                 Is.EqualTo(BuildPipelineStateLoadResult.Success));
             Assert.That(loaded.TaskId, Is.EqualTo("roundtrip"));
-            Assert.That(loaded.SerializedVersion, Is.EqualTo(2));
+            Assert.That(
+                loaded.SerializedVersion,
+                Is.EqualTo(BuildPipelineState.CurrentSerializedVersion));
             Assert.That(loaded.Phase, Is.EqualTo(BuildPipelinePhase.WaitingForEditor));
             Assert.That(loaded.WaitingReason, Is.EqualTo("等待脚本编译"));
             Assert.That(loaded.RollbackState, Is.EqualTo(BuildRollbackState.Pending));
@@ -181,6 +188,8 @@ namespace UnityRFramework.Editor.Tests
             Assert.That(loaded.CompletedSteps.Count, Is.EqualTo(1));
             Assert.That(loaded.CompletedSteps[0].StepId, Is.EqualTo("a"));
             Assert.That(loaded.CompletedSteps[0].Message, Is.EqualTo("ok"));
+            Assert.That(loaded.TaskOverrides.HasBuildNumber, Is.True);
+            Assert.That(loaded.TaskOverrides.BuildNumber, Is.EqualTo(42));
         }
 
         /// <summary>
@@ -198,10 +207,10 @@ namespace UnityRFramework.Editor.Tests
         }
 
         /// <summary>
-        /// 版本 1 旧状态加载后自动迁移到版本 2，原字段保留，新字段取默认值。
+        /// 旧版本状态不自动迁移，必须显式作废后重新开始任务。
         /// </summary>
         [Test]
-        public void Persistence_LoadVersion1_MigratesToCurrentVersion()
+        public void Persistence_LoadOlderVersion_ReturnsVersionMismatch()
         {
             BuildPipelinePersistence persistence =
                 new BuildPipelinePersistence(tempRoot);
@@ -223,13 +232,8 @@ namespace UnityRFramework.Editor.Tests
 
             Assert.That(
                 persistence.LoadStateDetailed(out BuildPipelineState state),
-                Is.EqualTo(BuildPipelineStateLoadResult.Success));
-            Assert.That(state.SerializedVersion, Is.EqualTo(2));
-            Assert.That(state.TaskId, Is.EqualTo("legacy-task"));
-            Assert.That(state.ProfileName, Is.EqualTo("LegacyProfile"));
-            Assert.That(state.Phase, Is.EqualTo(BuildPipelinePhase.Running));
-            Assert.That(state.WaitingReason, Is.Empty);
-            Assert.That(state.RollbackState, Is.EqualTo(BuildRollbackState.NotRequired));
+                Is.EqualTo(BuildPipelineStateLoadResult.VersionMismatch));
+            Assert.That(state, Is.Null);
         }
 
         /// <summary>
@@ -884,6 +888,166 @@ namespace UnityRFramework.Editor.Tests
                 result.FinalState.RollbackState,
                 Is.EqualTo(BuildRollbackState.Succeeded),
                 "已生效事务结束后应记录回滚成功。");
+        }
+
+        /// <summary>
+        /// Player 编译阶段中断判定：失败于构建 Player/收尾，或检查点停在构建 Player
+        /// 之前（步骤执行中被杀）的任务判定为已中断；其他中断不误报。
+        /// </summary>
+        [Test]
+        public void Recovery_IsPlayerBuildInterrupted_MatchesOnlyPlayerStage()
+        {
+            Assert.That(
+                BuildPipelineRecovery.IsPlayerBuildInterrupted(null),
+                Is.False);
+
+            BuildStepRecord MakeFailedRecord(string stepId)
+            {
+                return new BuildStepRecord
+                {
+                    StepId = stepId,
+                    Status = BuildStepStatus.Failed.ToString()
+                };
+            }
+
+            BuildPipelineState failedAtPlayer = new BuildPipelineState
+            {
+                TaskId = "t",
+                Phase = BuildPipelinePhase.Failed,
+                FailedStep = MakeFailedRecord("core.build-player")
+            };
+            Assert.That(
+                BuildPipelineRecovery.IsPlayerBuildInterrupted(failedAtPlayer),
+                Is.True,
+                "失败于构建 Player 的任务应判定为 Player 阶段中断。");
+
+            BuildPipelineState failedAtFinalize = new BuildPipelineState
+            {
+                TaskId = "t",
+                Phase = BuildPipelinePhase.Failed,
+                FailedStep = MakeFailedRecord("core.finalize")
+            };
+            Assert.That(
+                BuildPipelineRecovery.IsPlayerBuildInterrupted(failedAtFinalize),
+                Is.True,
+                "假成功被收尾拦截的任务同样属于 Player 阶段中断。");
+
+            BuildPipelineState failedAtValidate = new BuildPipelineState
+            {
+                TaskId = "t",
+                Phase = BuildPipelinePhase.Failed,
+                FailedStep = MakeFailedRecord("core.validate")
+            };
+            Assert.That(
+                BuildPipelineRecovery.IsPlayerBuildInterrupted(failedAtValidate),
+                Is.False,
+                "校验阶段失败不属于 Player 阶段中断。");
+
+            BuildPipelineState killedDuringPlayer = new BuildPipelineState
+            {
+                TaskId = "t",
+                Phase = BuildPipelinePhase.Running,
+                StepIds = new List<string>
+                {
+                    "core.validate",
+                    "core.build-player",
+                    "core.finalize"
+                },
+                CurrentStepIndex = 1
+            };
+            Assert.That(
+                BuildPipelineRecovery.IsPlayerBuildInterrupted(killedDuringPlayer),
+                Is.True,
+                "检查点停在构建 Player 之前说明进程在步骤执行中被杀。");
+
+            BuildPipelineState killedDuringValidate = new BuildPipelineState
+            {
+                TaskId = "t",
+                Phase = BuildPipelinePhase.Running,
+                StepIds = new List<string>
+                {
+                    "core.validate",
+                    "core.build-player",
+                    "core.finalize"
+                },
+                CurrentStepIndex = 0
+            };
+            Assert.That(
+                BuildPipelineRecovery.IsPlayerBuildInterrupted(killedDuringValidate),
+                Is.False,
+                "检查点停在校验阶段不误报。");
+
+            BuildPipelineState waitingBeforePlayer = new BuildPipelineState
+            {
+                TaskId = "t",
+                Phase = BuildPipelinePhase.WaitingForEditor,
+                WaitingReason = "等待编译",
+                StepIds = new List<string>
+                {
+                    "core.validate",
+                    "core.apply-profile",
+                    "core.build-player",
+                    "core.finalize"
+                },
+                CurrentStepIndex = 2
+            };
+            Assert.That(
+                BuildPipelineRecovery.IsPlayerBuildInterrupted(waitingBeforePlayer),
+                Is.False,
+                "等待编辑器状态（步骤后正常重载等待）不得误判为 Player 阶段中断。");
+        }
+
+        /// <summary>
+        /// Player 编译阶段被强制中断的任务禁止恢复/重试：内核恢复入口直接拒绝，
+        /// 唯一路径是作废后先用官方构建完整修复。
+        /// </summary>
+        [Test]
+        public void Runner_Resume_PlayerInterruptedState_Throws()
+        {
+            BuildPipelineState interrupted = new BuildPipelineState
+            {
+                TaskId = "killed-mid-player",
+                Phase = BuildPipelinePhase.Running,
+                StepIds = new List<string>
+                {
+                    "core.validate",
+                    "core.build-player",
+                    "core.finalize"
+                },
+                CurrentStepIndex = 1
+            };
+
+            Assert.Throws<InvalidOperationException>(() =>
+                BuildPipelineRunner.Resume(
+                    interrupted,
+                    tempRoot,
+                    new List<IBuildPipelineStep> { new RecordingStep("core.build-player") },
+                    profile));
+
+            // 失败于构建 Player 的终态外状态同样拒绝。
+            BuildPipelineState failedAtPlayer = new BuildPipelineState
+            {
+                TaskId = "failed-at-player",
+                Phase = BuildPipelinePhase.Failed,
+                StepIds = new List<string>
+                {
+                    "core.validate",
+                    "core.build-player",
+                    "core.finalize"
+                },
+                CurrentStepIndex = 1,
+                FailedStep = new BuildStepRecord
+                {
+                    StepId = "core.build-player",
+                    Status = BuildStepStatus.Failed.ToString()
+                }
+            };
+            Assert.Throws<InvalidOperationException>(() =>
+                BuildPipelineRunner.Resume(
+                    failedAtPlayer,
+                    tempRoot,
+                    new List<IBuildPipelineStep> { new RecordingStep("core.build-player") },
+                    profile));
         }
 
         /// <summary>

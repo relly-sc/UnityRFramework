@@ -30,10 +30,10 @@ namespace UnityRFramework.Editor
         SwitchTarget,
         ApplySettings,
         PrepareData,
-        PreparePlayer,
-        BuildPlayer,
         PrepareCode,
         BuildAssets,
+        PreparePlayer,
+        BuildPlayer,
         Finalize
     }
 
@@ -254,7 +254,7 @@ namespace UnityRFramework.Editor
             {
                 bool isCore = pair.Key.StartsWith("core.", StringComparison.OrdinalIgnoreCase);
                 bool isAutomatic = pair.Value is IAutomaticBuildPipelineStep automatic
-                    && automatic.ShouldInclude(profile);
+                    && automatic.ShouldInclude(profile, recipe);
                 if ((selectAllAvailable || isCore || enabled.Contains(pair.Key) || isAutomatic)
                     && IncludesStage(recipe, pair.Value.Stage))
                 {

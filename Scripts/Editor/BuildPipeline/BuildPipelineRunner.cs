@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Threading;
 using UnityEditor;
@@ -79,7 +80,7 @@ namespace UnityRFramework.Editor
 
         /// <summary>
         /// 任务到达终态（成功、失败、取消或人工处理）后触发；窗口与 BatchMode
-        /// 通过该事件收尾（记录摘要、恢复覆盖项、退出进程）。事件在收尾清理前触发。
+        /// 通过该事件收尾（记录摘要、映射退出码）。事件在收尾清理前触发。
         /// </summary>
         public static event Action<BuildPipelineRunner> TaskCompleted;
 
@@ -97,6 +98,13 @@ namespace UnityRFramework.Editor
 
         /// <summary>持久化实例。</summary>
         private readonly BuildPipelinePersistence persistence;
+
+        /// <summary>源 Profile 资产；仅用于成功后提交非覆盖构建号。</summary>
+        private readonly UnityRFrameworkBuildProfile sourceProfile;
+
+        /// <summary>报告写入函数；测试可注入失败实现。</summary>
+        private readonly Func<BuildExecutionReport, string, string, string, string>
+            reportWriter;
 
         /// <summary>取消令牌源。</summary>
         private readonly CancellationTokenSource cts;
@@ -140,12 +148,17 @@ namespace UnityRFramework.Editor
         /// <param name="persistenceRoot">持久化根目录；为空时使用工程默认目录（测试注入临时目录）。</param>
         /// <param name="steps">显式步骤列表；为空时从注册表自动发现。</param>
         /// <param name="recipeOverride">运行期 Recipe 覆盖；为空时使用 Profile 保存的 Recipe。</param>
+        /// <param name="taskOverrides">任务级参数覆盖；仅作用于内存副本。</param>
+        /// <param name="reportWriter">报告写入函数；为空时使用默认实现。</param>
         /// <returns>已加锁并落盘初始检查点的运行器。</returns>
         public static BuildPipelineRunner StartNew(
             UnityRFrameworkBuildProfile profile,
             string persistenceRoot = null,
             IReadOnlyList<IBuildPipelineStep> steps = null,
-            BuildRecipe? recipeOverride = null)
+            BuildRecipe? recipeOverride = null,
+            BuildTaskOverrides taskOverrides = null,
+            Func<BuildExecutionReport, string, string, string, string>
+                reportWriter = null)
         {
             if (profile == null)
             {
@@ -154,10 +167,13 @@ namespace UnityRFramework.Editor
 
             BuildPipelinePersistence persistence =
                 new BuildPipelinePersistence(persistenceRoot);
+            taskOverrides = taskOverrides ?? new BuildTaskOverrides();
+            UnityRFrameworkBuildProfile effectiveProfile =
+                taskOverrides.CreateEffectiveProfile(profile);
             List<IBuildPipelineStep> available = PrepareSteps(steps);
             BuildRecipePlan recipePlan =
                 BuildRecipePlanner.Create(
-                    profile,
+                    effectiveProfile,
                     available,
                     requireCoreSteps: steps == null,
                     recipeOverride: recipeOverride);
@@ -197,18 +213,21 @@ namespace UnityRFramework.Editor
             List<IBuildPipelineStep> ordered =
                 new List<IBuildPipelineStep>(recipePlan.Steps);
             CancellationTokenSource source = new CancellationTokenSource();
-            BuildPipelineContext context = BuildPipelineContext.Create(
-                profile,
+            BuildPipelineContext previewContext = BuildPipelineContext.Create(
+                effectiveProfile,
                 ToStepDictionary(ordered),
                 source.Token,
                 taskId,
-                persistenceRoot);
-            List<IBuildPipelineStep> usable = FilterUsable(ordered, context);
+                persistenceRoot,
+                recipeOverride);
+            List<IBuildPipelineStep> usable = FilterUsable(ordered, previewContext);
             BuildPipelineState state = CreateState(
                 profile,
-                context,
+                effectiveProfile,
+                previewContext,
                 usable,
-                taskId);
+                taskId,
+                taskOverrides);
 
             string lockError;
             if (!persistence.TryAcquireLock(state, out lockError))
@@ -218,13 +237,34 @@ namespace UnityRFramework.Editor
                     $"无法启动构建任务：{lockError}");
             }
 
+            BuildPipelineContext context;
+            try
+            {
+                context = BuildPipelineContext.Create(
+                    effectiveProfile,
+                    ToStepDictionary(ordered),
+                    source.Token,
+                    taskId,
+                    persistenceRoot,
+                    recipeOverride,
+                    captureSettingsTransaction: true);
+            }
+            catch
+            {
+                persistence.ReleaseLock();
+                source.Dispose();
+                throw;
+            }
+
             persistence.SaveState(state);
             return new BuildPipelineRunner(
                 context,
+                profile,
                 persistence,
                 source,
                 state,
-                reportHeader: $"构建任务开始：{state.ProfileName}（{state.TaskId}）");
+                reportHeader: $"构建任务开始：{state.ProfileName}（{state.TaskId}）",
+                reportWriter: reportWriter);
         }
 
         /// <summary>
@@ -257,6 +297,16 @@ namespace UnityRFramework.Editor
                 throw new InvalidOperationException(
                     "任务状态未绑定 TaskId，无法恢复。");
             }
+            if (BuildPipelineRecovery.IsPlayerBuildInterrupted(state))
+            {
+                // 强杀在 Player 编译阶段会损坏 Unity 增量状态，恢复重试只会
+                // 再次遇到假成功；唯一路径是作废后先用官方构建完整修复。
+                throw new InvalidOperationException(
+                    $"任务 {state.TaskId} 在「构建 Player」阶段被强制中断，"
+                    + "Unity 增量状态可能已损坏，不支持恢复/重试。"
+                    + "请作废本任务，先用官方 Build Settings 完整构建一次"
+                    + "（成功产出 exe）修复状态，再用本工具构建。");
+            }
 
             BuildPipelinePersistence persistence =
                 new BuildPipelinePersistence(persistenceRoot);
@@ -265,8 +315,10 @@ namespace UnityRFramework.Editor
             {
                 profile = LoadProfile(state);
             }
-
-            RestoreMissingBuildIdentity(state, profile);
+            BuildTaskOverrides taskOverrides =
+                state.TaskOverrides ?? new BuildTaskOverrides();
+            UnityRFrameworkBuildProfile effectiveProfile =
+                taskOverrides.CreateEffectiveProfile(profile);
 
             bool sameSession =
                 string.Equals(
@@ -304,11 +356,13 @@ namespace UnityRFramework.Editor
 
             CancellationTokenSource source = new CancellationTokenSource();
             BuildPipelineContext context = BuildPipelineContext.Create(
-                profile,
+                effectiveProfile,
                 ToStepDictionary(ordered),
                 source.Token,
                 state.TaskId,
-                persistenceRoot);
+                persistenceRoot,
+                state.Recipe,
+                captureSettingsTransaction: true);
 
             state.Phase = BuildPipelinePhase.Running;
             state.WaitingReason = string.Empty;
@@ -316,12 +370,14 @@ namespace UnityRFramework.Editor
             persistence.SaveState(state);
             return new BuildPipelineRunner(
                 context,
+                profile,
                 persistence,
                 source,
                 state,
                 reportHeader:
                     $"构建任务恢复：{state.ProfileName}（{state.TaskId}），"
-                    + $"从步骤 {state.CurrentStepIndex + 1}/{state.StepIds.Count} 继续。");
+                    + $"从步骤 {state.CurrentStepIndex + 1}/{state.StepIds.Count} 继续。",
+                reportWriter: null);
         }
 
         /// <summary>
@@ -337,6 +393,8 @@ namespace UnityRFramework.Editor
         /// <summary>
         /// 推进一次状态机：每次调用最多启动或推进一个阶段。
         /// 由 EditorApplication.update 自动驱动；测试可手动循环调用。
+        /// 每次推进前刷新任务进度条（可取消）；原生编译步骤执行期间由
+        /// Unity 自身的构建进度条接管，其取消结果同样映射为任务已取消。
         /// </summary>
         public void Tick()
         {
@@ -344,6 +402,8 @@ namespace UnityRFramework.Editor
             {
                 return;
             }
+
+            UpdateTaskProgressBar();
 
             try
             {
@@ -370,6 +430,38 @@ namespace UnityRFramework.Editor
                     false,
                     report.ToString(),
                     CurrentState));
+            }
+        }
+
+        /// <summary>
+        /// 刷新任务级可取消进度条。仅在主线程可交互的时机显示：
+        /// 步骤边界与等待编辑器期（此时取消点击会在下一次推进被接收）。
+        /// 进入原生编译步骤（构建 Player 等）时隐藏本进度条——
+        /// 主线程由 Unity 占据，取消交由 Unity 原生构建进度条
+        /// （其取消映射为 BuildReport Cancelled，任务记为已取消、无产物）。
+        /// </summary>
+        private void UpdateTaskProgressBar()
+        {
+            if (kernelPhase == KernelPhase.ExecuteStep)
+            {
+                EditorUtility.ClearProgressBar();
+                return;
+            }
+
+            int total = Math.Max(1, CurrentState.StepIds.Count);
+            float progress = Mathf.Clamp01(
+                (float)CurrentState.CurrentStepIndex / total);
+            string message = kernelPhase == KernelPhase.WaitingEditor
+                ? $"等待编辑器：{CurrentState.WaitingReason}"
+                : $"步骤 {CurrentState.CurrentStepIndex + 1}/{total}";
+
+            bool cancelClicked = EditorUtility.DisplayCancelableProgressBar(
+                "UnityRFramework 构建任务",
+                $"{CurrentState.ProfileName}：{message}",
+                progress);
+            if (cancelClicked)
+            {
+                Cancel();
             }
         }
 
@@ -417,6 +509,7 @@ namespace UnityRFramework.Editor
                 Active = null;
             }
 
+            EditorUtility.ClearProgressBar();
             HasActiveTask = false;
             BuildPipelineRecovery.ClearSessionMark();
         }
@@ -429,16 +522,22 @@ namespace UnityRFramework.Editor
         /// <param name="cts">取消令牌源。</param>
         /// <param name="state">任务状态。</param>
         /// <param name="reportHeader">报告首行。</param>
+        /// <param name="reportWriter">报告写入函数；为空时使用默认实现。</param>
         private BuildPipelineRunner(
             BuildPipelineContext context,
+            UnityRFrameworkBuildProfile sourceProfile,
             BuildPipelinePersistence persistence,
             CancellationTokenSource cts,
             BuildPipelineState state,
-            string reportHeader)
+            string reportHeader,
+            Func<BuildExecutionReport, string, string, string, string>
+                reportWriter)
         {
             Context = context;
+            this.sourceProfile = sourceProfile;
             this.persistence = persistence;
             this.cts = cts;
+            this.reportWriter = reportWriter ?? BuildReportWriter.Write;
             CurrentState = state;
             kernelPhase = KernelPhase.BetweenSteps;
             report.AppendLine(reportHeader);
@@ -514,15 +613,27 @@ namespace UnityRFramework.Editor
             string stepId = CurrentState.StepIds[CurrentState.CurrentStepIndex];
             IBuildPipelineStep step = Context.Steps[stepId];
             BuildStepResult result;
-            try
-            {
-                result = step.Execute(Context);
-            }
-            catch (Exception exception)
+            if (string.Equals(stepId, "core.finalize", StringComparison.Ordinal)
+                && (Context.Recipe == BuildRecipe.Player
+                    || Context.Recipe == BuildRecipe.Release)
+                && !CurrentState.PlayerProduced)
             {
                 result = BuildStepResult.Failed(
-                    $"步骤 {step.DisplayName} 抛出异常：{exception.Message}",
-                    exception);
+                    "本次任务未产生 Player，拒绝使用输出目录中的旧产物完成收尾。",
+                    null);
+            }
+            else
+            {
+                try
+                {
+                    result = step.Execute(Context);
+                }
+                catch (Exception exception)
+                {
+                    result = BuildStepResult.Failed(
+                        $"步骤 {step.DisplayName} 抛出异常：{exception.Message}",
+                        exception);
+                }
             }
 
             string finishedAt = NowIso();
@@ -539,6 +650,20 @@ namespace UnityRFramework.Editor
                 FinishedAt = finishedAt
             };
 
+            if (Context.SettingsTransaction != null
+                && Context.SettingsTransaction.HasChanges)
+            {
+                CurrentState.SettingsApplied = true;
+            }
+            if (result.Status == BuildStepStatus.Succeeded
+                && string.Equals(
+                    stepId,
+                    "core.build-player",
+                    StringComparison.Ordinal))
+            {
+                CurrentState.PlayerProduced = true;
+            }
+
             if (result.Status == BuildStepStatus.Succeeded)
             {
                 report.AppendLine(
@@ -547,6 +672,25 @@ namespace UnityRFramework.Editor
                 CurrentState.CurrentStepIndex++;
                 CurrentState.UpdatedAt = NowIso();
                 persistence.SaveState(CurrentState);
+
+                if (cts.IsCancellationRequested)
+                {
+                    // 取消请求在本步骤执行期间到达（如 Player 原生编译无法中断）：
+                    // 本步骤已完成并保留记录，后续步骤（含收尾）不再执行。
+                    report.AppendLine(
+                        "构建任务已被取消（取消请求在本步骤执行期间到达，"
+                        + "本步骤已完成，后续步骤不再执行）。");
+                    CurrentState.Phase = BuildPipelinePhase.Cancelled;
+                    CurrentState.UpdatedAt = NowIso();
+                    persistence.SaveState(CurrentState);
+                    kernelPhase = KernelPhase.Done;
+                    Complete(new BuildRunResult(
+                        false,
+                        true,
+                        report.ToString(),
+                        CurrentState));
+                    return;
+                }
 
                 if (step.SwitchesTarget
                     || step.TriggersCompilation
@@ -696,14 +840,67 @@ namespace UnityRFramework.Editor
 
             IsFinished = true;
             FinalResult = result;
+            EditorUtility.ClearProgressBar();
             EditorApplication.update -= Tick;
 
             RestoreTransactionIfNeeded();
 
+            // 取消请求到达时「构建 Player」可能已在执行且无法中断：如实交代产物去留。
+            if (FinalResult.Cancelled
+                && Context.Profile != null
+                && Context.OutputError.Length == 0)
+            {
+                try
+                {
+                    string productPath =
+                        BuildPlayerOptionsFactory.ResolveLocationPath(Context);
+                    if (ProductAlreadyBuilt(productPath))
+                    {
+                        report.AppendLine(
+                            "注意：取消请求到达时「构建 Player」已在执行且无法中断，"
+                            + "本次 Player 已构建完成，产物已生成并保留："
+                            + $"{productPath}。任务按已取消处理——构建号未消耗、"
+                            + "收尾步骤未执行；产物可自行保留或删除。");
+                        FinalResult = new BuildRunResult(
+                            false,
+                            true,
+                            report.ToString(),
+                            CurrentState);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Debug.Log($"取消产物检查失败：{exception.Message}");
+                }
+            }
+
             bool succeeded = FinalResult.Succeeded;
             bool cancelled = FinalResult.Cancelled;
-            WriteExecutionReport(succeeded, cancelled);
-            if (succeeded)
+            bool reportWritten = WriteExecutionReport(
+                succeeded,
+                cancelled,
+                out string reportError);
+            if (succeeded
+                && !reportWritten
+                && Context.Recipe == BuildRecipe.Release)
+            {
+                CurrentState.Phase = BuildPipelinePhase.Failed;
+                CurrentState.ErrorMessage =
+                    $"Release 构建报告写入失败：{reportError}";
+                CurrentState.UpdatedAt = NowIso();
+                persistence.SaveState(CurrentState);
+                report.AppendLine($"[错误] {CurrentState.ErrorMessage}");
+                FinalResult = new BuildRunResult(
+                    false,
+                    false,
+                    report.ToString(),
+                    CurrentState);
+                succeeded = false;
+                cancelled = false;
+            }
+            if (succeeded
+                && (Context.Recipe == BuildRecipe.Player
+                    || Context.Recipe == BuildRecipe.Release))
             {
                 // 构建号只在完整成功后提交；失败与取消不消耗正式版本号。
                 CommitBuildNumberSafely();
@@ -779,6 +976,22 @@ namespace UnityRFramework.Editor
                     report.ToString(),
                     CurrentState);
             }
+        }
+
+        /// <summary>
+        /// 判断产物是否真实落盘：Windows/Android 为文件，
+        /// iOS/WebGL 等目录产物为目录。
+        /// </summary>
+        /// <param name="outputPath">构建报告给出的产物路径。</param>
+        /// <returns>文件或目录存在时返回 true。</returns>
+        private static bool ProductAlreadyBuilt(string outputPath)
+        {
+            if (string.IsNullOrEmpty(outputPath))
+            {
+                return false;
+            }
+
+            return File.Exists(outputPath) || Directory.Exists(outputPath);
         }
 
         /// <summary>
@@ -916,15 +1129,18 @@ namespace UnityRFramework.Editor
         /// 创建初始任务状态。
         /// </summary>
         /// <param name="profile">构建配置。</param>
+        /// <param name="effectiveProfile">已应用任务覆盖的内存副本。</param>
         /// <param name="context">构建上下文。</param>
         /// <param name="usable">可用步骤列表。</param>
         /// <param name="taskId">预生成的任务 Id。</param>
         /// <returns>初始状态。</returns>
         private static BuildPipelineState CreateState(
             UnityRFrameworkBuildProfile profile,
+            UnityRFrameworkBuildProfile effectiveProfile,
             BuildPipelineContext context,
             List<IBuildPipelineStep> usable,
-            string taskId)
+            string taskId,
+            BuildTaskOverrides taskOverrides)
         {
             BuildPipelineState state = new BuildPipelineState
             {
@@ -933,10 +1149,12 @@ namespace UnityRFramework.Editor
                     AssetDatabase.GetAssetPath(profile)),
                 ProfileAssetPath = AssetDatabase.GetAssetPath(profile),
                 ProfileName = profile.name,
-                TargetName = profile.Platform.Target.ToString(),
-                FlavorName = profile.Flavor.ToString(),
-                PublicVersion = profile.Platform.PublicVersion,
-                BuildNumber = profile.Platform.BuildNumber,
+                TargetName = effectiveProfile.Platform.Target.ToString(),
+                FlavorName = effectiveProfile.Flavor.ToString(),
+                Recipe = context.Recipe,
+                TaskOverrides = taskOverrides,
+                PublicVersion = effectiveProfile.Platform.PublicVersion,
+                BuildNumber = effectiveProfile.Platform.BuildNumber,
                 OutputRootAbsolute = context.OutputRootAbsolute,
                 OutputDirectory = context.OutputDirectory,
                 OutputFileName = context.OutputFileName,
@@ -949,26 +1167,6 @@ namespace UnityRFramework.Editor
                 state.StepIds.Add(usable[i].Id);
             }
             return state;
-        }
-
-        /// <summary>
-        /// 为旧版检查点补齐尚未持久化的构建身份。
-        /// 正在恢复的任务尚未提交构建号递增，因此可安全读取 Profile 当前值。
-        /// </summary>
-        /// <param name="state">待恢复任务状态。</param>
-        /// <param name="profile">任务使用的构建配置。</param>
-        private static void RestoreMissingBuildIdentity(
-            BuildPipelineState state,
-            UnityRFrameworkBuildProfile profile)
-        {
-            if (string.IsNullOrEmpty(state.PublicVersion))
-            {
-                state.PublicVersion = profile.Platform.PublicVersion;
-            }
-            if (state.BuildNumber <= 0)
-            {
-                state.BuildNumber = profile.Platform.BuildNumber;
-            }
         }
 
         /// <summary>
@@ -997,12 +1195,16 @@ namespace UnityRFramework.Editor
 
         /// <summary>
         /// 组装并写入构建报告；成功、失败与取消均会写报告，保证失败构建
-        /// 有可定位的步骤与原因。报告写入失败只警告，不阻断任务收尾。
+        /// 有可定位的步骤与原因。Release 报告失败由调用方阻断成功，其他 Recipe 记录警告。
         /// </summary>
         /// <param name="succeeded">任务是否成功完成。</param>
         /// <param name="cancelled">任务是否被取消。</param>
-        private void WriteExecutionReport(bool succeeded, bool cancelled)
+        private bool WriteExecutionReport(
+            bool succeeded,
+            bool cancelled,
+            out string error)
         {
+            error = string.Empty;
             try
             {
                 BuildExecutionReport reportModel = BuildExecutionReport.Create(
@@ -1010,16 +1212,19 @@ namespace UnityRFramework.Editor
                     CurrentState,
                     succeeded,
                     cancelled);
-                string reportPath = BuildReportWriter.Write(
+                string reportPath = reportWriter(
                     reportModel,
                     CurrentState.OutputRootAbsolute,
                     CurrentState.OutputDirectory,
                     CurrentState.TaskId);
                 Debug.Log($"构建报告已写入：{reportPath}");
+                return true;
             }
             catch (Exception exception)
             {
-                Debug.Log($"构建报告写入失败：{exception.Message}");
+                error = exception.Message;
+                Debug.LogWarning($"构建报告写入失败：{exception.Message}");
+                return false;
             }
         }
 
@@ -1028,9 +1233,15 @@ namespace UnityRFramework.Editor
         /// </summary>
         private void CommitBuildNumberSafely()
         {
+            if (CurrentState.TaskOverrides != null
+                && CurrentState.TaskOverrides.HasBuildNumber)
+            {
+                return;
+            }
+
             try
             {
-                BuildVersionResolver.CommitBuildNumber(Context.Profile);
+                BuildVersionResolver.CommitBuildNumber(sourceProfile);
             }
             catch (Exception exception)
             {

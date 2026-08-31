@@ -25,17 +25,20 @@ namespace UnityRFramework.Editor
 
         public override bool TriggersCompilation => true;
 
-        public bool ShouldInclude(UnityRFrameworkBuildProfile profile)
+        public bool ShouldInclude(
+            UnityRFrameworkBuildProfile profile,
+            BuildRecipe recipe)
         {
             return profile != null
-                && (profile.Recipe == BuildRecipe.Player
-                    || profile.Recipe == BuildRecipe.Release)
+                && (recipe == BuildRecipe.Player
+                    || recipe == BuildRecipe.Release)
                 && BuildStepConfigLocator.HasEnabledEntry(profile, HybridClrStepId);
         }
 
         public override bool CanRun(BuildPipelineContext context)
         {
-            return context != null && ShouldInclude(context.Profile);
+            return context != null
+                && ShouldInclude(context.Profile, context.Recipe);
         }
 
         public override void Validate(
@@ -44,7 +47,7 @@ namespace UnityRFramework.Editor
         {
             // Release 还会选择热更发布步骤，由发布步骤统一报告插件配置问题，
             // 避免同一校验结果在窗口中重复出现。
-            if (context?.Profile?.Recipe == BuildRecipe.Player)
+            if (context != null && context.Recipe == BuildRecipe.Player)
             {
                 HybridCLRBuildValidation.ValidatePluginSettings(issues);
             }

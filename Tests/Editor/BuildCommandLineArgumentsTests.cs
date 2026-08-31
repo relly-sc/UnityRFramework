@@ -6,7 +6,7 @@ using UnityEngine;
 namespace UnityRFramework.Editor.Tests
 {
     /// <summary>
-    /// 构建命令行参数解析、Profile 定位、覆盖作用域与退出码映射的单元测试。
+    /// 构建命令行参数解析、Profile 定位、任务覆盖与退出码映射的单元测试。
     /// </summary>
     public sealed class BuildCommandLineArgumentsTests
     {
@@ -421,12 +421,16 @@ namespace UnityRFramework.Editor.Tests
         }
 
         /// <summary>
-        /// 覆盖作用域应把命令行覆盖值写入 Profile 实例。
+        /// 任务覆盖只写入有效副本，源 Profile 保持不变。
         /// </summary>
         [Test]
-        public void OverrideScope_AppliesOverridesToProfile()
+        public void TaskOverrides_CreateEffectiveProfile_DoesNotModifySource()
         {
             UnityRFrameworkBuildProfile profile = CreateStandaloneProfile();
+            profile.Output.OutputRoot = "Builds";
+            profile.Platform.PublicVersion = "1.2.3";
+            profile.Platform.BuildNumber = 10;
+            profile.Output.CleanBeforeBuild = false;
             BuildCommandLineArguments arguments = BuildCommandLineArguments.Parse(new[]
             {
                 "-urfProfile",
@@ -442,52 +446,28 @@ namespace UnityRFramework.Editor.Tests
             });
             Assert.That(arguments.IsValid, Is.True, string.Join("; ", arguments.Errors));
 
-            BuildProfileOverrideScope scope =
-                new BuildProfileOverrideScope(profile, arguments);
-
-            Assert.That(profile.Output.OutputRoot, Is.EqualTo("D:/CiBuilds"));
-            Assert.That(profile.Platform.PublicVersion, Is.EqualTo("9.9.9"));
-            Assert.That(profile.Platform.BuildNumber, Is.EqualTo(55));
-            Assert.That(profile.Output.CleanBeforeBuild, Is.True);
-        }
-
-        /// <summary>
-        /// 恢复作用域应把全部覆盖字段还原为原值。
-        /// </summary>
-        [Test]
-        public void OverrideScope_Restore_RevertsAllFields()
-        {
-            UnityRFrameworkBuildProfile profile = CreateStandaloneProfile();
-            profile.Output.OutputRoot = "Builds";
-            profile.Platform.PublicVersion = "1.2.3";
-            profile.Platform.BuildNumber = 10;
-            profile.Output.CleanBeforeBuild = false;
-
-            BuildCommandLineArguments arguments = BuildCommandLineArguments.Parse(new[]
-            {
-                "-urfProfile",
-                "P",
-                "-urfOutputRoot",
-                "D:/CiBuilds",
-                "-urfVersion",
-                "9.9.9",
-                "-urfCleanBuild",
-                "true"
-            });
-            BuildProfileOverrideScope scope =
-                new BuildProfileOverrideScope(profile, arguments);
-            scope.Restore();
+            BuildTaskOverrides taskOverrides =
+                BuildTaskOverrides.FromArguments(arguments);
+            UnityRFrameworkBuildProfile effective =
+                taskOverrides.CreateEffectiveProfile(profile);
 
             Assert.That(profile.Output.OutputRoot, Is.EqualTo("Builds"));
             Assert.That(profile.Platform.PublicVersion, Is.EqualTo("1.2.3"));
+            Assert.That(profile.Platform.BuildNumber, Is.EqualTo(10));
             Assert.That(profile.Output.CleanBeforeBuild, Is.False);
+            Assert.That(effective.Output.OutputRoot, Is.EqualTo("D:/CiBuilds"));
+            Assert.That(effective.Platform.PublicVersion, Is.EqualTo("9.9.9"));
+            Assert.That(effective.Platform.BuildNumber, Is.EqualTo(55));
+            Assert.That(effective.Output.CleanBeforeBuild, Is.True);
+
+            UnityEngine.Object.DestroyImmediate(effective);
         }
 
         /// <summary>
-        /// 无任何覆盖项时作用域不应修改 Profile。
+        /// 无覆盖时仍返回独立副本，避免任务步骤修改源 Profile。
         /// </summary>
         [Test]
-        public void OverrideScope_NoOverrides_DoesNothing()
+        public void TaskOverrides_NoOverrides_ReturnsIndependentCopy()
         {
             UnityRFrameworkBuildProfile profile = CreateStandaloneProfile();
             profile.Output.OutputRoot = "Builds";
@@ -495,90 +475,17 @@ namespace UnityRFramework.Editor.Tests
 
             BuildCommandLineArguments arguments =
                 BuildCommandLineArguments.Parse(new[] { "-urfProfile", "P" });
-            BuildProfileOverrideScope scope =
-                new BuildProfileOverrideScope(profile, arguments);
+            BuildTaskOverrides taskOverrides =
+                BuildTaskOverrides.FromArguments(arguments);
+            UnityRFrameworkBuildProfile effective =
+                taskOverrides.CreateEffectiveProfile(profile);
 
-            Assert.That(profile.Output.OutputRoot, Is.EqualTo("Builds"));
+            Assert.That(effective, Is.Not.SameAs(profile));
+            Assert.That(effective.Output.OutputRoot, Is.EqualTo("Builds"));
+            effective.Platform.BuildNumber = 99;
             Assert.That(profile.Platform.BuildNumber, Is.EqualTo(3));
 
-            // 模拟流水线成功后的构建号递增。
-            profile.Platform.BuildNumber++;
-            scope.Restore();
-
-            // 无覆盖时恢复为空操作，递增结果应保留。
-            Assert.That(profile.Platform.BuildNumber, Is.EqualTo(4));
-        }
-
-        /// <summary>
-        /// 构建号被覆盖时，恢复应丢弃流水线对覆盖值的递增并还原原值。
-        /// </summary>
-        [Test]
-        public void OverrideScope_BuildNumberOverridden_RestoreDiscardsIncrement()
-        {
-            UnityRFrameworkBuildProfile profile = CreateStandaloneProfile();
-            profile.Platform.BuildNumber = 10;
-            profile.Platform.AutoIncrementBuildNumber = true;
-
-            BuildCommandLineArguments arguments = BuildCommandLineArguments.Parse(new[]
-            {
-                "-urfProfile",
-                "P",
-                "-urfBuildNumber",
-                "99"
-            });
-            BuildProfileOverrideScope scope =
-                new BuildProfileOverrideScope(profile, arguments);
-
-            // 模拟流水线成功后对覆盖值 99 的自动递增。
-            profile.Platform.BuildNumber++;
-            Assert.That(profile.Platform.BuildNumber, Is.EqualTo(100));
-
-            scope.Restore();
-
-            // CI 自行管理构建号：恢复原值，不消耗 Profile 计数器。
-            Assert.That(profile.Platform.BuildNumber, Is.EqualTo(10));
-        }
-
-        /// <summary>
-        /// 构建号未被覆盖时，恢复应保留流水线成功后的自动递增结果。
-        /// </summary>
-        [Test]
-        public void OverrideScope_BuildNumberNotOverridden_RestoreKeepsIncrement()
-        {
-            UnityRFrameworkBuildProfile profile = CreateStandaloneProfile();
-            profile.Platform.BuildNumber = 10;
-            profile.Platform.AutoIncrementBuildNumber = true;
-
-            BuildCommandLineArguments arguments = BuildCommandLineArguments.Parse(new[]
-            {
-                "-urfProfile",
-                "P",
-                "-urfVersion",
-                "3.0.0"
-            });
-            BuildProfileOverrideScope scope =
-                new BuildProfileOverrideScope(profile, arguments);
-
-            // 模拟流水线成功后的自动递增。
-            profile.Platform.BuildNumber++;
-            scope.Restore();
-
-            Assert.That(profile.Platform.BuildNumber, Is.EqualTo(11));
-            Assert.That(profile.Platform.PublicVersion, Is.EqualTo("0.1.0"));
-        }
-
-        /// <summary>
-        /// Profile 为 null 时构造覆盖作用域应抛出参数异常。
-        /// </summary>
-        [Test]
-        public void OverrideScope_NullProfile_Throws()
-        {
-            BuildCommandLineArguments arguments =
-                BuildCommandLineArguments.Parse(new[] { "-urfProfile", "P" });
-
-            Assert.That(
-                () => new BuildProfileOverrideScope(null, arguments),
-                Throws.ArgumentNullException);
+            UnityEngine.Object.DestroyImmediate(effective);
         }
 
         /// <summary>
@@ -614,7 +521,7 @@ namespace UnityRFramework.Editor.Tests
         }
 
         /// <summary>
-        /// 创建未保存的独立 Profile 实例，用于覆盖作用域测试。
+        /// 创建未保存的独立 Profile 实例，用于任务覆盖测试。
         /// </summary>
         /// <returns>独立 Profile 实例。</returns>
         private static UnityRFrameworkBuildProfile CreateStandaloneProfile()

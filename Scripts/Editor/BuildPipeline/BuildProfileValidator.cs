@@ -176,7 +176,26 @@ namespace UnityRFramework.Editor
         public static BuildValidationResult Validate(
             UnityRFrameworkBuildProfile profile)
         {
-            return Validate(profile, BuildEnvironmentState.Capture());
+            return Validate(
+                profile,
+                profile?.Recipe ?? BuildRecipe.Player,
+                BuildEnvironmentState.Capture(),
+                false);
+        }
+
+        /// <summary>使用当前工程状态和显式 Recipe 执行完整校验。</summary>
+        /// <param name="profile">待校验的构建配置。</param>
+        /// <param name="recipe">本任务实际 Recipe。</param>
+        /// <returns>校验结果。</returns>
+        public static BuildValidationResult Validate(
+            UnityRFrameworkBuildProfile profile,
+            BuildRecipe recipe)
+        {
+            return Validate(
+                profile,
+                recipe,
+                BuildEnvironmentState.Capture(),
+                false);
         }
 
         /// <summary>
@@ -189,7 +208,11 @@ namespace UnityRFramework.Editor
             UnityRFrameworkBuildProfile profile,
             BuildEnvironmentState state)
         {
-            return Validate(profile, state, false);
+            return Validate(
+                profile,
+                profile?.Recipe ?? BuildRecipe.Player,
+                state,
+                false);
         }
 
         /// <summary>
@@ -204,6 +227,20 @@ namespace UnityRFramework.Editor
             BuildEnvironmentState state,
             bool includeAssetHealth)
         {
+            return Validate(
+                profile,
+                profile?.Recipe ?? BuildRecipe.Player,
+                state,
+                includeAssetHealth);
+        }
+
+        /// <summary>使用显式 Recipe 和指定工程状态执行完整只读校验。</summary>
+        public static BuildValidationResult Validate(
+            UnityRFrameworkBuildProfile profile,
+            BuildRecipe recipe,
+            BuildEnvironmentState state,
+            bool includeAssetHealth = false)
+        {
             List<BuildValidationIssue> issues = new List<BuildValidationIssue>();
             if (profile == null)
             {
@@ -214,13 +251,16 @@ namespace UnityRFramework.Editor
                 return new BuildValidationResult(issues);
             }
 
-            ValidateBasic(profile, issues);
-            ValidateScenes(profile, issues);
+            ValidateBasic(profile, recipe, issues);
+            if (recipe == BuildRecipe.Player || recipe == BuildRecipe.Release)
+            {
+                ValidateScenes(profile, issues);
+            }
             ValidateOutput(profile, state, issues, out BuildValidationContext context);
             ValidatePlatform(profile, context, issues);
             ValidateDefineSymbols(profile, issues);
             ValidateEnvironment(state, issues);
-            ValidateRecipeAndSteps(profile, issues);
+            ValidateRecipeAndSteps(profile, recipe, issues);
 
             if (includeAssetHealth)
             {
@@ -236,9 +276,12 @@ namespace UnityRFramework.Editor
         /// </summary>
         private static void ValidateRecipeAndSteps(
             UnityRFrameworkBuildProfile profile,
+            BuildRecipe recipe,
             ICollection<BuildValidationIssue> issues)
         {
-            BuildRecipePlan plan = BuildRecipePlanner.Create(profile);
+            BuildRecipePlan plan = BuildRecipePlanner.Create(
+                profile,
+                recipeOverride: recipe);
             for (int i = 0; i < plan.Issues.Count; i++)
             {
                 issues.Add(plan.Issues[i]);
@@ -260,7 +303,8 @@ namespace UnityRFramework.Editor
             BuildPipelineContext pipelineContext = BuildPipelineContext.Create(
                 profile,
                 stepMap,
-                System.Threading.CancellationToken.None);
+                System.Threading.CancellationToken.None,
+                recipeOverride: recipe);
             for (int i = 0; i < plan.Steps.Count; i++)
             {
                 IBuildPipelineStep step = plan.Steps[i];
@@ -285,9 +329,10 @@ namespace UnityRFramework.Editor
         /// <param name="issues">追加问题条目的目标集合。</param>
         private static void ValidateBasic(
             UnityRFrameworkBuildProfile profile,
+            BuildRecipe recipe,
             ICollection<BuildValidationIssue> issues)
         {
-            List<string> errors = profile.Validate();
+            List<string> errors = profile.Validate(recipe);
             for (int i = 0; i < errors.Count; i++)
             {
                 issues.Add(BuildValidationIssue.Error(

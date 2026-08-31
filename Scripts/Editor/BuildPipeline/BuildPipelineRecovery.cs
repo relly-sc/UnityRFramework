@@ -15,7 +15,7 @@ namespace UnityRFramework.Editor
         /// <summary>自动继续任务（同进程 Domain Reload 安全场景，会话 TaskId 匹配）。</summary>
         Resume,
 
-        /// <summary>提示用户选择继续（或重试失败步骤）或作废（GUI 模式）。</summary>
+        /// <summary>GUI 模式提示用户作废或保留现场（跨进程残留不再继续构建）。</summary>
         Prompt,
 
         /// <summary>直接作废任务（BatchMode 或明确失败）。</summary>
@@ -36,7 +36,7 @@ namespace UnityRFramework.Editor
     /// - 同进程（会话标记的 TaskId 与状态一致）自动恢复，等待编译与资源导入结束后续跑；
     /// - 跨进程时验证锁：持锁进程存活且工程匹配则本进程不干预（Busy）；
     ///   锁残留（进程已退出、工程不匹配、锁缺失或与状态 TaskId 不一致）时
-    ///   GUI 提示用户选择，BatchMode 直接作废；
+    ///   GUI 提示作废或保留现场（跨进程不再继续构建），BatchMode 直接作废；
     /// - 损坏状态不自动吞掉：GUI 提示作废或保留，BatchMode 作废并记录错误。
     /// </summary>
     public static class BuildPipelineRecovery
@@ -283,7 +283,7 @@ namespace UnityRFramework.Editor
             BuildPipelinePersistence persistence)
         {
             string reason = loadResult == BuildPipelineStateLoadResult.VersionMismatch
-                ? "状态文件版本高于当前实现，无法安全解析"
+                ? "状态文件版本与当前实现不一致，无法安全恢复"
                 : "状态文件损坏且备份不可用";
             if (Application.isBatchMode)
             {
@@ -330,7 +330,56 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 弹窗提示用户选择继续（或重试失败步骤）或作废。
+        /// 判断任务是否在「构建 Player」阶段被中断（强杀/崩溃）。
+        /// 该场景下 Unity/Bee 增量状态可能损坏：恢复重试会再次遇到
+        /// "报告成功但无产物"的假成功，因此此类任务不支持恢复/重试，
+        /// 只能作废并先用官方 Build Settings 完整构建一次修复。
+        /// 判定依据：失败步骤为构建 Player 或收尾；或状态为运行中且检查点
+        /// 停在构建 Player 之前（进程在步骤执行中被杀，检查点未推进）。
+        /// 等待编辑器状态（检查点同样可能停在构建 Player 之前）属于正常
+        /// 重载等待，不判定为中断。
+        /// </summary>
+        /// <param name="state">任务状态。</param>
+        /// <returns>属于 Player 编译阶段中断时返回 true。</returns>
+        public static bool IsPlayerBuildInterrupted(BuildPipelineState state)
+        {
+            if (state == null)
+            {
+                return false;
+            }
+
+            if (state.FailedStep != null)
+            {
+                string failedStepId = state.FailedStep.StepId;
+                if (string.Equals(failedStepId, "core.build-player", StringComparison.Ordinal)
+                    || string.Equals(failedStepId, "core.finalize", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            if (state.Phase != BuildPipelinePhase.Running)
+            {
+                return false;
+            }
+
+            int index = state.CurrentStepIndex;
+            if (index >= 0 && index < state.StepIds.Count)
+            {
+                return string.Equals(
+                    state.StepIds[index],
+                    "core.build-player",
+                    StringComparison.Ordinal);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 弹窗处理跨进程残留任务。Unity 重启后不再继续构建（强杀可能损坏
+        /// Unity 增量状态，继续构建会跳过原生编译并报假成功）：
+        /// 仅提供作废或保留现场，并说明 Player 阶段中断场景的官方构建修复路径。
+        /// 同会话（Domain Reload）的续跑由恢复决策直接走自动恢复，不经过本弹窗。
         /// </summary>
         /// <param name="state">任务状态。</param>
         /// <param name="persistence">持久化实例。</param>
@@ -338,39 +387,19 @@ namespace UnityRFramework.Editor
             BuildPipelineState state,
             BuildPipelinePersistence persistence)
         {
-            string title;
-            string confirmLabel;
-            if (state.Phase == BuildPipelinePhase.Failed)
-            {
-                title = "发现失败的构建任务";
-                confirmLabel = "重试失败步骤";
-            }
-            else if (state.Phase == BuildPipelinePhase.WaitingForEditor)
-            {
-                title = "发现等待中的构建任务";
-                confirmLabel = "继续";
-            }
-            else
-            {
-                title = "发现未完成的构建任务";
-                confirmLabel = "恢复";
-            }
-
-            bool resume = EditorUtility.DisplayDialog(
-                title,
-                $"构建配置「{state.ProfileName}」的任务（{state.TaskId}）尚未完成，"
-                + $"已完成 {state.CompletedSteps.Count} / {state.StepIds.Count} 个步骤。\n"
-                + (string.IsNullOrWhiteSpace(state.ErrorMessage)
-                    ? string.Empty
-                    : $"原因：{state.ErrorMessage}\n")
-                + "是否从检查点继续？",
-                confirmLabel,
-                "作废");
-            if (resume)
-            {
-                WaitUntilIdleAndResume(state, persistence);
-            }
-            else
+            bool discard = EditorUtility.DisplayDialog(
+                "发现未完成的构建任务（Unity 已重启）",
+                $"构建配置「{state.ProfileName}」的任务（{state.TaskId}）尚未完成"
+                + $"（状态：{state.Phase}，已完成 "
+                + $"{state.CompletedSteps.Count} / {state.StepIds.Count} 个步骤）。\n\n"
+                + "Unity 重启后不支持继续构建：上次构建若在「构建 Player」阶段被强制中断，"
+                + "Unity 增量状态可能已损坏，继续构建会跳过原生编译并报告假成功（无 exe 产出）。\n\n"
+                + "修复路径：作废本任务 → 若上次构建在 Player 阶段被中断，"
+                + "先用官方 Build Settings 完整构建一次（成功产出 exe）修复状态"
+                + " → 再用本工具重新发起构建。",
+                "作废任务",
+                "保留现场");
+            if (discard)
             {
                 AbandonTask(state, persistence);
             }

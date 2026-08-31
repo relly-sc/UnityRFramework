@@ -31,6 +31,7 @@ namespace UnityRFramework.Editor.Tests
             profile = ScriptableObject.CreateInstance<UnityRFrameworkBuildProfile>();
             profile.name = "TestProfile";
             profile.Platform.Target = BuildTarget.StandaloneWindows64;
+            profile.Output.OutputRoot = tempRoot;
             BuildPipelineRunner.ClearActive();
         }
 
@@ -56,6 +57,7 @@ namespace UnityRFramework.Editor.Tests
             private readonly int order;
             private readonly BuildStepResult result;
             private readonly Action<BuildPipelineContext> onExecute;
+            private readonly BuildPipelineStage stage;
 
             /// <summary>步骤实际执行次数。</summary>
             public int ExecuteCount;
@@ -71,13 +73,18 @@ namespace UnityRFramework.Editor.Tests
                 string id,
                 int order = 0,
                 BuildStepResult result = null,
-                Action<BuildPipelineContext> onExecute = null)
+                Action<BuildPipelineContext> onExecute = null,
+                BuildPipelineStage stage = BuildPipelineStage.PrepareData)
             {
                 this.id = id;
                 this.order = order;
                 this.result = result ?? BuildStepResult.Succeeded("ok");
                 this.onExecute = onExecute;
+                this.stage = stage;
             }
+
+            /// <summary>步骤所属阶段。</summary>
+            public override BuildPipelineStage Stage => stage;
 
             /// <summary>步骤唯一 Id。</summary>
             public override string Id
@@ -162,6 +169,194 @@ namespace UnityRFramework.Editor.Tests
                 "任务状态必须保留本次产物使用的构建号。");
             Assert.That(profile.Platform.BuildNumber, Is.EqualTo(2),
                 "成功后 Profile 应递增为下一次构建号。");
+        }
+
+        /// <summary>Assets Recipe 成功不得消耗 Player Build Number。</summary>
+        [Test]
+        public void Runner_AssetsSuccess_DoesNotIncrementPlayerBuildNumber()
+        {
+            profile.Recipe = BuildRecipe.Player;
+            profile.Platform.BuildNumber = 7;
+            profile.Platform.AutoIncrementBuildNumber = true;
+
+            BuildPipelineRunner runner = BuildPipelineRunner.StartNew(
+                profile,
+                tempRoot,
+                new List<IBuildPipelineStep> { new RecordingStep("assets") },
+                BuildRecipe.Assets);
+            BuildRunResult result = runner.Execute();
+
+            Assert.That(result.Succeeded, Is.True);
+            Assert.That(profile.Platform.BuildNumber, Is.EqualTo(7),
+                "Assets Recipe 不应递增 Player Build Number。");
+        }
+
+        /// <summary>
+        /// 命令行覆盖构建号时，步骤读取覆盖值，但源 Profile 计数器不递增。
+        /// </summary>
+        [Test]
+        public void Runner_BuildNumberOverride_DoesNotModifySourceProfile()
+        {
+            profile.Platform.BuildNumber = 7;
+            profile.Platform.AutoIncrementBuildNumber = true;
+            int observedBuildNumber = 0;
+            BuildTaskOverrides taskOverrides = new BuildTaskOverrides
+            {
+                HasBuildNumber = true,
+                BuildNumber = 99
+            };
+
+            BuildPipelineRunner runner = BuildPipelineRunner.StartNew(
+                profile,
+                tempRoot,
+                new List<IBuildPipelineStep>
+                {
+                    new RecordingStep(
+                        "core.build-player",
+                        onExecute: context => observedBuildNumber =
+                            context.Profile.Platform.BuildNumber,
+                        stage: BuildPipelineStage.BuildPlayer)
+                },
+                BuildRecipe.Player,
+                taskOverrides);
+            BuildRunResult result = runner.Execute();
+
+            Assert.That(result.Succeeded, Is.True);
+            Assert.That(observedBuildNumber, Is.EqualTo(99));
+            Assert.That(result.FinalState.BuildNumber, Is.EqualTo(99));
+            Assert.That(result.FinalState.TaskOverrides.HasBuildNumber, Is.True);
+            Assert.That(profile.Platform.BuildNumber, Is.EqualTo(7));
+        }
+
+        /// <summary>
+        /// Player/Release 的 Finalize 必须看到本任务成功执行过 BuildPlayer，
+        /// 不能把输出目录中的旧文件当成本次构建证据。
+        /// </summary>
+        [Test]
+        public void Runner_FinalizeWithoutCurrentPlayerEvidence_Fails()
+        {
+            BuildPipelineRunner runner = BuildPipelineRunner.StartNew(
+                profile,
+                tempRoot,
+                new List<IBuildPipelineStep>
+                {
+                    new RecordingStep(
+                        "core.finalize",
+                        stage: BuildPipelineStage.Finalize)
+                },
+                BuildRecipe.Player);
+
+            UnityEngine.TestTools.LogAssert.Expect(
+                LogType.Error,
+                new System.Text.RegularExpressions.Regex("构建任务开始"));
+            BuildRunResult result = runner.Execute();
+
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.FinalState.PlayerProduced, Is.False);
+            Assert.That(
+                result.FinalState.ErrorMessage,
+                Does.Contain("本次任务未产生 Player"));
+        }
+
+        /// <summary>Release 报告写入失败必须阻断成功并保留失败状态。</summary>
+        [Test]
+        public void Runner_ReleaseReportWriteFailure_BlocksSuccess()
+        {
+            BuildPipelineRunner runner = BuildPipelineRunner.StartNew(
+                profile,
+                tempRoot,
+                new List<IBuildPipelineStep>
+                {
+                    new RecordingStep(
+                        "core.build-player",
+                        stage: BuildPipelineStage.BuildPlayer),
+                    new RecordingStep(
+                        "core.finalize",
+                        stage: BuildPipelineStage.Finalize)
+                },
+                BuildRecipe.Release,
+                reportWriter: (report, root, directory, taskId) =>
+                    throw new IOException("report denied"));
+
+            UnityEngine.TestTools.LogAssert.Expect(
+                LogType.Warning,
+                new System.Text.RegularExpressions.Regex("构建报告写入失败"));
+            UnityEngine.TestTools.LogAssert.Expect(
+                LogType.Error,
+                new System.Text.RegularExpressions.Regex("构建任务开始"));
+            BuildRunResult result = runner.Execute();
+
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.FinalState.Phase, Is.EqualTo(BuildPipelinePhase.Failed));
+            Assert.That(result.FinalState.ErrorMessage, Does.Contain("Release 构建报告"));
+        }
+
+        /// <summary>Player 报告写入失败记录警告，但不否定已完成的 Player。</summary>
+        [Test]
+        public void Runner_PlayerReportWriteFailure_IsWarningOnly()
+        {
+            BuildPipelineRunner runner = BuildPipelineRunner.StartNew(
+                profile,
+                tempRoot,
+                new List<IBuildPipelineStep>
+                {
+                    new RecordingStep(
+                        "core.build-player",
+                        stage: BuildPipelineStage.BuildPlayer),
+                    new RecordingStep(
+                        "core.finalize",
+                        stage: BuildPipelineStage.Finalize)
+                },
+                BuildRecipe.Player,
+                reportWriter: (report, root, directory, taskId) =>
+                    throw new IOException("report denied"));
+
+            UnityEngine.TestTools.LogAssert.Expect(
+                LogType.Warning,
+                new System.Text.RegularExpressions.Regex("构建报告写入失败"));
+            BuildRunResult result = runner.Execute();
+
+            Assert.That(result.Succeeded, Is.True);
+            Assert.That(result.FinalState.Phase, Is.EqualTo(BuildPipelinePhase.Succeeded));
+        }
+
+        /// <summary>获取任务锁失败时不得写入设置快照。</summary>
+        [Test]
+        public void Runner_StartNew_WhenLocked_DoesNotWriteSnapshot()
+        {
+            BuildPipelinePersistence persistence =
+                new BuildPipelinePersistence(tempRoot);
+            BuildPipelineState holder = new BuildPipelineState
+            {
+                TaskId = "holder",
+                ProfileName = "Holder"
+            };
+            Assert.That(persistence.TryAcquireLock(holder, out string error),
+                Is.True, error);
+
+            try
+            {
+                Assert.Throws<InvalidOperationException>(() =>
+                    BuildPipelineRunner.StartNew(
+                        profile,
+                        tempRoot,
+                        new List<IBuildPipelineStep>
+                        {
+                            new RecordingStep("assets")
+                        },
+                        BuildRecipe.Assets));
+
+                Assert.That(
+                    File.Exists(Path.Combine(
+                        tempRoot,
+                        BuildPipelinePersistence.SnapshotFileName)),
+                    Is.False,
+                    "未取得锁的任务不得写快照。");
+            }
+            finally
+            {
+                persistence.ReleaseLock();
+            }
         }
 
         /// <summary>

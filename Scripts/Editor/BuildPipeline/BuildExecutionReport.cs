@@ -89,6 +89,9 @@ namespace UnityRFramework.Editor
         /// <summary>构建用途分档名称。</summary>
         public string ProfileFlavor = string.Empty;
 
+        /// <summary>本任务实际执行的 Recipe。</summary>
+        public string Recipe = string.Empty;
+
         /// <summary>构建配置资产路径（工程相对路径）。</summary>
         public string ProfileAssetPath = string.Empty;
 
@@ -254,16 +257,21 @@ namespace UnityRFramework.Editor
             UnityRFrameworkBuildProfile profile = context.Profile;
             report.ProfileName = profile.name;
             report.ProfileFlavor = profile.Flavor.ToString();
+            report.Recipe = context.Recipe.ToString();
             report.ProfileAssetPath = AssetDatabase.GetAssetPath(profile);
             report.TargetPlatform = profile.Platform.Target.ToString();
             report.ScriptBackend = profile.Platform.ScriptingBackend.ToString();
             report.PublicVersion = profile.Platform.PublicVersion;
             report.BuildNumber = profile.Platform.BuildNumber;
 
-            string[] scenes = BuildPlayerOptionsFactory.ResolveScenes(profile);
-            for (int i = 0; i < scenes.Length; i++)
+            if (context.Recipe == BuildRecipe.Player
+                || context.Recipe == BuildRecipe.Release)
             {
-                report.Scenes.Add(scenes[i]);
+                string[] scenes = BuildPlayerOptionsFactory.ResolveScenes(profile);
+                for (int i = 0; i < scenes.Length; i++)
+                {
+                    report.Scenes.Add(scenes[i]);
+                }
             }
 
             FillDefineSymbols(report, profile);
@@ -350,6 +358,7 @@ namespace UnityRFramework.Editor
             report.FinishedAt = state.UpdatedAt;
             report.PublicVersion = state.PublicVersion;
             report.BuildNumber = state.BuildNumber;
+            report.Recipe = state.Recipe.ToString();
             report.DurationSeconds = CalculateDuration(
                 state.CreatedAt,
                 state.UpdatedAt);

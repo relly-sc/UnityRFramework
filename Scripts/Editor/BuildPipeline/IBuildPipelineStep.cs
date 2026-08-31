@@ -210,8 +210,12 @@ namespace UnityRFramework.Editor
     /// </summary>
     public interface IAutomaticBuildPipelineStep
     {
-        /// <summary>判断当前 Profile 是否需要自动加入该步骤。</summary>
-        bool ShouldInclude(UnityRFrameworkBuildProfile profile);
+        /// <summary>判断当前 Profile 和实际 Recipe 是否需要自动加入该步骤。</summary>
+        /// <param name="profile">构建配置。</param>
+        /// <param name="recipe">本任务实际执行的 Recipe。</param>
+        bool ShouldInclude(
+            UnityRFrameworkBuildProfile profile,
+            BuildRecipe recipe);
     }
 
     /// <summary>

@@ -94,7 +94,7 @@ namespace UnityRFramework.Editor
         /// <summary>状态文件损坏且备份不可用或不存在。</summary>
         Corrupt,
 
-        /// <summary>状态文件序列化版本高于当前实现，无法安全解析。</summary>
+        /// <summary>状态文件序列化版本与当前实现不一致，无法安全恢复。</summary>
         VersionMismatch
     }
 
@@ -230,8 +230,7 @@ namespace UnityRFramework.Editor
 
         /// <summary>
         /// 加载任务状态并区分结果：主文件损坏或版本不识别时自动回退到备份文件。
-        /// 版本低于当前实现的状态在内存中完成迁移，不回写文件；
-        /// 损坏状态不自动删除，由恢复流程决定作废或保留。
+        /// 任意版本不一致均不迁移；损坏状态不自动删除，由恢复流程决定作废或保留。
         /// </summary>
         /// <param name="state">加载成功的任务状态；不可用时为空。</param>
         /// <returns>加载结果。</returns>
@@ -474,7 +473,7 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 读取并解析单个状态文件，附带版本迁移与版本判定。
+        /// 读取并解析单个状态文件，并严格判定序列化版本。
         /// </summary>
         /// <param name="path">状态文件绝对路径。</param>
         /// <param name="state">解析成功且版本可用的任务状态；失败时为空。</param>
@@ -511,12 +510,11 @@ namespace UnityRFramework.Editor
                 return BuildPipelineStateLoadResult.Corrupt;
             }
 
-            if (parsed.SerializedVersion > BuildPipelineState.CurrentSerializedVersion)
+            if (parsed.SerializedVersion != BuildPipelineState.CurrentSerializedVersion)
             {
                 return BuildPipelineStateLoadResult.VersionMismatch;
             }
 
-            parsed.MigrateToCurrentVersion();
             state = parsed;
             return BuildPipelineStateLoadResult.Success;
         }

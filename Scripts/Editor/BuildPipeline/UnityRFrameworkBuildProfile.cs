@@ -70,12 +70,23 @@ namespace UnityRFramework.Editor
         /// <returns>错误描述列表；无错误时返回空列表。</returns>
         public List<string> Validate()
         {
+            return Validate(Recipe);
+        }
+
+        /// <summary>按任务实际 Recipe 校验配置。</summary>
+        /// <param name="recipe">实际执行的 Recipe。</param>
+        /// <returns>错误描述列表；无错误时返回空列表。</returns>
+        public List<string> Validate(BuildRecipe recipe)
+        {
             List<string> errors = new List<string>();
 
             errors.AddRange(Platform.Validate());
 
             ValidateFlavor(errors);
-            ValidateScenes(errors);
+            if (recipe == BuildRecipe.Player || recipe == BuildRecipe.Release)
+            {
+                ValidateScenes(errors);
+            }
             ValidateSteps(errors);
 
             return errors;

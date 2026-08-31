@@ -95,9 +95,11 @@ namespace UnityRFramework.Editor
                 return preparation;
             }
 
-            BuildProfileOverrideScope overrideScope =
-                new BuildProfileOverrideScope(profile, arguments);
-            BuildValidationResult validation = BuildProfileValidator.Validate(profile);
+            BuildTaskOverrides taskOverrides =
+                BuildTaskOverrides.FromArguments(arguments);
+            BuildValidationResult validation = ValidateEffectiveProfile(
+                profile,
+                taskOverrides);
             if (!validation.CanBuild)
             {
                 LogValidationIssues(validation);
@@ -106,7 +108,9 @@ namespace UnityRFramework.Editor
 
             try
             {
-                runner = BuildPipelineRunner.StartNew(profile);
+                runner = BuildPipelineRunner.StartNew(
+                    profile,
+                    taskOverrides: taskOverrides);
             }
             catch (Exception exception)
             {
@@ -114,10 +118,8 @@ namespace UnityRFramework.Editor
                 return BuildCommandExitCodes.BuildFailure;
             }
 
-            // 覆盖项在任务终态后恢复，先于退出进程执行。
             BuildPipelineRunner.TaskCompleted += completed =>
             {
-                overrideScope.Restore();
                 EditorApplication.Exit(MapResultToExitCode(completed.FinalResult));
             };
             return BuildCommandExitCodes.Success;
@@ -219,9 +221,11 @@ namespace UnityRFramework.Editor
                     : preparation;
             }
 
-            BuildProfileOverrideScope overrideScope =
-                new BuildProfileOverrideScope(profile, arguments);
-            BuildValidationResult validation = BuildProfileValidator.Validate(profile);
+            BuildTaskOverrides taskOverrides =
+                BuildTaskOverrides.FromArguments(arguments);
+            BuildValidationResult validation = ValidateEffectiveProfile(
+                profile,
+                taskOverrides);
             if (!validation.CanBuild)
             {
                 LogValidationIssues(validation);
@@ -230,9 +234,9 @@ namespace UnityRFramework.Editor
 
             try
             {
-                BuildPipelineRunner runner = BuildPipelineRunner.StartNew(profile);
-                BuildPipelineRunner.TaskCompleted += completed =>
-                    overrideScope.Restore();
+                BuildPipelineRunner runner = BuildPipelineRunner.StartNew(
+                    profile,
+                    taskOverrides: taskOverrides);
                 Debug.Log(
                     $"构建任务已启动（{runner.CurrentState.TaskId}），"
                     + "由编辑器更新驱动推进，可在构建工具窗口查看进度。");
@@ -518,114 +522,23 @@ namespace UnityRFramework.Editor
                 }
             }
         }
-    }
-
-    /// <summary>
-    /// 命令行覆盖项的运行期作用域：构造时把覆盖值写入 Profile 实例，
-    /// <see cref="Restore"/> 时恢复原值。
-    /// 构建号未被覆盖时保留流水线成功后的自动递增结果；
-    /// 构建号被覆盖时恢复原值（由 CI 自行管理构建号，不消耗 Profile 计数器）。
-    /// 恢复后对已保存资产执行 SetDirty 与 SaveAssets，防止覆盖值被流水线收尾持久化。
-    /// </summary>
-    public sealed class BuildProfileOverrideScope
-    {
-        /// <summary>被覆盖的 Profile 实例。</summary>
-        private readonly UnityRFrameworkBuildProfile profile;
-
-        /// <summary>覆盖前的输出根目录原值。</summary>
-        private readonly string originalOutputRoot;
-
-        /// <summary>覆盖前的公共版本号原值。</summary>
-        private readonly string originalPublicVersion;
-
-        /// <summary>覆盖前的平台构建号原值。</summary>
-        private readonly int originalBuildNumber;
-
-        /// <summary>覆盖前的 Clean Build 原值。</summary>
-        private readonly bool originalCleanBeforeBuild;
-
-        /// <summary>是否应用了任意覆盖项；无覆盖时 Restore 为空操作。</summary>
-        private readonly bool hasAnyOverride;
-
-        /// <summary>构建号是否被覆盖；被覆盖时恢复原值，否则保留自动递增结果。</summary>
-        private readonly bool buildNumberOverridden;
 
         /// <summary>
-        /// 创建覆盖作用域并立即应用覆盖项。
+        /// 使用任务覆盖生成内存 Profile 副本并执行只读校验。
         /// </summary>
-        /// <param name="profile">目标 Profile，不能为空。</param>
-        /// <param name="arguments">已解析的命令行参数，不能为空。</param>
-        public BuildProfileOverrideScope(
+        private static BuildValidationResult ValidateEffectiveProfile(
             UnityRFrameworkBuildProfile profile,
-            BuildCommandLineArguments arguments)
+            BuildTaskOverrides taskOverrides)
         {
-            if (profile == null)
+            UnityRFrameworkBuildProfile effective =
+                taskOverrides.CreateEffectiveProfile(profile);
+            try
             {
-                throw new ArgumentNullException(nameof(profile));
+                return BuildProfileValidator.Validate(effective);
             }
-
-            if (arguments == null)
+            finally
             {
-                throw new ArgumentNullException(nameof(arguments));
-            }
-
-            this.profile = profile;
-            originalOutputRoot = profile.Output.OutputRoot;
-            originalPublicVersion = profile.Platform.PublicVersion;
-            originalBuildNumber = profile.Platform.BuildNumber;
-            originalCleanBeforeBuild = profile.Output.CleanBeforeBuild;
-
-            buildNumberOverridden = arguments.BuildNumberOverride.HasValue;
-            hasAnyOverride = !string.IsNullOrEmpty(arguments.OutputRootOverride)
-                || !string.IsNullOrEmpty(arguments.VersionOverride)
-                || buildNumberOverridden
-                || arguments.CleanBuildOverride.HasValue;
-
-            if (!string.IsNullOrEmpty(arguments.OutputRootOverride))
-            {
-                profile.Output.OutputRoot = arguments.OutputRootOverride;
-            }
-
-            if (!string.IsNullOrEmpty(arguments.VersionOverride))
-            {
-                profile.Platform.PublicVersion = arguments.VersionOverride;
-            }
-
-            if (buildNumberOverridden)
-            {
-                profile.Platform.BuildNumber = arguments.BuildNumberOverride.Value;
-            }
-
-            if (arguments.CleanBuildOverride.HasValue)
-            {
-                profile.Output.CleanBeforeBuild = arguments.CleanBuildOverride.Value;
-            }
-        }
-
-        /// <summary>
-        /// 恢复 Profile 原值并持久化。
-        /// 构建号未被覆盖时保留当前值（可能是流水线成功后的递增结果）。
-        /// </summary>
-        public void Restore()
-        {
-            if (!hasAnyOverride)
-            {
-                return;
-            }
-
-            profile.Output.OutputRoot = originalOutputRoot;
-            profile.Platform.PublicVersion = originalPublicVersion;
-            profile.Output.CleanBeforeBuild = originalCleanBeforeBuild;
-            if (buildNumberOverridden)
-            {
-                profile.Platform.BuildNumber = originalBuildNumber;
-            }
-
-            string assetPath = AssetDatabase.GetAssetPath(profile);
-            if (!string.IsNullOrEmpty(assetPath))
-            {
-                EditorUtility.SetDirty(profile);
-                AssetDatabase.SaveAssets();
+                UnityEngine.Object.DestroyImmediate(effective);
             }
         }
     }

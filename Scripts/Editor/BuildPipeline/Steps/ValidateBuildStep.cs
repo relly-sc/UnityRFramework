@@ -60,7 +60,9 @@ namespace UnityRFramework.Editor
             }
 
             BuildValidationResult validation =
-                BuildProfileValidator.Validate(context.Profile);
+                BuildProfileValidator.Validate(
+                    context.Profile,
+                    context.Recipe);
             if (!validation.CanBuild)
             {
                 StringBuilder builder = new StringBuilder();
@@ -76,14 +78,18 @@ namespace UnityRFramework.Editor
                 return BuildStepResult.Failed(builder.ToString(), null);
             }
 
-            BuildValidationIssue? optionIssue =
-                BuildPlayerOptionsFactory.ValidateDevelopmentOptions(
-                    context.Profile);
-            if (optionIssue.HasValue)
+            if (context.Recipe == BuildRecipe.Player
+                || context.Recipe == BuildRecipe.Release)
             {
-                return BuildStepResult.Failed(
-                    $"构建前校验未通过：{optionIssue.Value.Message}",
-                    null);
+                BuildValidationIssue? optionIssue =
+                    BuildPlayerOptionsFactory.ValidateDevelopmentOptions(
+                        context.Profile);
+                if (optionIssue.HasValue)
+                {
+                    return BuildStepResult.Failed(
+                        $"构建前校验未通过：{optionIssue.Value.Message}",
+                        null);
+                }
             }
 
             return BuildStepResult.Succeeded(

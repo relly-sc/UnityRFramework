@@ -87,10 +87,10 @@ namespace UnityRFramework.Editor
     [Serializable]
     public sealed class BuildPipelineState
     {
-        /// <summary>当前序列化版本号。版本 2 引入七态状态机、等待原因与回滚状态字段。</summary>
-        public const int CurrentSerializedVersion = 2;
+        /// <summary>当前序列化版本号。版本 3 引入实际 Recipe 与任务级覆盖。</summary>
+        public const int CurrentSerializedVersion = 3;
 
-        /// <summary>序列化版本号；加载时低于当前版本会执行字段迁移。</summary>
+        /// <summary>序列化版本号；与当前版本不一致时拒绝恢复。</summary>
         public int SerializedVersion = CurrentSerializedVersion;
 
         /// <summary>任务唯一 Id（Guid 无连字符形式）；会话标记与锁文件都引用该 Id。</summary>
@@ -110,6 +110,18 @@ namespace UnityRFramework.Editor
 
         /// <summary>构建用途分档名称（BuildProfileFlavor 名称）。</summary>
         public string FlavorName = string.Empty;
+
+        /// <summary>本任务实际 Recipe 名称，恢复时不再读取 Profile 当前值。</summary>
+        public string RecipeName = BuildRecipe.Player.ToString();
+
+        /// <summary>本任务命令行覆盖；恢复时重新应用到内存 Profile 副本。</summary>
+        public BuildTaskOverrides TaskOverrides = new BuildTaskOverrides();
+
+        /// <summary>临时构建设置是否已开始应用，用于 Domain Reload 后决定回滚。</summary>
+        public bool SettingsApplied;
+
+        /// <summary>本任务是否已成功产出 Player。</summary>
+        public bool PlayerProduced;
 
         /// <summary>任务创建时冻结的公共版本号。</summary>
         public string PublicVersion = string.Empty;
@@ -195,6 +207,21 @@ namespace UnityRFramework.Editor
             }
         }
 
+        /// <summary>获取或设置本任务实际 Recipe。</summary>
+        public BuildRecipe Recipe
+        {
+            get
+            {
+                return Enum.TryParse(RecipeName, out BuildRecipe value)
+                    ? value
+                    : BuildRecipe.Player;
+            }
+            set
+            {
+                RecipeName = value.ToString();
+            }
+        }
+
         /// <summary>
         /// 任务是否已进入终态。终态任务不再执行任何步骤：
         /// 成功或作废；失败、取消与人工处理保留状态等待后续决策，不属于终态。
@@ -223,29 +250,5 @@ namespace UnityRFramework.Editor
             }
         }
 
-        /// <summary>
-        /// 应用旧版本状态到当前版本的迁移；只在内存中生效，
-        /// 下一次保存检查点时以当前版本格式落盘。
-        /// </summary>
-        public void MigrateToCurrentVersion()
-        {
-            if (SerializedVersion > CurrentSerializedVersion)
-            {
-                return;
-            }
-
-            if (SerializedVersion < 2)
-            {
-                // 版本 1 → 2：新增等待原因与回滚状态字段，保持默认值即可；
-                // 失败与取消任务的旧语义（自动清理）由运行器按新契约接管。
-                WaitingReason ??= string.Empty;
-                if (string.IsNullOrEmpty(RollbackStateName))
-                {
-                    RollbackStateName = BuildRollbackState.NotRequired.ToString();
-                }
-            }
-
-            SerializedVersion = CurrentSerializedVersion;
-        }
     }
 }

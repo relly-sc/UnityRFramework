@@ -231,7 +231,7 @@ namespace UnityRFramework.Editor.Tests
         }
 
         [Test]
-        public void ReleaseRecipe_BuildsPlayerBeforePublishingHybridClrAndAssets()
+        public void ReleaseRecipe_PreparesCodeAndAssetsBeforeBuildingPlayer()
         {
             UnityRFrameworkBuildProfile profile = CreateProfile(BuildRecipe.Release);
             AddConfiguredStep(profile, "hybridclr");
@@ -242,17 +242,17 @@ namespace UnityRFramework.Editor.Tests
 
             Assert.That(plan.IsValid, Is.True);
             Assert.That(
-                IndexOf(plan.StepIds, "hybridclr.prepare-player"),
-                Is.LessThan(IndexOf(plan.StepIds, "core.build-player")));
-            Assert.That(
-                IndexOf(plan.StepIds, "core.build-player"),
-                Is.LessThan(IndexOf(plan.StepIds, "hybridclr")));
-            Assert.That(
                 IndexOf(plan.StepIds, "hybridclr"),
                 Is.LessThan(IndexOf(plan.StepIds, "obfuz")));
             Assert.That(
                 IndexOf(plan.StepIds, "obfuz"),
                 Is.LessThan(IndexOf(plan.StepIds, "yooasset")));
+            Assert.That(
+                IndexOf(plan.StepIds, "yooasset"),
+                Is.LessThan(IndexOf(plan.StepIds, "hybridclr.prepare-player")));
+            Assert.That(
+                IndexOf(plan.StepIds, "hybridclr.prepare-player"),
+                Is.LessThan(IndexOf(plan.StepIds, "core.build-player")));
         }
 
         [Test]

@@ -16,7 +16,8 @@ namespace UnityRFramework.Editor
     /// 窗口只调用构建服务与配置模型，不实现任何具体构建步骤逻辑，
     /// 也不直接同步执行流水线：构建命令经 <see cref="BuildPipelineRunner"/>
     /// 状态机内核异步推进，窗口提供 Profile/Recipe 选择、校验、开始、取消、
-    /// 恢复、重试、作废与报告入口，并实时展示当前任务状态。
+    /// 作废与报告入口，并实时展示当前任务状态。Unity 重启后的残留任务不支持
+    /// 继续（强杀可能损坏 Unity 增量状态），只提供作废与官方构建修复指引。
     /// </summary>
     public sealed class UnityRFrameworkBuildWindow : EditorWindow
     {
@@ -38,6 +39,13 @@ namespace UnityRFramework.Editor
         /// <summary>窗口状态持久化实例。</summary>
         [SerializeField]
         private BuildWindowState windowState = new BuildWindowState();
+
+        /// <summary>
+        /// 窗口最近一次启动的任务 Id。随窗口序列化在 Domain Reload 后保留，
+        /// 用于脚本重载后重新挂接完成回调（更新最近构建摘要与结果弹窗）。
+        /// </summary>
+        [SerializeField]
+        private string windowStartedTaskId = string.Empty;
 
         /// <summary>当前选中的 Profile；为 null 表示尚未选择。</summary>
         private UnityRFrameworkBuildProfile selectedProfile;
@@ -83,13 +91,23 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 窗口启用时恢复状态并加载上次选中的 Profile。
+        /// 窗口启用时恢复状态并加载上次选中的 Profile；
+        /// 若窗口启动的任务在 Domain Reload 后仍在执行，重新挂接完成回调。
         /// </summary>
         private void OnEnable()
         {
             windowState.Load();
             RefreshProfiles();
             ReloadSelectedProfile();
+            if (IsTaskActive
+                && BuildPipelineRunner.Active?.CurrentState != null
+                && string.Equals(
+                    BuildPipelineRunner.Active.CurrentState.TaskId,
+                    windowStartedTaskId,
+                    StringComparison.Ordinal))
+            {
+                SubscribeNextTaskCompletion();
+            }
         }
 
         /// <summary>
@@ -98,6 +116,7 @@ namespace UnityRFramework.Editor
         private void OnDisable()
         {
             BuildPipelineRunner.TaskCompleted -= OnWindowTaskCompleted;
+            completionSubscribed = false;
             windowState.SelectedProfileGuid = BuildProfileEditorUtility.GetGuid(selectedProfile);
             windowState.Save();
         }
@@ -105,12 +124,34 @@ namespace UnityRFramework.Editor
         /// <summary>
         /// 编辑器更新：存在活动任务时持续重绘窗口，保证状态实时刷新。
         /// </summary>
+        /// <summary>完成回调当前是否已挂接（运行时状态，跨 Reload 复位）。</summary>
+        private bool completionSubscribed;
+
+        /// <summary>
+        /// 编辑器更新：存在活动任务时持续重绘窗口；若窗口启动的任务
+        /// 在 Domain Reload 后由恢复检查重新拉起（此时窗口 OnEnable 已执行过、
+        /// 无法在 OnEnable 中看到活动任务），在此补偿挂接完成回调。
+        /// </summary>
         private void Update()
         {
-            if (IsTaskActive)
+            if (!IsTaskActive)
             {
-                Repaint();
+                completionSubscribed = false;
+                return;
             }
+
+            if (!completionSubscribed
+                && BuildPipelineRunner.Active?.CurrentState != null
+                && string.Equals(
+                    BuildPipelineRunner.Active.CurrentState.TaskId,
+                    windowStartedTaskId,
+                    StringComparison.Ordinal))
+            {
+                SubscribeNextTaskCompletion();
+                completionSubscribed = true;
+            }
+
+            Repaint();
         }
 
         /// <summary>
@@ -122,20 +163,30 @@ namespace UnityRFramework.Editor
         {
             BuildPipelineRunner.TaskCompleted -= OnWindowTaskCompleted;
             BuildPipelineRunner.TaskCompleted += OnWindowTaskCompleted;
+            completionSubscribed = true;
         }
 
         /// <summary>
-        /// 窗口任务终态回调：记录最近构建摘要并弹窗提示结果。
+        /// 窗口任务终态回调：仅处理窗口自己启动的任务（TaskId 匹配），
+        /// 记录最近构建摘要并弹窗提示结果。
         /// </summary>
         /// <param name="runner">完成的任务运行器。</param>
         private void OnWindowTaskCompleted(BuildPipelineRunner runner)
         {
             BuildPipelineRunner.TaskCompleted -= OnWindowTaskCompleted;
-            if (runner == null || runner.FinalResult == null)
+            completionSubscribed = false;
+            if (runner == null
+                || runner.FinalResult == null
+                || runner.CurrentState == null
+                || !string.Equals(
+                    runner.CurrentState.TaskId,
+                    windowStartedTaskId,
+                    StringComparison.Ordinal))
             {
                 return;
             }
 
+            windowStartedTaskId = string.Empty;
             RecordLastBuild(runner.FinalResult);
             ShowBuildResultDialog(runner.FinalResult);
             Repaint();
@@ -511,6 +562,8 @@ namespace UnityRFramework.Editor
                     return;
                 }
 
+                bool playerInterrupted =
+                    BuildPipelineRecovery.IsPlayerBuildInterrupted(leftover);
                 EditorGUILayout.HelpBox(
                     $"发现未完成任务 {leftover.TaskId}（{leftover.ProfileName}）。\n"
                     + $"状态：{GetPhaseText(leftover.Phase)}\n"
@@ -518,22 +571,21 @@ namespace UnityRFramework.Editor
                     + (string.IsNullOrEmpty(leftover.ErrorMessage)
                         ? string.Empty
                         : $"\n错误：{leftover.ErrorMessage}")
-                    + (leftover.Phase == BuildPipelinePhase.Failed
-                        ? "\n可修复配置后「恢复」以重试失败步骤。"
-                        : "\n可「恢复」从检查点继续，或「作废」放弃该任务。"),
+                    + "\n\nUnity 重启后不支持继续构建（强杀可能损坏 Unity 增量状态，"
+                    + "继续构建会跳过原生编译并报假成功）。请作废本任务后重新发起构建"
+                    + (playerInterrupted
+                        ? "；本次中断发生在「构建 Player」阶段，作废后请先用官方 "
+                            + "Build Settings 完整构建一次（成功产出 exe）修复状态。"
+                        : "。"),
                     MessageType.Warning);
 
-                using (new EditorGUILayout.HorizontalScope())
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "作废任务",
+                            "清理任务状态与锁；作废后可用本工具重新发起构建。"),
+                        GUILayout.Height(26f)))
                 {
-                    if (GUILayout.Button("恢复", GUILayout.Height(26f)))
-                    {
-                        ResumeLeftoverTask(leftover);
-                    }
-
-                    if (GUILayout.Button("作废", GUILayout.Height(26f)))
-                    {
-                        AbandonLeftoverTask(leftover);
-                    }
+                    AbandonLeftoverTask(leftover);
                 }
             });
         }
@@ -566,27 +618,7 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 恢复残留任务：启动内核继续执行（失败任务重试失败步骤，其余从检查点继续）。
-        /// </summary>
-        /// <param name="leftover">残留任务状态。</param>
-        private void ResumeLeftoverTask(BuildPipelineState leftover)
-        {
-            try
-            {
-                BuildPipelineRunner.Resume(leftover);
-                SubscribeNextTaskCompletion();
-            }
-            catch (Exception exception)
-            {
-                EditorUtility.DisplayDialog(
-                    "恢复失败",
-                    $"无法恢复构建任务：{exception.Message}",
-                    "确定");
-            }
-        }
-
-        /// <summary>
-        /// 作废残留任务并清理状态与锁。
+        /// 加载残留任务状态；损坏状态返回空并保持现场等待恢复检查处理。
         /// </summary>
         /// <param name="leftover">残留任务状态。</param>
         private void AbandonLeftoverTask(BuildPipelineState leftover)
@@ -716,12 +748,17 @@ namespace UnityRFramework.Editor
                 + "构建命令使用临时设置事务：任务结束（成功、失败、取消）后自动恢复项目设置，"
                 + "活动构建平台按契约保留。构建中可点击「取消任务」。",
                 MessageType.Info);
+            EditorGUILayout.HelpBox(
+                "请勿在构建期间强制关闭 Unity——尤其在「构建 Player」阶段被强杀后，"
+                + "Unity 增量状态可能损坏，后续构建会跳过原生编译并报告假成功（无 exe 产出）；"
+                + "此时需先用官方 Build Settings 完整构建一次修复状态，再用本工具构建。",
+                MessageType.Warning);
         }
 
         /// <summary>
         /// 绘制单个步骤条目：启用态、友好名称、可用性说明、配置参数与删除按钮。
         /// 启用开关变更时写回 Profile 并标记脏，保证窗口内修改持久化。
-        /// 可配置步骤（config/hybridclr/yooasset）在行下方内联显示其参数，无需创建独立配置资产。
+        /// 可配置步骤在行下方显示其独立配置资产及参数。
         /// </summary>
         /// <param name="step">步骤配置条目。</param>
         /// <param name="index">该条目在 Steps 数组中的索引，供删除按钮使用。</param>
@@ -860,7 +897,7 @@ namespace UnityRFramework.Editor
         private void StartBuildWithRecipe(BuildRecipe recipe)
         {
             BuildValidationResult validation =
-                BuildProfileValidator.Validate(selectedProfile);
+                BuildProfileValidator.Validate(selectedProfile, recipe);
             if (!validation.CanBuild)
             {
                 StringBuilder builder = new StringBuilder();
@@ -896,18 +933,20 @@ namespace UnityRFramework.Editor
                     "存在未完成任务",
                     $"存在未完成的构建任务（{leftover.ProfileName}，{leftover.TaskId}，"
                     + $"状态 {GetPhaseText(leftover.Phase)}）。\n"
-                    + "请先在「当前任务」分区恢复或作废后再启动新任务。",
+                    + "请先在「当前任务」分区作废该任务（若上次构建在 Player 阶段被中断，"
+                    + "还需先用官方 Build Settings 完整构建一次修复状态）后再启动新任务。",
                     "确定");
                 return;
             }
 
             try
             {
-                BuildPipelineRunner.StartNew(
+                BuildPipelineRunner runner = BuildPipelineRunner.StartNew(
                     selectedProfile,
                     null,
                     null,
                     recipe);
+                windowStartedTaskId = runner.CurrentState.TaskId;
                 SubscribeNextTaskCompletion();
                 Repaint();
             }
@@ -942,7 +981,17 @@ namespace UnityRFramework.Editor
                     : (state.Phase == BuildPipelinePhase.ManualIntervention
                         ? "人工处理"
                         : "失败"));
-            last.DurationSeconds = 0f;
+            if (DateTime.TryParse(state.CreatedAt, out DateTime createdAt)
+                && DateTime.TryParse(state.UpdatedAt, out DateTime updatedAt))
+            {
+                last.DurationSeconds =
+                    (float)Math.Max(0.0, (updatedAt - createdAt).TotalSeconds);
+            }
+            else
+            {
+                last.DurationSeconds = 0f;
+            }
+
             last.OutputPath = ResolveOutputDirectory(state);
             last.TimeText = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             windowState.Save();

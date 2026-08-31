@@ -62,6 +62,14 @@ namespace UnityRFramework.Editor
                     "构建收尾已取消。");
             }
 
+            if (context.Recipe == BuildRecipe.Assets
+                || context.Recipe == BuildRecipe.HotUpdate)
+            {
+                return BuildStepResult.Succeeded(
+                    $"构建收尾：{context.Recipe} Recipe 已完成所有选中步骤。"
+                    + "本 Recipe 不要求 Player 产物。");
+            }
+
             string productPath;
             try
             {

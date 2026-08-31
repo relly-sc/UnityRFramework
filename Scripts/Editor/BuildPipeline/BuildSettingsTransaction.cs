@@ -24,6 +24,9 @@ namespace UnityRFramework.Editor
         /// <summary>快照创建时刻（ISO 8601 字符串）。</summary>
         public string CreatedAt = string.Empty;
 
+        /// <summary>临时设置是否已开始应用；先持久化后写项目设置。</summary>
+        public bool Applied;
+
         /// <summary>快照时的活动平台名称（仅作记录，不参与恢复）。</summary>
         public string ActiveTargetName = string.Empty;
 
@@ -109,11 +112,20 @@ namespace UnityRFramework.Editor
         /// <summary>Keystore Alias。</summary>
         public string AndroidKeyaliasName = string.Empty;
 
-        /// <summary>Keystore 密码（仅内存与任务目录内流转，不写入日志与报告）。</summary>
+        /// <summary>Keystore 密码（仅当前进程内存，不写入快照 JSON）。</summary>
+        [NonSerialized]
         public string AndroidKeystorePass = string.Empty;
 
-        /// <summary>Alias 密码（仅内存与任务目录内流转，不写入日志与报告）。</summary>
+        /// <summary>Alias 密码（仅当前进程内存，不写入快照 JSON）。</summary>
+        [NonSerialized]
         public string AndroidKeyaliasPass = string.Empty;
+
+        /// <summary>
+        /// 当前进程是否捕获过签名密码。Domain Reload 后该值为 false，
+        /// 恢复时不得用未序列化的空值覆盖 Unity 当前内存值。
+        /// </summary>
+        [NonSerialized]
+        public bool HasInMemorySigningPasswords;
 
         // ===== iOS 专有 =====
 
@@ -149,6 +161,7 @@ namespace UnityRFramework.Editor
         {
             Snapshot = snapshot;
             this.persistence = persistence;
+            HasChanges = snapshot != null && snapshot.Applied;
         }
 
         /// <summary>
@@ -189,6 +202,8 @@ namespace UnityRFramework.Editor
         public void MarkApplied()
         {
             HasChanges = true;
+            Snapshot.Applied = true;
+            persistence?.SaveSnapshot(Snapshot);
         }
 
         /// <summary>
@@ -203,8 +218,12 @@ namespace UnityRFramework.Editor
                 return;
             }
 
-            NamedBuildTarget namedTarget = GetNamedTarget(
-                EditorUserBuildSettings.activeBuildTarget);
+            BuildTarget snapshotTarget = Enum.TryParse(
+                Snapshot.ActiveTargetName,
+                out BuildTarget parsedTarget)
+                ? parsedTarget
+                : EditorUserBuildSettings.activeBuildTarget;
+            NamedBuildTarget namedTarget = GetNamedTarget(snapshotTarget);
 
             if (!string.Equals(PlayerSettings.companyName, Snapshot.CompanyName, StringComparison.Ordinal))
             {
@@ -377,8 +396,11 @@ namespace UnityRFramework.Editor
                 PlayerSettings.Android.keyaliasName = Snapshot.AndroidKeyaliasName;
             }
 
-            PlayerSettings.Android.keystorePass = Snapshot.AndroidKeystorePass;
-            PlayerSettings.Android.keyaliasPass = Snapshot.AndroidKeyaliasPass;
+            if (Snapshot.HasInMemorySigningPasswords)
+            {
+                PlayerSettings.Android.keystorePass = Snapshot.AndroidKeystorePass;
+                PlayerSettings.Android.keyaliasPass = Snapshot.AndroidKeyaliasPass;
+            }
 
             if (PlayerSettings.iOS.sdkVersion.ToString() != Snapshot.IosTargetSdkName)
             {
@@ -436,6 +458,7 @@ namespace UnityRFramework.Editor
                 AndroidKeyaliasName = PlayerSettings.Android.keyaliasName,
                 AndroidKeystorePass = PlayerSettings.Android.keystorePass,
                 AndroidKeyaliasPass = PlayerSettings.Android.keyaliasPass,
+                HasInMemorySigningPasswords = true,
                 IosTargetSdkName = PlayerSettings.iOS.sdkVersion.ToString()
             };
 

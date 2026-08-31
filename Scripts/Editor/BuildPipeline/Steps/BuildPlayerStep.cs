@@ -187,6 +187,21 @@ namespace UnityRFramework.Editor
             switch (summary.result)
             {
                 case BuildResult.Succeeded:
+                    if (!ProductExists(summary.outputPath))
+                    {
+                        // 强制中断 Player 编译后，Unity/Bee 增量状态可能损坏：
+                        // 后续构建跳过原生编译却报告成功。立即拦截并给出实测有效的修复路径。
+                        return BuildStepResult.Failed(
+                            "BuildReport 报告成功，但产物未生成在预期路径："
+                            + $"{summary.outputPath}。\n"
+                            + "原因：上次构建在 Player 编译阶段被强制中断，Unity 增量状态损坏，"
+                            + "本次构建跳过了原生编译（Unity 侧假成功）。\n"
+                            + "修复：用官方 Build Settings 完整构建一次（成功产出 exe 即修复），"
+                            + "再用本工具重新构建；清理输出目录或删除缓存无效。\n"
+                            + "请避免在构建 Player 阶段强制关闭 Unity。",
+                            null);
+                    }
+
                     return BuildStepResult.Succeeded(
                         $"Player 构建成功：{summary.outputPath}"
                         + $"（{sizeText}，耗时 {durationText}）。");
@@ -204,6 +219,22 @@ namespace UnityRFramework.Editor
                         + $"产物路径：{locationPath}",
                         null);
             }
+        }
+
+        /// <summary>
+        /// 校验产物是否真实落盘：Windows/Android 为文件，
+        /// iOS/WebGL 等目录产物为目录。
+        /// </summary>
+        /// <param name="outputPath">构建报告给出的产物路径。</param>
+        /// <returns>文件或目录存在时返回 true。</returns>
+        private static bool ProductExists(string outputPath)
+        {
+            if (string.IsNullOrEmpty(outputPath))
+            {
+                return false;
+            }
+
+            return File.Exists(outputPath) || Directory.Exists(outputPath);
         }
 
         /// <summary>
