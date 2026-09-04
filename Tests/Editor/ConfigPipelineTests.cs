@@ -931,6 +931,12 @@ namespace UnityRFramework.Editor.Tests
             StringAssert.Contains("[ConfigTable(\"TestConfigRow\")]", code);
             StringAssert.Contains("BinaryConfigCodecRegistry.Register", code);
             StringAssert.Contains("ConfigSchemaRegistry.Register", code);
+            StringAssert.Contains(
+                "RuntimeInitializeLoadType.AfterAssembliesLoaded",
+                code);
+            StringAssert.DoesNotContain(
+                "RuntimeInitializeLoadType.BeforeSceneLoad",
+                code);
             StringAssert.DoesNotContain("Activator.CreateInstance", code);
             StringAssert.DoesNotContain("FieldInfo", code);
             string[] lines = code.Replace("\r\n", "\n").Split('\n');

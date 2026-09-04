@@ -70,6 +70,7 @@ namespace UnityRFramework.Expansion
                 await LoadAotMetadataAsync(resource, manifest.aotMetadata, ct);
 
                 Assembly entryAssembly = null;
+                Type entryType = null;
                 for (int i = 0; i < manifest.hotUpdateAssemblies.Length; i++)
                 {
                     Assembly assembly = await LoadAssemblyAsync(
@@ -77,19 +78,59 @@ namespace UnityRFramework.Expansion
                         manifest.hotUpdateAssemblies[i],
                         manifest.codeVersion,
                         ct);
-                    if (assembly.GetType(manifest.entryTypeName, false) != null)
+                    Type configuredType = assembly.GetType(
+                        manifest.entryTypeName,
+                        false);
+                    if (configuredType != null)
                     {
                         entryAssembly = assembly;
+                        entryType = configuredType;
+                        break;
                     }
                 }
 
                 if (entryAssembly == null)
                 {
-                    throw new RFrameworkException(
-                        $"HybridCLR entry type '{manifest.entryTypeName}' was not found.");
+                    // Obfuz 可能重命名热更新类型，manifest 中保存的原始全名
+                    // 因而不一定还能直接反射命中。仅在全名查找失败时，按协议
+                    // 扫描实现 IHotUpdateEntry 的唯一候选类型。
+                    List<Type> candidates = new List<Type>();
+                    for (int i = 0; i < manifest.hotUpdateAssemblies.Length; i++)
+                    {
+                        Assembly assembly = await LoadAssemblyAsync(
+                            resource,
+                            manifest.hotUpdateAssemblies[i],
+                            manifest.codeVersion,
+                            ct);
+                        Type[] types = assembly.GetTypes();
+                        for (int j = 0; j < types.Length; j++)
+                        {
+                            Type candidate = types[j];
+                            if (typeof(IHotUpdateEntry).IsAssignableFrom(candidate)
+                                && !candidate.IsAbstract
+                                && candidate.GetConstructor(Type.EmptyTypes) != null)
+                            {
+                                candidates.Add(candidate);
+                            }
+                        }
+                    }
+
+                    if (candidates.Count == 1)
+                    {
+                        entryType = candidates[0];
+                        entryAssembly = entryType.Assembly;
+                        Debug.LogWarning(
+                            $"HybridCLR entry type '{manifest.entryTypeName}' was not found; "
+                            + $"using the only IHotUpdateEntry candidate '{entryType.FullName}'.");
+                    }
+                    else
+                    {
+                        throw new RFrameworkException(
+                            $"HybridCLR entry type '{manifest.entryTypeName}' was not found, "
+                            + $"and discovered {candidates.Count} valid IHotUpdateEntry candidates.");
+                    }
                 }
 
-                Type entryType = entryAssembly.GetType(manifest.entryTypeName, true);
                 if (!typeof(IHotUpdateEntry).IsAssignableFrom(entryType)
                     || entryType.IsAbstract
                     || entryType.GetConstructor(Type.EmptyTypes) == null)

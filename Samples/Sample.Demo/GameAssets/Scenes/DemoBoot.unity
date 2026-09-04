@@ -360,6 +360,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 2624505095415119000, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
+      propertyPath: resourceHelperTypeName
+      value: UnityRFramework.Runtime.DefaultResourceHelper
+      objectReference: {fileID: 0}
     - target: {fileID: 6082128165338467655, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
       propertyPath: m_Name
       value: UnityRFramework

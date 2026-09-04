@@ -1,8 +1,8 @@
 {
   "Tables": {
     "Demo_Action": {
-      "TableId": "76BEC56B",
-      "SchemaHash": "44948E06C33E4552",
+      "TableId": "2976181B",
+      "SchemaHash": "BB5683A638F283C2",
       "Rows": [
         {
           "Id": 1,
@@ -28,8 +28,8 @@
       ]
     },
     "Demo_Character": {
-      "TableId": "590B7654",
-      "SchemaHash": "40FBFED9348F7264",
+      "TableId": "DC6B9624",
+      "SchemaHash": "68224A35E779EEF4",
       "Rows": [
         {
           "Id": 1,
@@ -61,8 +61,8 @@
       ]
     },
     "Demo_Enemy": {
-      "TableId": "956B2D43",
-      "SchemaHash": "63693568BD5D8A93",
+      "TableId": "3BB03E13",
+      "SchemaHash": "CE1E50D8B4D5DE63",
       "Rows": [
         {
           "Id": 1,
@@ -81,8 +81,8 @@
       ]
     },
     "Demo_Quest": {
-      "TableId": "010AA9B9",
-      "SchemaHash": "BED2B063AEB3EDE5",
+      "TableId": "AF7A35A9",
+      "SchemaHash": "BD799BBC2F0FF995",
       "Rows": [
         {
           "Id": 1,
@@ -92,7 +92,7 @@
           "Rounds": 3,
           "Difficulty": 1,
           "RewardExp": 30,
-          "RewardGold": 150
+          "RewardGold": 100
         },
         {
           "Id": 2,
@@ -107,8 +107,8 @@
       ]
     },
     "Demo_Reward": {
-      "TableId": "18BB9C3A",
-      "SchemaHash": "A2D85FBED9F88C6E",
+      "TableId": "5A1F2A2A",
+      "SchemaHash": "913F8916944A767E",
       "Rows": [
         {
           "Id": 1,

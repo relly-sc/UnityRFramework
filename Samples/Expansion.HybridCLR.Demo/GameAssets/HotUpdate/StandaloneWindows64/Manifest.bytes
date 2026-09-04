@@ -1,6 +1,6 @@
 {
     "schemaVersion": 1,
-    "codeVersion": "2026-08-10-142935",
+    "codeVersion": "1.0.0",
     "buildTarget": "StandaloneWindows64",
     "entryTypeName": "UnityRFramework.Sample.HotUpdateEntry",
     "aotMetadata": [

@@ -8,94 +8,91 @@ using RFramework;
 using UnityEngine;
 using UnityRFramework.Runtime;
 
-namespace UnityRFramework.Sample
+/// <summary>
+/// Demo_Reward 配置行。
+/// </summary>
+[Serializable]
+[ConfigTable("Demo_Reward")]
+public sealed class Demo_RewardConfig
 {
     /// <summary>
-    /// Demo_Reward 配置行。
+    /// 主键ID（唯一标识）
     /// </summary>
-    [Serializable]
-    [ConfigTable("Demo_Reward")]
-    public sealed class Demo_RewardConfig
-    {
-        /// <summary>
-        /// 主键ID（唯一标识）
-        /// </summary>
-        public int Id;
-
-        /// <summary>
-        /// 名称本地化键
-        /// </summary>
-        public string NameKey;
-
-        /// <summary>
-        /// 掉落概率（0~1）
-        /// </summary>
-        public float DropRate;
-    }
+    public int Id;
 
     /// <summary>
-    /// Demo_Reward 的 URFC v2 读取器。
+    /// 名称本地化键
     /// </summary>
-    internal sealed class Demo_RewardConfigBinaryCodec : IBinaryConfigCodec
-    {
-        /// <inheritdoc/>
-        public Type RowType => typeof(Demo_RewardConfig);
-
-        /// <inheritdoc/>
-        public uint TableId => 0x18BB9C3Au;
-
-        /// <inheritdoc/>
-        public ulong SchemaHash => 0xA2D85FBED9F88C6EUL;
-
-        /// <inheritdoc/>
-        public object ReadTable(BinaryReader reader, int rowCount)
-        {
-            if (reader == null)
-            {
-                throw new RFrameworkException("Binary config reader is invalid.");
-            }
-
-            var table = new Dictionary<int, Demo_RewardConfig>(rowCount);
-            for (int i = 0; i < rowCount; i++)
-            {
-                var row = new Demo_RewardConfig
-                {
-                    Id = reader.ReadInt32(),
-                    NameKey = BinaryFormatUtility.ReadUtf8String(reader, false),
-                    DropRate = reader.ReadSingle()
-                };
-                if (table.ContainsKey(row.Id))
-                {
-                    throw new RFrameworkException(
-                        $"Binary config 'Demo_RewardConfig' contains duplicate "
-                        + $"Id '{row.Id}'.");
-                }
-
-                table.Add(row.Id, row);
-            }
-
-            return table;
-        }
-    }
+    public string NameKey;
 
     /// <summary>
-    /// Demo_Reward Codec 自动注册入口。
+    /// 掉落概率（0~1）
     /// </summary>
-    internal static class Demo_RewardConfigBinaryCodecRegistration
+    public float DropRate;
+}
+
+/// <summary>
+/// Demo_Reward 的 URFC v2 读取器。
+/// </summary>
+internal sealed class Demo_RewardConfigBinaryCodec : IBinaryConfigCodec
+{
+    /// <inheritdoc/>
+    public Type RowType => typeof(Demo_RewardConfig);
+
+    /// <inheritdoc/>
+    public uint TableId => 0x5A1F2A2Au;
+
+    /// <inheritdoc/>
+    public ulong SchemaHash => 0x913F8916944A767EUL;
+
+    /// <inheritdoc/>
+    public object ReadTable(BinaryReader reader, int rowCount)
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void RegisterRuntime()
+        if (reader == null)
         {
-            ConfigSchemaRegistry.Register(typeof(Demo_RewardConfig), 0x18BB9C3Au, 0xA2D85FBED9F88C6EUL);
-            BinaryConfigCodecRegistry.Register(new Demo_RewardConfigBinaryCodec());
+            throw new RFrameworkException("Binary config reader is invalid.");
         }
+
+        var table = new Dictionary<int, Demo_RewardConfig>(rowCount);
+        for (int i = 0; i < rowCount; i++)
+        {
+            var row = new Demo_RewardConfig
+            {
+                Id = reader.ReadInt32(),
+                NameKey = BinaryFormatUtility.ReadUtf8String(reader, false),
+                DropRate = reader.ReadSingle()
+            };
+            if (table.ContainsKey(row.Id))
+            {
+                throw new RFrameworkException(
+                    $"Binary config 'Demo_RewardConfig' contains duplicate "
+                    + $"Id '{row.Id}'.");
+            }
+
+            table.Add(row.Id, row);
+        }
+
+        return table;
+    }
+}
+
+/// <summary>
+/// Demo_Reward Codec 自动注册入口。
+/// </summary>
+internal static class Demo_RewardConfigBinaryCodecRegistration
+{
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+    private static void RegisterRuntime()
+    {
+        ConfigSchemaRegistry.Register(typeof(Demo_RewardConfig), 0x5A1F2A2Au, 0x913F8916944A767EUL);
+        BinaryConfigCodecRegistry.Register(new Demo_RewardConfigBinaryCodec());
+    }
 
 #if UNITY_EDITOR
-        [UnityEditor.InitializeOnLoadMethod]
-        private static void RegisterEditor()
-        {
-            RegisterRuntime();
-        }
-#endif
+    [UnityEditor.InitializeOnLoadMethod]
+    private static void RegisterEditor()
+    {
+        RegisterRuntime();
     }
+#endif
 }

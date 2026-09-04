@@ -1396,6 +1396,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2905828053089552248, guid: c6ec5f46665c8db429b6ef170ec5221b, type: 3}
+      propertyPath: defaultHostServer
+      value: http://192.168.3.155/ExpansionDemoPackage
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

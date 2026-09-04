@@ -54,16 +54,22 @@ Editor 运行时只验证 Manifest、资源加载、入口和 UI 链路；真正
 
 ### 2. 首次主包发布
 
-严格按以下顺序执行：
+使用构建工具时，启用 `hybridclr` 步骤并选择 `Player` Recipe：
 
-1. 切换目标平台，并确认使用 IL2CPP。
-2. 执行 `UnityRFramework/Expansion/HybridCLR/生成当前平台代码产物`，或调用
-   `HybridCLRArtifactBuilder.GenerateCurrentTarget()`。
-3. 构建该平台 Player。成功后，框架后处理器会在
+构建窗口中的“热更新程序集”和“AOT 补充元数据程序集”为只读信息，直接显示
+HybridCLR Settings 当前实际配置；请通过“打开 HybridCLR 设置”修改，不在 Profile 中维护副本。
+
+1. 构建工具在 Player 构建前自动执行 HybridCLR 官方 `Generate/All`。
+2. 构建该平台 Player。成功后，框架后处理器会在
    `HybridCLRData/UnityRFramework/PlayerBaselines/<BuildTarget>.json` 记录 AOT 基线哈希。
-4. 调用 `HybridCLRArtifactBuilder.CompileAndStage(...)`，编译热更新 DLL、校验 Player
-   基线并生成 Manifest 和 `.bytes` 产物。
-5. 使用项目资源系统构建资源包，并将对应版本发布到服务器。
+3. 再执行 `HotUpdate` Recipe，编译热更新 DLL、校验 Player 基线、生成 Manifest 和
+   `.bytes` 产物，并通过后续资源步骤构建发布包。
+
+选择 `Release` Recipe 时，上述动作在一条流水线内按“Generate/All → Player →
+CompileDll/整理产物 → Obfuz（按需）→ YooAsset（按需）”顺序执行。
+
+不使用构建工具时，仍可手动调用 `HybridCLRArtifactBuilder.GenerateCurrentTarget()`、构建
+Player，再调用 `HybridCLRArtifactBuilder.CompileAndStage(...)`。
 
 不要在第 3、4 步之间再次执行 `Generate/All`。该操作可能改写
 `AssembliesPostIl2CppStrip`，框架的基线校验会拒绝继续发布。
@@ -73,7 +79,8 @@ Editor 运行时只验证 Manifest、资源加载、入口和 UI 链路；真正
 主包、AOT 程序集和目标平台均未变化时：
 
 1. 修改热更新程序集代码。
-2. 直接调用 `CompileAndStage(...)`；不要重新执行 `Generate/All`，也不要重新构建 Player。
+2. 执行 `HotUpdate` Recipe，或直接调用 `CompileAndStage(...)`；不要重新执行
+   `Generate/All`，也不要重新构建 Player。
 3. 构建并发布新的资源包版本。
 4. 用户完整退出并重新启动 Player 后，下载并执行新 DLL。
 
