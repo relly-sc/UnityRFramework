@@ -57,6 +57,17 @@ namespace UnityRFramework.Editor
         {
             try
             {
+                // HybridCLR + Obfuz 由 ObfuzPlayerPrepareStep 调用官方联合入口，
+                // 此处保留步骤作为依赖节点但不重复执行普通 Generate/All。
+                if (BuildStepConfigLocator.HasEnabledEntry(
+                    context.Profile,
+                    "obfuz"))
+                {
+                    return BuildStepResult.Succeeded(
+                        "HybridCLR Player 普通准备已跳过：当前由 Obfuz 联合准备步骤执行 "
+                        + "HybridCLR/ObfuzExtension/GenerateAll。 ");
+                }
+
                 HybridCLRArtifactBuilder.ConfigureAndValidate();
                 HybridCLRArtifactBuilder.GenerateCurrentTarget();
                 return BuildStepResult.Succeeded(
@@ -79,7 +90,8 @@ namespace UnityRFramework.Editor
     /// HotUpdate Recipe 使用最近一次 Player 基线；Release Recipe 则先由自动准备步骤生成代码
     /// 并构建 Player，再由本步骤基于新基线整理热更产物。
     /// </summary>
-    public sealed class HybridCLRBuildStep : BuildPipelineStepBase
+    public sealed class HybridCLRBuildStep : BuildPipelineStepBase,
+        IBuildIntegrationActivationController
     {
         /// <summary>错误码：HybridCLR 热更准备。</summary>
         private const string StepCode = "HYBRIDCLR";
@@ -94,6 +106,26 @@ namespace UnityRFramework.Editor
             {
                 return "hybridclr";
             }
+        }
+
+        /// <inheritdoc />
+        string IBuildIntegrationActivationController.StepId => Id;
+
+        /// <inheritdoc />
+        bool IBuildIntegrationActivationController.IsEnabled =>
+            HybridCLRSettings.Instance.enable;
+
+        /// <inheritdoc />
+        void IBuildIntegrationActivationController.SetEnabled(bool enabled)
+        {
+            HybridCLRSettings settings = HybridCLRSettings.Instance;
+            if (settings.enable == enabled)
+            {
+                return;
+            }
+
+            settings.enable = enabled;
+            HybridCLRSettings.Save();
         }
 
         /// <summary>获取步骤显示名称。</summary>
@@ -177,7 +209,9 @@ namespace UnityRFramework.Editor
             {
                 issues.Add(BuildValidationIssue.Error(
                     StepCode,
-                    "HybridCLR 步骤配置缺少 EntryTypeName（热更新入口类型全名）。",
+                    "HybridCLR 步骤配置缺少 EntryTypeName。请填写热更新程序集中"
+                    + "实现 IHotUpdateEntry 接口的入口类型全名（命名空间 + 类名），"
+                    + "例如 UnityRFramework.Sample.HotUpdateEntry。",
                     StepGroup));
             }
 
@@ -220,7 +254,9 @@ namespace UnityRFramework.Editor
             if (string.IsNullOrWhiteSpace(settings.EntryTypeName))
             {
                 return BuildStepResult.Failed(
-                    "HybridCLR 步骤配置缺少 EntryTypeName（热更新入口类型全名）。",
+                    "HybridCLR 步骤配置缺少 EntryTypeName。请填写热更新程序集中"
+                    + "实现 IHotUpdateEntry 接口的入口类型全名（命名空间 + 类名），"
+                    + "例如 UnityRFramework.Sample.HotUpdateEntry。",
                     null);
             }
 

@@ -139,12 +139,25 @@ namespace UnityRFramework.Editor
             SerializedObject serializedObject,
             string outputPreview = null)
         {
+            DrawBasicParameters(serializedObject);
+            DrawAdvancedParameters(serializedObject, outputPreview);
+        }
+
+        /// <summary>绘制顶部固定区域使用的 Profile 基础参数。</summary>
+        public static void DrawBasicParameters(SerializedObject serializedObject)
+        {
             // 标签宽度由窗口 OnGUI 顶层统一设为 200px，此处不再单独管理。
             EditorGUILayout.PropertyField(serializedObject.FindProperty("Description"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("Enabled"));
             DrawFlavor(serializedObject);
             DrawRecipe(serializedObject.FindProperty("Recipe"));
+        }
 
+        /// <summary>绘制平台、输出、场景和宏定义等其余 Profile 参数。</summary>
+        public static void DrawAdvancedParameters(
+            SerializedObject serializedObject,
+            string outputPreview = null)
+        {
             EditorGUILayout.Space(6f);
             DrawPlatformSection(serializedObject, serializedObject.FindProperty("Platform"));
 

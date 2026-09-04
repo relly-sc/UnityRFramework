@@ -161,9 +161,9 @@ namespace UnityRFramework.Runtime
         {
 #if UNITY_STANDALONE || UNITY_EDITOR
             return Path.GetFullPath(
-                Path.Combine(Application.dataPath, "..", "Logs", "UnityRFramework"));
+                Path.Combine(Application.dataPath, "..", "Logs"));
 #else
-            return Path.Combine(Application.persistentDataPath, "Logs", "UnityRFramework");
+            return Path.Combine(Application.persistentDataPath, "Logs"");
 #endif
         }
 

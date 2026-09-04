@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -140,8 +141,17 @@ namespace UnityRFramework.Editor
         /// <summary>构建平台显示名称。</summary>
         public string Platform = string.Empty;
 
-        /// <summary>构建版本号（含构建号）。</summary>
+        /// <summary>旧版固定版本字段，仅用于读取已有 EditorPrefs。</summary>
         public string Version = string.Empty;
+
+        /// <summary>本次任务的 Recipe 中文名称。</summary>
+        public string Recipe = string.Empty;
+
+        /// <summary>仅 Player/Release 使用的实际 Player 版本。</summary>
+        public string PlayerVersion = string.Empty;
+
+        /// <summary>按 Recipe 提取的关键步骤结果。</summary>
+        public string Summary = string.Empty;
 
         /// <summary>构建结果状态：成功、失败或取消。</summary>
         public string Status = string.Empty;
@@ -152,8 +162,122 @@ namespace UnityRFramework.Editor
         /// <summary>产物输出路径。</summary>
         public string OutputPath = string.Empty;
 
+        /// <summary>输出路径字段的语义：Player 目录或构建报告。</summary>
+        public string OutputLabel = string.Empty;
+
         /// <summary>构建完成时刻文本。</summary>
         public string TimeText = string.Empty;
+
+        /// <summary>根据终态任务生成 Recipe 感知的最近构建摘要。</summary>
+        public static BuildWindowLastBuild Create(BuildPipelineState state)
+        {
+            BuildWindowLastBuild result = new BuildWindowLastBuild
+            {
+                HasRecord = true,
+                ProfileName = state.ProfileName,
+                Platform = state.TargetName,
+                Recipe = GetRecipeText(state.Recipe),
+                Status = state.Phase == BuildPipelinePhase.Succeeded
+                    ? "成功"
+                    : state.Phase == BuildPipelinePhase.Cancelled
+                        ? "已取消"
+                        : state.Phase == BuildPipelinePhase.ManualIntervention
+                            ? "人工处理"
+                            : "失败",
+                TimeText = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            };
+
+            if (DateTime.TryParse(state.CreatedAt, out DateTime createdAt)
+                && DateTime.TryParse(state.UpdatedAt, out DateTime updatedAt))
+            {
+                result.DurationSeconds =
+                    (float)Math.Max(0.0, (updatedAt - createdAt).TotalSeconds);
+            }
+
+            bool producesPlayer = state.Recipe == BuildRecipe.Player
+                || state.Recipe == BuildRecipe.Release;
+            if (producesPlayer)
+            {
+                result.PlayerVersion =
+                    $"{state.PublicVersion}（构建号 {state.BuildNumber}）";
+                result.OutputLabel = "Player 目录";
+                result.OutputPath = ResolvePlayerDirectory(state);
+            }
+            else
+            {
+                result.OutputLabel = "构建报告";
+                result.OutputPath = Path.GetFullPath(Path.Combine(
+                    "Bundles",
+                    BuildReportWriter.GetAssetOnlyReportDirectory(state),
+                    BuildReportWriter.ReportFileName));
+            }
+
+            result.Summary = BuildStepSummary(state);
+            return result;
+        }
+
+        private static string GetRecipeText(BuildRecipe recipe)
+        {
+            switch (recipe)
+            {
+                case BuildRecipe.Player: return "Player";
+                case BuildRecipe.Assets: return "资源";
+                case BuildRecipe.HotUpdate: return "热更新";
+                case BuildRecipe.Release: return "完整发布";
+                default: return recipe.ToString();
+            }
+        }
+
+        private static string ResolvePlayerDirectory(BuildPipelineState state)
+        {
+            if (string.IsNullOrEmpty(state.OutputRootAbsolute))
+            {
+                return string.Empty;
+            }
+
+            return string.IsNullOrEmpty(state.OutputDirectory)
+                ? state.OutputRootAbsolute
+                : Path.Combine(state.OutputRootAbsolute, state.OutputDirectory);
+        }
+
+        private static string BuildStepSummary(BuildPipelineState state)
+        {
+            string[] relevantSteps;
+            switch (state.Recipe)
+            {
+                case BuildRecipe.Assets:
+                    relevantSteps = new[] { "config", "yooasset" };
+                    break;
+                case BuildRecipe.HotUpdate:
+                    relevantSteps = new[] { "hybridclr", "obfuz", "yooasset" };
+                    break;
+                case BuildRecipe.Release:
+                    relevantSteps = new[] { "config", "hybridclr", "obfuz", "yooasset" };
+                    break;
+                default:
+                    relevantSteps = Array.Empty<string>();
+                    break;
+            }
+
+            List<string> messages = new List<string>();
+            for (int i = 0; i < relevantSteps.Length; i++)
+            {
+                BuildStepRecord record = state.CompletedSteps?.Find(item =>
+                    string.Equals(item.StepId, relevantSteps[i], StringComparison.OrdinalIgnoreCase));
+                if (record != null && !string.IsNullOrWhiteSpace(record.Message))
+                {
+                    messages.Add(record.Message.Trim());
+                }
+            }
+
+            if (state.FailedStep != null
+                && !string.IsNullOrWhiteSpace(state.FailedStep.Message))
+            {
+                messages.Add(state.FailedStep.Message.Trim());
+            }
+
+            return string.Join("\n", messages);
+        }
     }
 
     /// <summary>

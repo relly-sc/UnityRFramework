@@ -83,7 +83,7 @@ namespace UnityRFramework.Tests.Config
     /// </summary>
     internal static class Acceptance_PartitionConfigBinaryCodecRegistration
     {
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         private static void RegisterRuntime()
         {
             ConfigSchemaRegistry.Register(typeof(Acceptance_PartitionConfig), 0x16B1E71Du, 0x079D32FA28B51355UL);

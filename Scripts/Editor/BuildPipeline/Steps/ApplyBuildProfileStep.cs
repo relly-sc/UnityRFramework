@@ -89,6 +89,12 @@ namespace UnityRFramework.Editor
             // "应用到项目"永久生效路径不经过本步骤。
             context.SettingsTransaction?.MarkApplied();
 
+            int isolatedIntegrations =
+                context.SettingsTransaction?.ApplyIntegrationIsolation(
+                    context.IntegrationActivationControllers,
+                    context.Profile,
+                    context.Recipe) ?? 0;
+
             BuildApplyResult result =
                 BuildProfileApplier.Apply(context.Profile);
             if (result.Succeeded)
@@ -97,6 +103,13 @@ namespace UnityRFramework.Editor
                 builder.Append(
                     $"已应用构建参数（{result.ReportLines.Count} 条，"
                     + $"平台切换：{(result.PlatformSwitched ? "是" : "否")}）。");
+                if (isolatedIntegrations > 0)
+                {
+                    builder.AppendLine();
+                    builder.Append(
+                        $"- 已临时关闭 {isolatedIntegrations} 个 Profile 未启用的"
+                        + "第三方 Player 构建回调，任务结束后恢复原值。");
+                }
                 for (int i = 0; i < result.ReportLines.Count; i++)
                 {
                     builder.AppendLine();

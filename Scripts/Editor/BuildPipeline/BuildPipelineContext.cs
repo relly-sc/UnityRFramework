@@ -46,6 +46,13 @@ namespace UnityRFramework.Editor
         /// <summary>步骤实例字典，键为步骤唯一 Id。</summary>
         public IReadOnlyDictionary<string, IBuildPipelineStep> Steps { get; }
 
+        /// <summary>
+        /// 已导入 Expansion 提供的第三方构建开关控制器。
+        /// 包含未进入当前 Recipe 的控制器，用于隔离插件自身的全局构建回调。
+        /// </summary>
+        public IReadOnlyList<IBuildIntegrationActivationController>
+            IntegrationActivationControllers { get; }
+
         /// <summary>取消令牌；步骤在执行中应定期检查。</summary>
         public CancellationToken CancellationToken { get; }
 
@@ -88,7 +95,9 @@ namespace UnityRFramework.Editor
             DateTime startedAt,
             string outputError,
             BuildSettingsTransaction settingsTransaction = null,
-            BuildRecipe? recipe = null)
+            BuildRecipe? recipe = null,
+            IReadOnlyList<IBuildIntegrationActivationController>
+                integrationActivationControllers = null)
         {
             Profile = profile;
             Recipe = recipe ?? profile?.Recipe ?? BuildRecipe.Player;
@@ -99,6 +108,8 @@ namespace UnityRFramework.Editor
             OutputFileName = outputFileName ?? string.Empty;
             Steps = steps ?? new Dictionary<string, IBuildPipelineStep>(
                 StringComparer.Ordinal);
+            IntegrationActivationControllers = integrationActivationControllers
+                ?? Array.Empty<IBuildIntegrationActivationController>();
             CancellationToken = cancellationToken;
             SettingsTransaction = settingsTransaction;
             StartedAt = startedAt;
@@ -126,7 +137,9 @@ namespace UnityRFramework.Editor
             string taskId = null,
             string persistenceRoot = null,
             BuildRecipe? recipeOverride = null,
-            bool captureSettingsTransaction = false)
+            bool captureSettingsTransaction = false,
+            IReadOnlyList<IBuildIntegrationActivationController>
+                integrationActivationControllers = null)
         {
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             string outputRoot = string.Empty;
@@ -193,7 +206,8 @@ namespace UnityRFramework.Editor
                 DateTime.Now,
                 outputError,
                 transaction,
-                recipeOverride);
+                recipeOverride,
+                integrationActivationControllers);
         }
 
         /// <summary>

@@ -192,6 +192,54 @@ namespace UnityRFramework.Editor.Tests
         }
 
         /// <summary>
+        /// 仅资源类 Recipe 的执行报告应写入 Bundles/BuildReports/{创建时间}_{Recipe}，
+        /// 不得使用或创建 Player 产物目录。
+        /// </summary>
+        [TestCase(BuildRecipe.Assets)]
+        [TestCase(BuildRecipe.HotUpdate)]
+        public void Runner_AssetOnlyRecipe_ReportTargetsBundlesBuildReports(
+            BuildRecipe recipe)
+        {
+            string reportRoot = null;
+            string reportDirectory = null;
+            string reportTaskId = null;
+
+            BuildPipelineRunner runner = BuildPipelineRunner.StartNew(
+                profile,
+                tempRoot,
+                new List<IBuildPipelineStep>
+                {
+                    new RecordingStep(
+                        "assets",
+                        stage: BuildPipelineStage.BuildAssets)
+                },
+                recipe,
+                reportWriter: (report, root, directory, taskId) =>
+                {
+                    reportRoot = root;
+                    reportDirectory = directory;
+                    reportTaskId = taskId;
+                    return Path.Combine(root, directory, BuildReportWriter.ReportFileName);
+                });
+            Assert.That(runner.Context.Recipe, Is.EqualTo(recipe));
+            BuildRunResult result = runner.Execute();
+
+            Assert.That(result.Succeeded, Is.True);
+            Assert.That(
+                Path.GetFullPath(reportRoot),
+                Is.EqualTo(Path.GetFullPath(Path.Combine(
+                    Path.GetDirectoryName(Application.dataPath),
+                    "Bundles"))));
+            Assert.That(
+                reportDirectory,
+                Is.EqualTo(BuildReportWriter.GetAssetOnlyReportDirectory(
+                    result.FinalState)));
+            Assert.That(reportDirectory, Does.Contain(recipe.ToString()));
+            Assert.That(reportDirectory, Does.Not.Contain(result.FinalState.TaskId));
+            Assert.That(reportTaskId, Is.EqualTo(result.FinalState.TaskId));
+        }
+
+        /// <summary>
         /// 命令行覆盖构建号时，步骤读取覆盖值，但源 Profile 计数器不递增。
         /// </summary>
         [Test]
@@ -248,7 +296,7 @@ namespace UnityRFramework.Editor.Tests
 
             UnityEngine.TestTools.LogAssert.Expect(
                 LogType.Error,
-                new System.Text.RegularExpressions.Regex("构建任务开始"));
+                new System.Text.RegularExpressions.Regex("构建结果详情"));
             BuildRunResult result = runner.Execute();
 
             Assert.That(result.Succeeded, Is.False);
@@ -283,7 +331,7 @@ namespace UnityRFramework.Editor.Tests
                 new System.Text.RegularExpressions.Regex("构建报告写入失败"));
             UnityEngine.TestTools.LogAssert.Expect(
                 LogType.Error,
-                new System.Text.RegularExpressions.Regex("构建任务开始"));
+                new System.Text.RegularExpressions.Regex("构建结果详情"));
             BuildRunResult result = runner.Execute();
 
             Assert.That(result.Succeeded, Is.False);

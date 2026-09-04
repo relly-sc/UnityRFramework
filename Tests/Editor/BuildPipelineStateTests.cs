@@ -615,7 +615,7 @@ namespace UnityRFramework.Editor.Tests
                 tempRoot,
                 new List<IBuildPipelineStep> { flaky });
 
-            LogAssert.Expect(LogType.Error, new Regex("构建任务开始"));
+            LogAssert.Expect(LogType.Error, new Regex("构建结果详情"));
             BuildRunResult result = runner.Execute();
 
             Assert.That(result.Succeeded, Is.False);
@@ -669,7 +669,7 @@ namespace UnityRFramework.Editor.Tests
                         BuildStepResult.Failed("配置错误", null))
                 });
 
-            LogAssert.Expect(LogType.Error, new Regex("构建任务开始"));
+            LogAssert.Expect(LogType.Error, new Regex("构建结果详情"));
             BuildRunResult result = runner.Execute();
             Assert.That(result.Succeeded, Is.False);
 
@@ -1183,7 +1183,7 @@ namespace UnityRFramework.Editor.Tests
                         BuildStepResult.Failed("失败", null))
                 });
 
-            LogAssert.Expect(LogType.Error, new Regex("构建任务开始"));
+            LogAssert.Expect(LogType.Error, new Regex("构建结果详情"));
             BuildRunResult result = runner.Execute();
 
             Assert.That(result.Succeeded, Is.False);

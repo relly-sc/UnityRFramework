@@ -16,7 +16,7 @@ namespace UnityRFramework.Editor
     /// <summary>
     /// 记录成功 Player Build 对应的裁剪后 AOT 程序集，并在发布前校验其未被替换。
     /// </summary>
-    internal static class HybridCLRPlayerBaseline
+    public static class HybridCLRPlayerBaseline
     {
         private const string BaselineRoot =
             "HybridCLRData/UnityRFramework/PlayerBaselines";
@@ -153,6 +153,23 @@ namespace UnityRFramework.Editor
         private static string GetMarkerPath(BuildTarget target)
         {
             return Path.Combine(BaselineRoot, target + ".json");
+        }
+
+        /// <summary>
+        /// 判断当前裁剪后 AOT 文件是否仍与最近一次成功 Player 一致。
+        /// 供 Release 流程决定是否需要执行 Obfuz 最终 Player 重建。
+        /// </summary>
+        public static bool IsCurrent(BuildTarget target, string[] assemblyNames)
+        {
+            try
+            {
+                Validate(target, assemblyNames);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 

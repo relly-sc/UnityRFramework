@@ -81,7 +81,7 @@ internal sealed class Demo_RewardConfigBinaryCodec : IBinaryConfigCodec
 /// </summary>
 internal static class Demo_RewardConfigBinaryCodecRegistration
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
     private static void RegisterRuntime()
     {
         ConfigSchemaRegistry.Register(typeof(Demo_RewardConfig), 0x5A1F2A2Au, 0x913F8916944A767EUL);

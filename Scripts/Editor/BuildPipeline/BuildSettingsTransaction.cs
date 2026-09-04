@@ -10,6 +10,20 @@ using Debug = UnityEngine.Debug;
 namespace UnityRFramework.Editor
 {
     /// <summary>
+    /// 第三方集成全局开关快照。使用步骤 Id 定位 Expansion 提供的控制器，
+    /// 避免核心程序集直接引用第三方插件类型。
+    /// </summary>
+    [Serializable]
+    public sealed class BuildIntegrationActivationSnapshot
+    {
+        /// <summary>关联的 Profile 步骤 Id。</summary>
+        public string StepId = string.Empty;
+
+        /// <summary>任务开始前的全局启用状态。</summary>
+        public bool Enabled;
+    }
+
+    /// <summary>
     /// 构建设置快照的可序列化数据。全部字段为基元类型与字符串，
     /// JsonUtility 可直接往返，随任务检查点持久化到状态目录，
     /// 保证 Domain Reload 或进程重启后仍能按任务恢复原始设置。
@@ -26,6 +40,13 @@ namespace UnityRFramework.Editor
 
         /// <summary>临时设置是否已开始应用；先持久化后写项目设置。</summary>
         public bool Applied;
+
+        /// <summary>
+        /// 本任务临时隔离的第三方构建开关原值。
+        /// 在修改插件 Settings 前写入快照，支持 Domain Reload 后恢复。
+        /// </summary>
+        public List<BuildIntegrationActivationSnapshot> IntegrationActivations =
+            new List<BuildIntegrationActivationSnapshot>();
 
         /// <summary>快照时的活动平台名称（仅作记录，不参与恢复）。</summary>
         public string ActiveTargetName = string.Empty;
@@ -207,11 +228,114 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
+        /// 对 Player/Release 任务隔离 Profile 未启用的第三方构建回调。
+        /// 只会临时关闭开关，不会替已选步骤自动开启插件；原值先持久化再修改。
+        /// </summary>
+        /// <param name="controllers">各 Expansion 提供的全局开关控制器。</param>
+        /// <param name="profile">当前有效 Profile。</param>
+        /// <param name="recipe">本任务实际 Recipe。</param>
+        /// <returns>本次实际关闭的集成数量。</returns>
+        public int ApplyIntegrationIsolation(
+            IReadOnlyList<IBuildIntegrationActivationController> controllers,
+            UnityRFrameworkBuildProfile profile,
+            BuildRecipe recipe)
+        {
+            if (!HasChanges
+                || profile == null
+                || (recipe != BuildRecipe.Player
+                    && recipe != BuildRecipe.Release)
+                || controllers == null
+                || controllers.Count == 0)
+            {
+                return 0;
+            }
+
+            Dictionary<string, IBuildIntegrationActivationController> unique =
+                BuildControllerMap(controllers);
+            List<IBuildIntegrationActivationController> toDisable =
+                new List<IBuildIntegrationActivationController>();
+            bool snapshotChanged = false;
+
+            foreach (KeyValuePair<string, IBuildIntegrationActivationController> pair
+                in unique)
+            {
+                if (BuildStepConfigLocator.HasEnabledEntry(profile, pair.Key))
+                {
+                    continue;
+                }
+
+                BuildIntegrationActivationSnapshot existing =
+                    FindIntegrationSnapshot(pair.Key);
+                if (existing == null)
+                {
+                    existing = new BuildIntegrationActivationSnapshot
+                    {
+                        StepId = pair.Key,
+                        Enabled = pair.Value.IsEnabled
+                    };
+                    Snapshot.IntegrationActivations.Add(existing);
+                    snapshotChanged = true;
+                }
+
+                if (pair.Value.IsEnabled)
+                {
+                    toDisable.Add(pair.Value);
+                }
+            }
+
+            // 必须先保存原值，避免设置写入触发 Domain Reload 后失去恢复基线。
+            if (snapshotChanged)
+            {
+                persistence?.SaveSnapshot(Snapshot);
+            }
+
+            for (int i = 0; i < toDisable.Count; i++)
+            {
+                toDisable[i].SetEnabled(false);
+            }
+
+            return toDisable.Count;
+        }
+
+        /// <summary>
         /// 将项目设置恢复为快照值；仅写回与当前值不同的字段。
         /// 活动构建平台按契约不恢复。任何字段恢复失败都会抛出异常，
         /// 由运行器映射为人工处理状态。
         /// </summary>
-        public void Restore()
+        public void Restore(
+            IReadOnlyList<IBuildIntegrationActivationController> controllers = null)
+        {
+            List<Exception> errors = new List<Exception>();
+            try
+            {
+                RestoreIntegrationActivations(controllers);
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+
+            try
+            {
+                RestoreProjectSettings();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+
+            if (errors.Count == 1)
+            {
+                throw errors[0];
+            }
+            if (errors.Count > 1)
+            {
+                throw new AggregateException("多个临时构建设置恢复失败。", errors);
+            }
+        }
+
+        /// <summary>恢复 Unity 项目构建设置。</summary>
+        private void RestoreProjectSettings()
         {
             if (!HasChanges)
             {
@@ -408,6 +532,122 @@ namespace UnityRFramework.Editor
                     typeof(iOSSdkVersion),
                     Snapshot.IosTargetSdkName);
             }
+        }
+
+        /// <summary>恢复被本任务临时关闭的第三方集成开关。</summary>
+        private void RestoreIntegrationActivations(
+            IReadOnlyList<IBuildIntegrationActivationController> controllers)
+        {
+            if (!HasChanges
+                || Snapshot.IntegrationActivations == null
+                || Snapshot.IntegrationActivations.Count == 0)
+            {
+                return;
+            }
+
+            Dictionary<string, IBuildIntegrationActivationController> map =
+                BuildControllerMap(controllers);
+            List<Exception> errors = new List<Exception>();
+            for (int i = 0; i < Snapshot.IntegrationActivations.Count; i++)
+            {
+                BuildIntegrationActivationSnapshot entry =
+                    Snapshot.IntegrationActivations[i];
+                if (entry == null || string.IsNullOrWhiteSpace(entry.StepId))
+                {
+                    continue;
+                }
+
+                if (!map.TryGetValue(
+                        entry.StepId,
+                        out IBuildIntegrationActivationController controller))
+                {
+                    errors.Add(new InvalidOperationException(
+                        $"无法恢复第三方集成 '{entry.StepId}'：当前工程未发现对应控制器。"));
+                    continue;
+                }
+
+                try
+                {
+                    if (controller.IsEnabled != entry.Enabled)
+                    {
+                        controller.SetEnabled(entry.Enabled);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    errors.Add(new InvalidOperationException(
+                        $"恢复第三方集成 '{entry.StepId}' 失败：{exception.Message}",
+                        exception));
+                }
+            }
+
+            if (errors.Count == 1)
+            {
+                throw errors[0];
+            }
+            if (errors.Count > 1)
+            {
+                throw new AggregateException("第三方集成开关恢复失败。", errors);
+            }
+        }
+
+        /// <summary>按步骤 Id 建立控制器索引，并拒绝重复或无效实现。</summary>
+        private static Dictionary<string, IBuildIntegrationActivationController>
+            BuildControllerMap(
+                IReadOnlyList<IBuildIntegrationActivationController> controllers)
+        {
+            Dictionary<string, IBuildIntegrationActivationController> result =
+                new Dictionary<string, IBuildIntegrationActivationController>(
+                    StringComparer.OrdinalIgnoreCase);
+            if (controllers == null)
+            {
+                return result;
+            }
+
+            for (int i = 0; i < controllers.Count; i++)
+            {
+                IBuildIntegrationActivationController controller = controllers[i];
+                if (controller == null || string.IsNullOrWhiteSpace(controller.StepId))
+                {
+                    throw new InvalidOperationException(
+                        "发现 null 或 StepId 为空的第三方构建开关控制器。");
+                }
+                if (result.ContainsKey(controller.StepId))
+                {
+                    throw new InvalidOperationException(
+                        $"第三方构建开关控制器 StepId '{controller.StepId}' 重复。");
+                }
+                result.Add(controller.StepId, controller);
+            }
+
+            return result;
+        }
+
+        /// <summary>查找已持久化的第三方集成开关原值。</summary>
+        private BuildIntegrationActivationSnapshot FindIntegrationSnapshot(
+            string stepId)
+        {
+            if (Snapshot.IntegrationActivations == null)
+            {
+                Snapshot.IntegrationActivations =
+                    new List<BuildIntegrationActivationSnapshot>();
+                return null;
+            }
+
+            for (int i = 0; i < Snapshot.IntegrationActivations.Count; i++)
+            {
+                BuildIntegrationActivationSnapshot entry =
+                    Snapshot.IntegrationActivations[i];
+                if (entry != null
+                    && string.Equals(
+                        entry.StepId,
+                        stepId,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return entry;
+                }
+            }
+            return null;
         }
 
         /// <summary>

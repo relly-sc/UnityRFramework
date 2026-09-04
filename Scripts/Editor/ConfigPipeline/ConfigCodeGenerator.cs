@@ -158,7 +158,7 @@ namespace UnityRFramework.Editor
                 .AppendLine("BinaryCodecRegistration");
             builder.Append(indent).AppendLine("{");
             builder.Append(indent).AppendLine(
-                "    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]");
+                "    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]");
             builder.Append(indent).AppendLine("    private static void RegisterRuntime()");
             builder.Append(indent).AppendLine("    {");
             builder.Append(indent).Append("        ConfigSchemaRegistry.Register(typeof(")

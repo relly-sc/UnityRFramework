@@ -1,5 +1,3 @@
-#if DEVELOPMENT_BUILD || UNITY_EDITOR
-
 using UnityEngine;
 
 namespace UnityRFramework.Runtime
@@ -7,7 +5,7 @@ namespace UnityRFramework.Runtime
     /// <summary>
     /// 调试器组件。挂载到 UnityRFramework 预制体上，在 Inspector 中配置
     /// 开关快捷键、日志缓存上限、日志过滤等参数，由 DebuggerOverlay 读取。
-    /// Release 包通过条件编译完全移除，零开销。
+    /// Release 包保留组件及序列化布局，但不初始化调试界面。
     /// </summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("UnityRFramework/Debugger")]
@@ -64,8 +62,20 @@ namespace UnityRFramework.Runtime
         /// </summary>
         public bool ActiveWindow
         {
-            get { return DebuggerOverlay.ActiveWindow; }
-            set { DebuggerOverlay.ActiveWindow = value; }
+            get
+            {
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+                return DebuggerOverlay.ActiveWindow;
+#else
+                return false;
+#endif
+            }
+            set
+            {
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+                DebuggerOverlay.ActiveWindow = value;
+#endif
+            }
         }
 
         /// <summary>
@@ -105,7 +115,14 @@ namespace UnityRFramework.Runtime
         /// </summary>
         public int LogCount
         {
-            get { return DebuggerOverlay.LogCount; }
+            get
+            {
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
+                return DebuggerOverlay.LogCount;
+#else
+                return 0;
+#endif
+            }
         }
 
         /// <summary>
@@ -147,6 +164,7 @@ namespace UnityRFramework.Runtime
         {
             base.Awake();
 
+#if DEVELOPMENT_BUILD || UNITY_EDITOR
             DebuggerOverlay.Initialize(this);
 
             // 根据激活模式设置初始状态
@@ -168,8 +186,7 @@ namespace UnityRFramework.Runtime
                     ActiveWindow = false;
                     break;
             }
+#endif
         }
     }
 }
-
-#endif

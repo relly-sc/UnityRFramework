@@ -21,7 +21,15 @@ namespace UnityRFramework.Editor
                 serializedObject.FindProperty("OutputAssetRoot"),
                 new GUIContent("Output Asset Root", "热更产物输出目录，必须位于工程内。"));
             EditorGUILayout.PropertyField(
-                serializedObject.FindProperty("EntryTypeName"));
+                serializedObject.FindProperty("EntryTypeName"),
+                new GUIContent(
+                    "Entry Type Name（必填）",
+                    "实现 IHotUpdateEntry 接口的热更新入口类型全名，格式为命名空间+类名。"));
+            EditorGUILayout.HelpBox(
+                "填写热更新程序集中实现 IHotUpdateEntry 接口的入口类型全名"
+                + "（命名空间 + 类名），例如：UnityRFramework.Sample.HotUpdateEntry。"
+                + "这不是 AOT 启动脚本或程序集名称。",
+                MessageType.Info);
             EditorGUILayout.PropertyField(
                 serializedObject.FindProperty("CodeVersion"));
             EditorGUILayout.PropertyField(

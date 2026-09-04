@@ -94,9 +94,12 @@ namespace UnityRFramework.Editor.Tests
             state.LastBuild.HasRecord = true;
             state.LastBuild.ProfileName = "Demo";
             state.LastBuild.Platform = "Android";
-            state.LastBuild.Version = "1.0.0-42";
+            state.LastBuild.Recipe = "Player";
+            state.LastBuild.PlayerVersion = "1.0.0（构建号 42）";
+            state.LastBuild.Summary = "完成";
             state.LastBuild.Status = "成功";
             state.LastBuild.DurationSeconds = 123.5f;
+            state.LastBuild.OutputLabel = "Player 目录";
             state.LastBuild.OutputPath = "Builds/Demo/Android/1.0.0-42";
             state.LastBuild.TimeText = "2026-08-19 14:00";
             state.Save();
@@ -107,11 +110,46 @@ namespace UnityRFramework.Editor.Tests
             Assert.That(loaded.LastBuild.HasRecord, Is.True);
             Assert.That(loaded.LastBuild.ProfileName, Is.EqualTo("Demo"));
             Assert.That(loaded.LastBuild.Platform, Is.EqualTo("Android"));
-            Assert.That(loaded.LastBuild.Version, Is.EqualTo("1.0.0-42"));
+            Assert.That(loaded.LastBuild.Recipe, Is.EqualTo("Player"));
+            Assert.That(loaded.LastBuild.PlayerVersion, Is.EqualTo("1.0.0（构建号 42）"));
+            Assert.That(loaded.LastBuild.Summary, Is.EqualTo("完成"));
             Assert.That(loaded.LastBuild.Status, Is.EqualTo("成功"));
             Assert.That(loaded.LastBuild.DurationSeconds, Is.EqualTo(123.5f));
+            Assert.That(loaded.LastBuild.OutputLabel, Is.EqualTo("Player 目录"));
             Assert.That(loaded.LastBuild.OutputPath, Is.EqualTo("Builds/Demo/Android/1.0.0-42"));
             Assert.That(loaded.LastBuild.TimeText, Is.EqualTo("2026-08-19 14:00"));
+        }
+
+        [Test]
+        public void LastBuild_HotUpdate_DoesNotShowNextPlayerBuildNumber()
+        {
+            BuildPipelineState state = new BuildPipelineState
+            {
+                TaskId = "hot-task",
+                ProfileName = "Demo",
+                TargetName = "StandaloneWindows64",
+                Recipe = BuildRecipe.HotUpdate,
+                PublicVersion = "1.2.0",
+                BuildNumber = 23,
+                CreatedAt = "2026-09-02T14:04:52.0728011+08:00",
+                Phase = BuildPipelinePhase.Succeeded
+            };
+            state.CompletedSteps.Add(new BuildStepRecord
+            {
+                StepId = "hybridclr",
+                Message = "HybridCLR 热更产物已生成：代码版本 1.0.0。"
+            });
+
+            BuildWindowLastBuild last = BuildWindowLastBuild.Create(state);
+
+            Assert.That(last.Recipe, Is.EqualTo("热更新"));
+            Assert.That(last.PlayerVersion, Is.Empty);
+            Assert.That(last.Summary, Does.Contain("代码版本 1.0.0"));
+            Assert.That(last.OutputLabel, Is.EqualTo("构建报告"));
+            Assert.That(last.OutputPath,
+                Does.Contain("2026-09-02_14-04-52-072_HotUpdate"));
+            Assert.That(last.OutputPath,
+                Does.EndWith(BuildReportWriter.ReportFileName));
         }
 
         /// <summary>

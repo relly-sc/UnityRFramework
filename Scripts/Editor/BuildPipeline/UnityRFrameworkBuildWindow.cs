@@ -213,9 +213,19 @@ namespace UnityRFramework.Editor
                     return;
                 }
 
-                windowState.ScrollPosition = EditorGUILayout.BeginScrollView(windowState.ScrollPosition);
+                // 基础 Profile 参数固定显示；其余设置和命令位于滚动区域。
                 DrawCurrentTaskSection();
-                DrawProfileParametersSection();
+                DrawProfileBasicSection();
+
+                // 其余内容使用一个滚动容器。让 GUILayout 直接分配剩余高度，
+                // 避免 BeginArea 使用布局阶段尚未稳定的矩形而绘制成空白区域。
+                windowState.ScrollPosition = EditorGUILayout.BeginScrollView(
+                    windowState.ScrollPosition,
+                    false,
+                    true,
+                    GUILayout.ExpandWidth(true),
+                    GUILayout.ExpandHeight(true));
+                DrawProfileAdvancedSection();
                 DrawStepsSection();
                 DrawValidationSection();
                 DrawLastBuildSection();
@@ -226,6 +236,33 @@ namespace UnityRFramework.Editor
             {
                 EditorGUIUtility.labelWidth = previousLabelWidth;
             }
+        }
+
+        /// <summary>
+        /// 在顶部固定区域显示 Profile 基础参数：Description、Enabled、Flavor、Recipe
+        /// 及 Recipe 执行范围提示。
+        /// </summary>
+        private void DrawProfileBasicSection()
+        {
+            DrawSectionHeader("Profile 参数", FoldProfileParameters, () =>
+            {
+                if (profileSerializedObject == null)
+                {
+                    EditorGUILayout.HelpBox(
+                        "Profile 序列化对象无效，请重新选择或刷新。",
+                        MessageType.Warning);
+                    return;
+                }
+
+                profileSerializedObject.Update();
+                BuildProfileParametersGUI.DrawBasicParameters(profileSerializedObject);
+                if (profileSerializedObject.ApplyModifiedProperties())
+                {
+                    EditorUtility.SetDirty(selectedProfile);
+                    AssetDatabase.SaveAssets();
+                    RecomputeDiffs();
+                }
+            });
         }
 
         /// <summary>
@@ -375,13 +412,11 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 绘制 Profile 参数分区：基础字段、平台设置、输出设置与场景列表，
-        /// 全部在窗口内直接编辑并即改即存；参数变更后重算校验结果。
-        /// 平台字段绘制与 Profile 资产 Inspector 共用同一套过滤规则。
+        /// 绘制滚动区域中的 Profile 其余设置：平台、输出、场景和宏定义。
         /// </summary>
-        private void DrawProfileParametersSection()
+        private void DrawProfileAdvancedSection()
         {
-            DrawSectionHeader("Profile 参数", FoldProfileParameters, () =>
+            DrawSectionHeader("平台、输出与场景设置", FoldProfileParameters + ".Advanced", () =>
             {
                 if (profileSerializedObject == null)
                 {
@@ -392,7 +427,7 @@ namespace UnityRFramework.Editor
                 }
 
                 profileSerializedObject.Update();
-                BuildProfileParametersGUI.DrawProfileParameters(
+                BuildProfileParametersGUI.DrawAdvancedParameters(
                     profileSerializedObject,
                     ResolveOutputPreview());
                 if (profileSerializedObject.ApplyModifiedProperties())
@@ -512,9 +547,19 @@ namespace UnityRFramework.Editor
                 DrawLabelValue("状态", last.Status);
                 DrawLabelValue("Profile", last.ProfileName);
                 DrawLabelValue("平台", last.Platform);
-                DrawLabelValue("版本", last.Version);
+                DrawLabelValue("类型", last.Recipe);
+                if (!string.IsNullOrEmpty(last.PlayerVersion))
+                {
+                    DrawLabelValue("Player 版本", last.PlayerVersion);
+                }
+                if (!string.IsNullOrEmpty(last.Summary))
+                {
+                    EditorGUILayout.HelpBox(last.Summary, MessageType.None);
+                }
                 DrawLabelValue("耗时", $"{last.DurationSeconds:F1} 秒");
-                DrawLabelValue("产物", last.OutputPath);
+                DrawLabelValue(
+                    string.IsNullOrEmpty(last.OutputLabel) ? "产物" : last.OutputLabel,
+                    last.OutputPath);
                 DrawLabelValue("时间", last.TimeText);
             });
         }
@@ -967,33 +1012,7 @@ namespace UnityRFramework.Editor
         /// <param name="result">流水线终态结果。</param>
         private void RecordLastBuild(BuildRunResult result)
         {
-            BuildPipelineState state = result.FinalState;
-            BuildWindowLastBuild last = windowState.LastBuild;
-            last.HasRecord = true;
-            last.ProfileName = state.ProfileName;
-            last.Platform = state.TargetName;
-            last.Version =
-                $"{state.PublicVersion}（构建号 {state.BuildNumber}）";
-            last.Status = state.Phase == BuildPipelinePhase.Succeeded
-                ? "成功"
-                : (state.Phase == BuildPipelinePhase.Cancelled
-                    ? "已取消"
-                    : (state.Phase == BuildPipelinePhase.ManualIntervention
-                        ? "人工处理"
-                        : "失败"));
-            if (DateTime.TryParse(state.CreatedAt, out DateTime createdAt)
-                && DateTime.TryParse(state.UpdatedAt, out DateTime updatedAt))
-            {
-                last.DurationSeconds =
-                    (float)Math.Max(0.0, (updatedAt - createdAt).TotalSeconds);
-            }
-            else
-            {
-                last.DurationSeconds = 0f;
-            }
-
-            last.OutputPath = ResolveOutputDirectory(state);
-            last.TimeText = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            windowState.LastBuild = BuildWindowLastBuild.Create(result.FinalState);
             windowState.Save();
         }
 
@@ -1012,29 +1031,85 @@ namespace UnityRFramework.Editor
                     + "\n…（完整报告见 Console）";
             }
 
+            string title;
+            string status;
+            bool isSuccess = result.Succeeded;
             if (result.FinalState.Phase == BuildPipelinePhase.ManualIntervention)
             {
-                EditorUtility.DisplayDialog(
-                    "构建任务需要人工处理",
-                    report,
-                    "确定");
-                return;
+                title = "构建任务需要人工处理";
+                status = "需要人工处理";
             }
-
-            if (result.Succeeded)
+            else if (result.Succeeded)
             {
-                EditorUtility.DisplayDialog("构建成功", report, "确定");
+                title = "构建成功";
+                status = "构建成功";
             }
             else if (result.Cancelled)
             {
-                EditorUtility.DisplayDialog("构建已取消", report, "确定");
+                title = "构建已取消";
+                status = "构建已取消";
             }
             else
             {
-                EditorUtility.DisplayDialog(
-                    "构建失败",
-                    report + "\n\n任务状态已保留，可在「当前任务」分区重试或作废。",
-                    "确定");
+                title = "构建失败";
+                status = "构建失败";
+                report += "\n\n任务状态已保留，可在「当前任务」分区重试或作废。";
+            }
+
+            BuildResultDialog.Show(title, status, report, isSuccess);
+        }
+
+        /// <summary>
+        /// 构建结果专用窗口：将终态作为醒目的首要信息展示，详情作为次要信息展示。
+        /// </summary>
+        private sealed class BuildResultDialog : EditorWindow
+        {
+            private string status;
+            private string report;
+            private bool isSuccess;
+
+            public static void Show(
+                string title,
+                string status,
+                string report,
+                bool isSuccess)
+            {
+                BuildResultDialog window =
+                    CreateInstance<BuildResultDialog>();
+                window.titleContent = new GUIContent(title);
+                window.status = status;
+                window.report = report;
+                window.isSuccess = isSuccess;
+                window.minSize = new Vector2(520f, 330f);
+                window.maxSize = new Vector2(900f, 700f);
+                window.ShowUtility();
+            }
+
+            private void OnGUI()
+            {
+                Color oldColor = GUI.color;
+                GUI.color = isSuccess
+                    ? new Color(0.12f, 0.55f, 0.2f)
+                    : new Color(0.8f, 0.12f, 0.08f);
+                GUIStyle statusStyle = new GUIStyle(EditorStyles.boldLabel)
+                {
+                    fontSize = 22,
+                    alignment = TextAnchor.MiddleCenter,
+                    padding = new RectOffset(8, 8, 10, 10)
+                };
+                GUILayout.Label(status, statusStyle, GUILayout.Height(52f));
+                GUI.color = oldColor;
+
+                EditorGUILayout.LabelField("构建结果详情", EditorStyles.boldLabel);
+                EditorGUILayout.HelpBox(report ?? string.Empty, MessageType.None);
+
+                GUILayout.BeginHorizontal();
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("确定", GUILayout.Width(90f), GUILayout.Height(26f)))
+                {
+                    Close();
+                }
+                GUILayout.EndHorizontal();
             }
         }
 

@@ -93,7 +93,7 @@ internal sealed class Demo_EnemyConfigBinaryCodec : IBinaryConfigCodec
 /// </summary>
 internal static class Demo_EnemyConfigBinaryCodecRegistration
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
     private static void RegisterRuntime()
     {
         ConfigSchemaRegistry.Register(typeof(Demo_EnemyConfig), 0x3BB03E13u, 0xCE1E50D8B4D5DE63UL);

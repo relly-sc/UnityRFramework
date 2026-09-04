@@ -105,7 +105,7 @@ internal sealed class Demo_CharacterConfigBinaryCodec : IBinaryConfigCodec
 /// </summary>
 internal static class Demo_CharacterConfigBinaryCodecRegistration
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
     private static void RegisterRuntime()
     {
         ConfigSchemaRegistry.Register(typeof(Demo_CharacterConfig), 0xDC6B9624u, 0x68224A35E779EEF4UL);

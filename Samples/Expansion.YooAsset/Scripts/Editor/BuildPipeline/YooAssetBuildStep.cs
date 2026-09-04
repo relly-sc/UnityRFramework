@@ -132,6 +132,11 @@ namespace UnityRFramework.Editor
                     StepGroup));
             }
 
+            ValidateHybridClrOutputCollector(
+                context.Profile,
+                settings.PackageName,
+                issues);
+
             string pipelineName = string.IsNullOrWhiteSpace(settings.BuildPipelineName)
                 ? BundleBuilderSetting.GetPackageBuildPipeline(settings.PackageName)
                 : settings.BuildPipelineName.Trim();
@@ -185,9 +190,7 @@ namespace UnityRFramework.Editor
                 AssetDatabase.Refresh();
 
                 string packageName = settings.PackageName.Trim();
-                string version = string.IsNullOrWhiteSpace(settings.PackageVersion)
-                    ? YooAssetBuildConfiguration.GetDefaultBuilderVersion()
-                    : settings.PackageVersion.Trim();
+                string version = settings.GetEffectivePackageVersion();
 
                 // 同步 Profile 配置回 YooAsset 插件设置：Profile 为空字段走 Builder 当前值
                 // （默认 ScriptableBuildPipeline），非空字段覆盖插件按 Package 持久化的设置，
@@ -447,6 +450,76 @@ namespace UnityRFramework.Editor
                     item.PackageName,
                     packageName,
                     StringComparison.Ordinal));
+        }
+
+        /// <summary>
+        /// 当 Profile 同时启用 HybridCLR 时，确认其产物目录会被当前 YooAsset
+        /// Package 收集，避免热更步骤生成新文件但资源包仍打入旧文件。
+        /// </summary>
+        private static void ValidateHybridClrOutputCollector(
+            UnityRFrameworkBuildProfile profile,
+            string packageName,
+            ICollection<BuildValidationIssue> issues)
+        {
+            BuildStepSettings hybridEntry = BuildStepConfigLocator.FindEntry(
+                profile,
+                "hybridclr");
+            if (hybridEntry == null
+                || !hybridEntry.Enabled
+                || hybridEntry.Configuration == null)
+            {
+                return;
+            }
+
+            SerializedObject configuration =
+                new SerializedObject(hybridEntry.Configuration);
+            SerializedProperty outputRoot =
+                configuration.FindProperty("OutputAssetRoot");
+            string outputPath = NormalizeAssetPath(outputRoot?.stringValue);
+            if (string.IsNullOrEmpty(outputPath))
+            {
+                return;
+            }
+
+            BundleCollectorPackage package = BundleCollectorSettingData.Setting
+                .Packages.FirstOrDefault(item => string.Equals(
+                    item.PackageName,
+                    packageName,
+                    StringComparison.Ordinal));
+            bool collected = package?.Groups != null
+                && package.Groups.Any(group => group?.Collectors != null
+                    && group.Collectors.Any(collector =>
+                        IsPathCollected(outputPath, collector?.CollectPath)));
+            if (!collected)
+            {
+                issues.Add(BuildValidationIssue.Error(
+                    StepCode,
+                    $"HybridCLR 输出目录 '{outputPath}' 未被 YooAsset Package "
+                    + $"'{packageName}' 的任何 Collector 收集。请统一 "
+                    + "OutputAssetRoot 与 Bundle Collector Setting，"
+                    + "否则资源包会继续使用旧热更文件。",
+                    StepGroup));
+            }
+        }
+
+        private static bool IsPathCollected(string assetPath, string collectPath)
+        {
+            string normalizedCollector = NormalizeAssetPath(collectPath);
+            return !string.IsNullOrEmpty(normalizedCollector)
+                && (string.Equals(
+                        assetPath,
+                        normalizedCollector,
+                        StringComparison.OrdinalIgnoreCase)
+                    || assetPath.StartsWith(
+                        normalizedCollector + "/",
+                        StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string NormalizeAssetPath(string path)
+        {
+            return string.IsNullOrWhiteSpace(path)
+                ? string.Empty
+                : path.Trim().Replace('\\', '/').TrimEnd('/');
         }
 
         /// <summary>

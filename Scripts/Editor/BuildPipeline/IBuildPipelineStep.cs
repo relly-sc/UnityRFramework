@@ -219,6 +219,25 @@ namespace UnityRFramework.Editor
     }
 
     /// <summary>
+    /// 控制具有独立 Player 构建回调的第三方集成开关。
+    /// 构建工具在 Player/Release 任务中临时关闭 Profile 未启用的集成，
+    /// 并通过设置事务在成功、失败、取消或 Domain Reload 恢复后还原原值。
+    /// 核心层只依赖本契约，具体 Settings API 由各 Expansion 实现。
+    /// </summary>
+    public interface IBuildIntegrationActivationController
+    {
+        /// <summary>该开关对应的 Profile 步骤 Id。</summary>
+        string StepId { get; }
+
+        /// <summary>读取第三方插件当前的全局启用状态。</summary>
+        bool IsEnabled { get; }
+
+        /// <summary>设置并持久化第三方插件的全局启用状态。</summary>
+        /// <param name="enabled">是否启用。</param>
+        void SetEnabled(bool enabled);
+    }
+
+    /// <summary>
     /// 构建步骤注册表：通过 TypeCache 自动发现全部 <see cref="IBuildPipelineStep"/> 实现。
     /// 带程序集级缓存；安装或卸载包后调用 <see cref="InvalidateCache"/> 重新扫描。
     /// 重复 Id 的步骤会被跳过并记录警告；列表按 Order 升序、同 Order 按 Id 字典序排序，

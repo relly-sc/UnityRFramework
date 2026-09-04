@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using HybridCLR.Editor;
+using HybridCLR.Editor.Settings;
 using Obfuz.Settings;
 using Obfuz4HybridCLR;
 using UnityEditor;
+using UnityEngine;
 
 namespace UnityRFramework.Editor
 {
@@ -20,7 +22,8 @@ namespace UnityRFramework.Editor
     /// 混淆清单在 Obfuz Settings（第三方窗口）中手动配置，须同时包含 AOT 与
     /// 热更程序集名称；本步骤不侵入第三方设置。
     /// </summary>
-    public sealed class ObfuzBuildStep : BuildPipelineStepBase
+    public sealed class ObfuzBuildStep : BuildPipelineStepBase,
+        IBuildIntegrationActivationController
     {
         /// <summary>错误码：Obfuz 热更混淆。</summary>
         private const string StepCode = "OBFUZ";
@@ -38,6 +41,26 @@ namespace UnityRFramework.Editor
             {
                 return "obfuz";
             }
+        }
+
+        /// <inheritdoc />
+        string IBuildIntegrationActivationController.StepId => Id;
+
+        /// <inheritdoc />
+        bool IBuildIntegrationActivationController.IsEnabled =>
+            ObfuzSettings.Instance.buildPipelineSettings.enable;
+
+        /// <inheritdoc />
+        void IBuildIntegrationActivationController.SetEnabled(bool enabled)
+        {
+            ObfuzSettings settings = ObfuzSettings.Instance;
+            if (settings.buildPipelineSettings.enable == enabled)
+            {
+                return;
+            }
+
+            settings.buildPipelineSettings.enable = enabled;
+            ObfuzSettings.Save();
         }
 
         /// <summary>获取步骤显示名称。</summary>
@@ -195,11 +218,19 @@ namespace UnityRFramework.Editor
 
             if (!HasAotBaseline(context.Target))
             {
-                issues.Add(BuildValidationIssue.Error(
-                    StepCode,
-                    "AOT 基线缺失（AssembliesPostIl2CppStrip 为空），请先运行 "
-                    + "HybridCLR/Generate/All 建立基线后再执行热更混淆。",
-                    StepGroup));
+                bool willCreateBaseline = context.Recipe == BuildRecipe.Player
+                    || context.Recipe == BuildRecipe.Release;
+                issues.Add(willCreateBaseline
+                    ? BuildValidationIssue.Warning(
+                        StepCode,
+                        "首次 Player/Release 构建尚未建立 AOT 基线，"
+                        + "后续将自动执行 HybridCLR/ObfuzExtension/GenerateAll。",
+                        StepGroup)
+                    : BuildValidationIssue.Error(
+                        StepCode,
+                        "AOT 基线缺失，请先执行 HybridCLR/ObfuzExtension/GenerateAll "
+                        + "建立基线后再执行 HotUpdate。",
+                        StepGroup));
             }
         }
 
@@ -397,5 +428,172 @@ namespace UnityRFramework.Editor
             return count;
         }
 
+    }
+
+    /// <summary>
+    /// Player/Release 的 Obfuz 与 HybridCLR 联合准备步骤。
+    /// 首次构建时自动执行官方 GenerateAll，建立混淆程序集对应的 AOT 基线、
+    /// MethodBridge 和 AOT 泛型引用。
+    /// </summary>
+    public sealed class ObfuzPlayerPrepareStep : BuildPipelineStepBase,
+        IAutomaticBuildPipelineStep
+    {
+        private const string NeedsFinalRebuildKey =
+            "UnityRFramework.Obfuz.ReleaseNeedsFinalRebuild";
+
+        public override string Id => "obfuz.prepare-player";
+
+        public override string DisplayName => "Obfuz Player 准备";
+
+        public override BuildPipelineStage Stage => BuildPipelineStage.PreparePlayer;
+
+        public override int Order => 25;
+
+        public override bool TriggersCompilation => true;
+
+        public override IReadOnlyList<string> Dependencies =>
+            new[] { "hybridclr.prepare-player" };
+
+        public bool ShouldInclude(
+            UnityRFrameworkBuildProfile profile,
+            BuildRecipe recipe)
+        {
+            return profile != null
+                && (recipe == BuildRecipe.Player || recipe == BuildRecipe.Release)
+                && BuildStepConfigLocator.HasEnabledEntry(profile, "hybridclr")
+                && BuildStepConfigLocator.HasEnabledEntry(profile, "obfuz");
+        }
+
+        public override bool CanRun(BuildPipelineContext context)
+        {
+            return context != null
+                && ShouldInclude(context.Profile, context.Recipe);
+        }
+
+        public override void Validate(
+            BuildPipelineContext context,
+            ICollection<BuildValidationIssue> issues)
+        {
+        }
+
+        public override BuildStepResult Execute(BuildPipelineContext context)
+        {
+            try
+            {
+                // GenerateAll 中的 GenerateStripedAOTDlls 依赖已经完成的 IL2CPP
+                // Player。第一次进入 Release 时先使用普通 HybridCLR 准备建立基线，
+                // 由后置的 ObfuzPlayerRebuildStep 在首轮 Player 完成后调用联合入口。
+                HybridCLRArtifactBuilder.ConfigureAndValidate();
+                string[] patchAotAssemblies =
+                    HybridCLRSettings.Instance.patchAOTAssemblies;
+                bool baselineIsCurrent =
+                    HybridCLRPlayerBaseline.IsCurrent(
+                        context.Target,
+                        patchAotAssemblies);
+                SessionState.SetBool(NeedsFinalRebuildKey, !baselineIsCurrent);
+                // 首轮 Player 必须先完成 IL2CPP，不能在这里调用
+                // HybridCLR Generate/All；该入口会读取尚不存在的裁剪后 AOT DLL。
+                // 联合 GenerateAll 由后置重建步骤在首轮 Player 成功后执行。
+                return BuildStepResult.Succeeded(
+                    baselineIsCurrent
+                        ? "Obfuz Player 准备完成：检测到现有 AOT 基线未变化，"
+                            + "后续将跳过重复的联合 Player 重建。"
+                        : "Obfuz Player 首轮准备完成：将先建立最新 AOT 基线，"
+                            + "随后执行联合准备并重建最终 Player。 ");
+            }
+            catch (Exception exception)
+            {
+                return BuildStepResult.Failed(
+                    $"Obfuz Player 准备失败：{exception.Message}",
+                    exception);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 首轮 Player 完成后的 Obfuz 联合准备与最终 Player 重建步骤。
+    /// 首轮 Player 只用于生成最新 AOT 基线；本步骤随后执行官方
+    /// HybridCLR/ObfuzExtension/GenerateAll，并重新构建最终 Player。
+    /// </summary>
+    public sealed class ObfuzPlayerRebuildStep : BuildPipelineStepBase,
+        IAutomaticBuildPipelineStep
+    {
+        private const string NeedsFinalRebuildKey =
+            "UnityRFramework.Obfuz.ReleaseNeedsFinalRebuild";
+
+        public override string Id => "obfuz.rebuild-player";
+
+        public override string DisplayName => "Obfuz 重建 Player";
+
+        public override BuildPipelineStage Stage => BuildPipelineStage.BuildPlayer;
+
+        public override int Order => 31;
+
+        public override bool TriggersCompilation => true;
+
+        public override bool CallsBuildPipeline => true;
+
+        public override IReadOnlyList<string> Dependencies =>
+            new[] { "core.build-player", "obfuz.prepare-player" };
+
+        public bool ShouldInclude(
+            UnityRFrameworkBuildProfile profile,
+            BuildRecipe recipe)
+        {
+            return profile != null
+                && recipe == BuildRecipe.Release
+                && BuildStepConfigLocator.HasEnabledEntry(profile, "hybridclr")
+                && BuildStepConfigLocator.HasEnabledEntry(profile, "obfuz");
+        }
+
+        public override bool CanRun(BuildPipelineContext context)
+        {
+            return context != null
+                && ShouldInclude(context.Profile, context.Recipe);
+        }
+
+        public override void Validate(
+            BuildPipelineContext context,
+            ICollection<BuildValidationIssue> issues)
+        {
+        }
+
+        public override BuildStepResult Execute(BuildPipelineContext context)
+        {
+            try
+            {
+                if (!SessionState.GetBool(NeedsFinalRebuildKey, true))
+                {
+                    return BuildStepResult.Succeeded(
+                        "Obfuz 最终 Player 重建已跳过：AOT 基线与当前构建一致。 ");
+                }
+
+                PrebuildCommandExt.GenerateAll();
+                BuildPlayerOptions options =
+                    BuildPlayerOptionsFactory.Create(context);
+                UnityEditor.Build.Reporting.BuildReport report =
+                    UnityEditor.BuildPipeline.BuildPlayer(options);
+                if (report == null
+                    || report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
+                {
+                    string message = report == null
+                        ? "Unity 返回空 BuildReport。"
+                        : $"结果：{report.summary.result}，错误：{report.summary.totalErrors}。";
+                    return BuildStepResult.Failed(
+                        "Obfuz 最终 Player 重建失败：" + message,
+                        null);
+                }
+
+                return BuildStepResult.Succeeded(
+                    "Obfuz 联合准备完成，并已基于最新 AOT 基线重建最终 Player："
+                    + options.locationPathName);
+            }
+            catch (Exception exception)
+            {
+                return BuildStepResult.Failed(
+                    "Obfuz 联合准备或最终 Player 重建失败：" + exception.Message,
+                    exception);
+            }
+        }
     }
 }

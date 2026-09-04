@@ -93,7 +93,7 @@ internal sealed class Demo_ActionConfigBinaryCodec : IBinaryConfigCodec
 /// </summary>
 internal static class Demo_ActionConfigBinaryCodecRegistration
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
     private static void RegisterRuntime()
     {
         ConfigSchemaRegistry.Register(typeof(Demo_ActionConfig), 0x2976181Bu, 0xBB5683A638F283C2UL);

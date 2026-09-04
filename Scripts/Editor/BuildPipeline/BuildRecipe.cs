@@ -143,7 +143,8 @@ namespace UnityRFramework.Editor
             List<IBuildPipelineStep> sorted = TopologicalSort(
                 registered,
                 selectedIds,
-                issues);
+                issues,
+                recipe);
             return new BuildRecipePlan(sorted, issues);
         }
 
@@ -337,7 +338,8 @@ namespace UnityRFramework.Editor
         private static List<IBuildPipelineStep> TopologicalSort(
             IReadOnlyDictionary<string, IBuildPipelineStep> registered,
             ISet<string> selected,
-            ICollection<BuildValidationIssue> issues)
+            ICollection<BuildValidationIssue> issues,
+            BuildRecipe recipe)
         {
             Dictionary<string, int> incoming =
                 new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -382,7 +384,7 @@ namespace UnityRFramework.Editor
             List<IBuildPipelineStep> result = new List<IBuildPipelineStep>(selected.Count);
             while (ready.Count > 0)
             {
-                ready.Sort(BuildPipelineStepRegistry.CompareSteps);
+                ready.Sort((left, right) => CompareStepsForRecipe(left, right, recipe));
                 IBuildPipelineStep step = ready[0];
                 ready.RemoveAt(0);
                 result.Add(step);
@@ -408,6 +410,69 @@ namespace UnityRFramework.Editor
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// 按 Recipe 计算步骤顺序。Release 是唯一需要跨越固定阶段重排的方案：
+        /// 先完成 Player，取得最新 AOT 基线，再编译并发布热更代码与资源。
+        /// 其他 Recipe 继续使用固定阶段顺序，避免影响已有构建语义。
+        /// </summary>
+        private static int CompareStepsForRecipe(
+            IBuildPipelineStep left,
+            IBuildPipelineStep right,
+            BuildRecipe recipe)
+        {
+            if (recipe != BuildRecipe.Release)
+            {
+                return BuildPipelineStepRegistry.CompareSteps(left, right);
+            }
+
+            int leftRank = GetReleaseStageRank(left.Stage);
+            int rightRank = GetReleaseStageRank(right.Stage);
+            int stage = leftRank.CompareTo(rightRank);
+            if (stage != 0)
+            {
+                return stage;
+            }
+
+            int order = left.Order.CompareTo(right.Order);
+            if (order != 0)
+            {
+                return order;
+            }
+
+            return string.CompareOrdinal(left.Id, right.Id);
+        }
+
+        /// <summary>
+        /// Release 阶段顺序：Player 准备 -> Player 构建 -> 代码准备 -> 资源构建。
+        /// Validate、平台切换和参数应用仍然位于最前，Finalize 位于最后。
+        /// </summary>
+        private static int GetReleaseStageRank(BuildPipelineStage stage)
+        {
+            switch (stage)
+            {
+                case BuildPipelineStage.Validate:
+                    return 0;
+                case BuildPipelineStage.SwitchTarget:
+                    return 1;
+                case BuildPipelineStage.ApplySettings:
+                    return 2;
+                case BuildPipelineStage.PrepareData:
+                    return 3;
+                case BuildPipelineStage.PreparePlayer:
+                    return 4;
+                case BuildPipelineStage.BuildPlayer:
+                    return 5;
+                case BuildPipelineStage.PrepareCode:
+                    return 6;
+                case BuildPipelineStage.BuildAssets:
+                    return 7;
+                case BuildPipelineStage.Finalize:
+                    return 8;
+                default:
+                    return int.MaxValue;
+            }
         }
 
         public static bool IncludesStage(BuildRecipe recipe, BuildPipelineStage stage)

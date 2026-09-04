@@ -1373,6 +1373,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: UnityRFramework
       objectReference: {fileID: 0}
+    - target: {fileID: 8812246317805994740, guid: 653d38c875d2d9649ace831b03f7ea9a, type: 3}
+      propertyPath: playMode
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 8812246317805994740, guid: 653d38c875d2d9649ace831b03f7ea9a, type: 3}
+      propertyPath: defaultHostServer
+      value: http://192.168.3.155/ExpansionHybridCLRDemoPackage
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

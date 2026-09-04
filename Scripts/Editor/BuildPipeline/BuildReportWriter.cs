@@ -16,8 +16,39 @@ namespace UnityRFramework.Editor
         /// <summary>报告文件名（ASCII 文件名，避免跨平台编码问题）。</summary>
         public const string ReportFileName = "build-report.json";
 
+        /// <summary>统一构建报告目录名。</summary>
+        public const string ReportDirectoryName = "BuildReports";
+
         /// <summary>输出解析失败时的回退目录名。</summary>
-        public const string FallbackDirectoryName = "BuildReports";
+        public const string FallbackDirectoryName = ReportDirectoryName;
+
+        /// <summary>
+        /// 获取 Assets/HotUpdate Recipe 的报告目录。
+        /// 使用任务创建时间与 Recipe 命名，便于人工按时间和构建类型定位。
+        /// </summary>
+        /// <param name="state">构建任务状态。</param>
+        /// <returns>相对于 Bundles 的报告目录。</returns>
+        public static string GetAssetOnlyReportDirectory(BuildPipelineState state)
+        {
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
+            if (DateTimeOffset.TryParse(state.CreatedAt, out DateTimeOffset createdAt))
+            {
+                return Path.Combine(
+                    ReportDirectoryName,
+                    $"{createdAt:yyyy-MM-dd_HH-mm-ss-fff}_{state.Recipe}");
+            }
+
+            string taskId = string.IsNullOrEmpty(state.TaskId)
+                ? "unknown"
+                : state.TaskId.Substring(0, Math.Min(8, state.TaskId.Length));
+            return Path.Combine(
+                ReportDirectoryName,
+                $"unknown_{state.Recipe}_{taskId}");
+        }
 
         /// <summary>
         /// 将执行报告写入目标目录；目录不存在时自动创建。

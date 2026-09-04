@@ -244,10 +244,12 @@ namespace UnityRFramework.Editor
                     effectiveProfile,
                     ToStepDictionary(ordered),
                     source.Token,
-                    taskId,
-                    persistenceRoot,
-                    recipeOverride,
-                    captureSettingsTransaction: true);
+                taskId,
+                persistenceRoot,
+                recipeOverride,
+                captureSettingsTransaction: true,
+                integrationActivationControllers:
+                    GetIntegrationActivationControllers(available));
             }
             catch
             {
@@ -263,7 +265,8 @@ namespace UnityRFramework.Editor
                 persistence,
                 source,
                 state,
-                reportHeader: $"构建任务开始：{state.ProfileName}（{state.TaskId}）",
+                reportHeader:
+                    $"构建结果详情：{state.ProfileName}（任务 {state.TaskId}）",
                 reportWriter: reportWriter);
         }
 
@@ -362,7 +365,9 @@ namespace UnityRFramework.Editor
                 state.TaskId,
                 persistenceRoot,
                 state.Recipe,
-                captureSettingsTransaction: true);
+                captureSettingsTransaction: true,
+                integrationActivationControllers:
+                    GetIntegrationActivationControllers(ordered));
 
             state.Phase = BuildPipelinePhase.Running;
             state.WaitingReason = string.Empty;
@@ -375,7 +380,7 @@ namespace UnityRFramework.Editor
                 source,
                 state,
                 reportHeader:
-                    $"构建任务恢复：{state.ProfileName}（{state.TaskId}），"
+                    $"构建结果详情：{state.ProfileName}（任务 {state.TaskId}，恢复执行），"
                     + $"从步骤 {state.CurrentStepIndex + 1}/{state.StepIds.Count} 继续。",
                 reportWriter: null);
         }
@@ -956,7 +961,7 @@ namespace UnityRFramework.Editor
 
             try
             {
-                transaction.Restore();
+                transaction.Restore(Context.IntegrationActivationControllers);
                 CurrentState.RollbackState = BuildRollbackState.Succeeded;
                 report.AppendLine("临时构建设置已按快照恢复（活动平台按契约保留）。");
             }
@@ -1007,6 +1012,31 @@ namespace UnityRFramework.Editor
                 : new List<IBuildPipelineStep>(BuildPipelineStepRegistry.GetAll());
             steps.Sort(BuildPipelineStepRegistry.CompareSteps);
             return steps;
+        }
+
+        /// <summary>
+        /// 从全部已注册步骤中收集第三方构建开关控制器。
+        /// 不能只检查 Recipe 已选步骤，否则无法关闭未选插件自身的全局回调。
+        /// </summary>
+        private static IReadOnlyList<IBuildIntegrationActivationController>
+            GetIntegrationActivationControllers(
+                IReadOnlyList<IBuildPipelineStep> steps)
+        {
+            List<IBuildIntegrationActivationController> result =
+                new List<IBuildIntegrationActivationController>();
+            if (steps == null)
+            {
+                return result;
+            }
+
+            for (int i = 0; i < steps.Count; i++)
+            {
+                if (steps[i] is IBuildIntegrationActivationController controller)
+                {
+                    result.Add(controller);
+                }
+            }
+            return result;
         }
 
         /// <summary>
@@ -1212,10 +1242,13 @@ namespace UnityRFramework.Editor
                     CurrentState,
                     succeeded,
                     cancelled);
+                ResolveExecutionReportDestination(
+                    out string reportRoot,
+                    out string reportDirectory);
                 string reportPath = reportWriter(
                     reportModel,
-                    CurrentState.OutputRootAbsolute,
-                    CurrentState.OutputDirectory,
+                    reportRoot,
+                    reportDirectory,
                     CurrentState.TaskId);
                 Debug.Log($"构建报告已写入：{reportPath}");
                 return true;
@@ -1226,6 +1259,29 @@ namespace UnityRFramework.Editor
                 Debug.LogWarning($"构建报告写入失败：{exception.Message}");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// 解析执行报告目录。Assets 与 HotUpdate 不产生 Player，报告写入工程
+        /// Bundles/BuildReports/{创建时间}_{Recipe}；Player 与 Release 跟随 Player 产物目录。
+        /// </summary>
+        private void ResolveExecutionReportDestination(
+            out string outputRoot,
+            out string outputDirectory)
+        {
+            if (Context.Recipe == BuildRecipe.Assets
+                || Context.Recipe == BuildRecipe.HotUpdate)
+            {
+                outputRoot = Path.GetFullPath(Path.Combine(
+                    Context.ProjectRoot,
+                    "Bundles"));
+                outputDirectory =
+                    BuildReportWriter.GetAssetOnlyReportDirectory(CurrentState);
+                return;
+            }
+
+            outputRoot = CurrentState.OutputRootAbsolute;
+            outputDirectory = CurrentState.OutputDirectory;
         }
 
         /// <summary>

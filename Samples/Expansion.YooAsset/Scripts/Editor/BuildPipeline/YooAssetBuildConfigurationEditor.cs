@@ -67,8 +67,38 @@ namespace UnityRFramework.Editor
                     MessageType.Error);
             }
 
+            SerializedProperty useCustomVersion =
+                serializedObject.FindProperty("UseCustomPackageVersion");
+            SerializedProperty packageVersion =
+                serializedObject.FindProperty("PackageVersion");
             EditorGUILayout.PropertyField(
-                serializedObject.FindProperty("PackageVersion"));
+                useCustomVersion,
+                new GUIContent(
+                    "Use Custom Package Version",
+                    "关闭时实时采用 YooAsset Bundle Builder 的默认版本规则。"));
+            if (useCustomVersion.boolValue)
+            {
+                EditorGUILayout.PropertyField(
+                    packageVersion,
+                    new GUIContent("Package Version", "本次构建使用的自定义版本号。"));
+                if (string.IsNullOrWhiteSpace(packageVersion.stringValue))
+                {
+                    EditorGUILayout.HelpBox(
+                        "自定义版本为空，将回退到 YooAsset Builder 默认版本。",
+                        MessageType.Warning);
+                }
+            }
+            else
+            {
+                using (new EditorGUI.DisabledScope(true))
+                {
+                    EditorGUILayout.TextField(
+                        new GUIContent(
+                            "Package Version",
+                            "实时按 YooAsset Bundle Builder 默认规则生成，不写入配置资产。"),
+                        YooAssetBuildConfiguration.GetDefaultBuilderVersion());
+                }
+            }
             EditorGUILayout.PropertyField(clearCache);
 
             string publishDirectory = string.IsNullOrWhiteSpace(package.stringValue)

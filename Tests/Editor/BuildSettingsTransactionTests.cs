@@ -118,6 +118,7 @@ namespace UnityRFramework.Editor.Tests
             profile.Platform.ApplicationIdentifier = $"com.test.{marker.ToLower()}";
             profile.Platform.PublicVersion = "1.0.0";
             profile.Platform.BuildNumber = 1;
+            profile.Output.OutputRoot = Path.Combine(tempRoot, "Builds");
 
             // 后端跟随当前值：避免应用/恢复触发脚本后端切换相关的编译。
             profile.Platform.ScriptingBackend = baselineBackend;
@@ -196,6 +197,80 @@ namespace UnityRFramework.Editor.Tests
             public override BuildStepResult Execute(BuildPipelineContext context)
             {
                 return result;
+            }
+        }
+
+        /// <summary>仅用于验证第三方插件全局开关隔离的内存控制器。</summary>
+        private sealed class FakeIntegrationController :
+            IBuildIntegrationActivationController
+        {
+            public string StepId { get; }
+
+            public bool IsEnabled { get; private set; }
+
+            public int SetCount { get; private set; }
+
+            public FakeIntegrationController(string stepId, bool enabled)
+            {
+                StepId = stepId;
+                IsEnabled = enabled;
+            }
+
+            public void SetEnabled(bool enabled)
+            {
+                IsEnabled = enabled;
+                SetCount++;
+            }
+        }
+
+        /// <summary>
+        /// 模拟已注册但未被 Player Recipe 选中的第三方步骤；同时提供全局开关控制器。
+        /// </summary>
+        private sealed class FakeIntegrationStep : BuildPipelineStepBase,
+            IBuildIntegrationActivationController
+        {
+            public override string Id => "fake-integration";
+
+            public override BuildPipelineStage Stage => BuildPipelineStage.PrepareCode;
+
+            public string StepId => Id;
+
+            public bool IsEnabled { get; private set; } = true;
+
+            public void SetEnabled(bool enabled)
+            {
+                IsEnabled = enabled;
+            }
+
+            public override BuildStepResult Execute(BuildPipelineContext context)
+            {
+                return BuildStepResult.Failed(
+                    "Player Recipe 不应执行未勾选的第三方步骤。",
+                    null);
+            }
+        }
+
+        /// <summary>在 Player 阶段检查第三方全局开关已被临时关闭。</summary>
+        private sealed class VerifyIntegrationDisabledStep : BuildPipelineStepBase
+        {
+            private readonly FakeIntegrationStep integration;
+
+            public VerifyIntegrationDisabledStep(FakeIntegrationStep integration)
+            {
+                this.integration = integration;
+            }
+
+            public override string Id => "core.build-player";
+
+            public override BuildPipelineStage Stage => BuildPipelineStage.BuildPlayer;
+
+            public override BuildStepResult Execute(BuildPipelineContext context)
+            {
+                return integration.IsEnabled
+                    ? BuildStepResult.Failed(
+                        "未勾选的第三方 Player 构建回调没有被关闭。",
+                        null)
+                    : BuildStepResult.Succeeded("第三方构建回调已隔离。");
             }
         }
 
@@ -281,6 +356,151 @@ namespace UnityRFramework.Editor.Tests
                 "成功任务清理后不应残留设置快照。");
         }
 
+        /// <summary>
+        /// Player 构建时，Profile 未勾选的第三方集成必须临时关闭，
+        /// 并可通过持久化快照在 Domain Reload 后恢复原值。
+        /// </summary>
+        [Test]
+        public void IntegrationIsolation_UnselectedPlayerStep_DisablesAndRestoresAfterReload()
+        {
+            BuildPipelinePersistence persistence =
+                new BuildPipelinePersistence(tempRoot);
+            BuildSettingsTransaction transaction =
+                BuildSettingsTransaction.Capture(persistence, "integration-reload");
+            transaction.MarkApplied();
+
+            UnityRFrameworkBuildProfile profile = CreateValidProfile("Isolation");
+            FakeIntegrationController beforeReload =
+                new FakeIntegrationController("obfuz", true);
+
+            int disabled = transaction.ApplyIntegrationIsolation(
+                new[] { beforeReload },
+                profile,
+                BuildRecipe.Player);
+
+            Assert.That(disabled, Is.EqualTo(1));
+            Assert.That(beforeReload.IsEnabled, Is.False);
+
+            // 模拟 Domain Reload：事务和控制器实例都重新创建。
+            BuildSettingsTransaction restored =
+                BuildSettingsTransaction.Capture(persistence, "integration-reload");
+            FakeIntegrationController afterReload =
+                new FakeIntegrationController("obfuz", false);
+            restored.Restore(new[] { afterReload });
+
+            Assert.That(afterReload.IsEnabled, Is.True);
+            Assert.That(afterReload.SetCount, Is.EqualTo(1));
+        }
+
+        /// <summary>Profile 已勾选的集成保持插件当前设置，不由构建工具强制开启或关闭。</summary>
+        [Test]
+        public void IntegrationIsolation_SelectedStep_PreservesPluginSetting()
+        {
+            BuildPipelinePersistence persistence =
+                new BuildPipelinePersistence(tempRoot);
+            BuildSettingsTransaction transaction =
+                BuildSettingsTransaction.Capture(persistence, "integration-selected");
+            transaction.MarkApplied();
+
+            UnityRFrameworkBuildProfile profile = CreateValidProfile("Selected");
+            profile.Steps.Add(new BuildStepSettings
+            {
+                StepId = "hybridclr",
+                Enabled = true
+            });
+            FakeIntegrationController controller =
+                new FakeIntegrationController("hybridclr", true);
+
+            int disabled = transaction.ApplyIntegrationIsolation(
+                new[] { controller },
+                profile,
+                BuildRecipe.Release);
+
+            Assert.That(disabled, Is.Zero);
+            Assert.That(controller.IsEnabled, Is.True);
+            Assert.That(controller.SetCount, Is.Zero);
+        }
+
+        /// <summary>Assets/HotUpdate 不构建 Player，不应改写插件的 Player 全局开关。</summary>
+        [Test]
+        public void IntegrationIsolation_AssetsRecipe_DoesNotChangePluginSetting()
+        {
+            BuildPipelinePersistence persistence =
+                new BuildPipelinePersistence(tempRoot);
+            BuildSettingsTransaction transaction =
+                BuildSettingsTransaction.Capture(persistence, "integration-assets");
+            transaction.MarkApplied();
+
+            UnityRFrameworkBuildProfile profile = CreateValidProfile("Assets");
+            FakeIntegrationController controller =
+                new FakeIntegrationController("obfuz", true);
+
+            int disabled = transaction.ApplyIntegrationIsolation(
+                new[] { controller },
+                profile,
+                BuildRecipe.Assets);
+
+            Assert.That(disabled, Is.Zero);
+            Assert.That(controller.IsEnabled, Is.True);
+            Assert.That(controller.SetCount, Is.Zero);
+        }
+
+        /// <summary>未导入任何第三方 Expansion 时，隔离流程必须是无副作用空操作。</summary>
+        [Test]
+        public void IntegrationIsolation_NoThirdPartyControllers_IsNoOp()
+        {
+            BuildPipelinePersistence persistence =
+                new BuildPipelinePersistence(tempRoot);
+            BuildSettingsTransaction transaction =
+                BuildSettingsTransaction.Capture(persistence, "integration-none");
+            transaction.MarkApplied();
+
+            UnityRFrameworkBuildProfile profile = CreateValidProfile("NoPlugins");
+            int disabled = transaction.ApplyIntegrationIsolation(
+                Array.Empty<IBuildIntegrationActivationController>(),
+                profile,
+                BuildRecipe.Player);
+
+            Assert.That(disabled, Is.Zero);
+            Assert.That(transaction.Snapshot.IntegrationActivations, Is.Empty);
+            Assert.DoesNotThrow(() => transaction.Restore());
+        }
+
+        /// <summary>
+        /// 运行器必须从全部注册步骤收集控制器，而不是只从当前 Recipe 的步骤收集；
+        /// 任务结束后恢复第三方开关原值。
+        /// </summary>
+        [Test]
+        public void Kernel_UnselectedRegisteredIntegration_IsolatedDuringPlayerAndRestored()
+        {
+            UnityRFrameworkBuildProfile profile = CreateValidProfile("KernelIsolation");
+            profile.Recipe = BuildRecipe.Player;
+            FakeIntegrationStep integration = new FakeIntegrationStep();
+
+            BuildPipelineRunner runner = BuildPipelineRunner.StartNew(
+                profile,
+                tempRoot,
+                new List<IBuildPipelineStep>
+                {
+                    new ApplyBuildProfileStep(),
+                    integration,
+                    new VerifyIntegrationDisabledStep(integration),
+                    new RecordingStep("core.finalize")
+                },
+                BuildRecipe.Player);
+            BuildRunResult result = runner.Execute();
+
+            Assert.That(result.Succeeded, Is.True, result.ReportText);
+            Assert.That(
+                integration.IsEnabled,
+                Is.True,
+                "任务结束后必须恢复第三方插件的原全局开关。" );
+            Assert.That(
+                result.FinalState.StepIds,
+                Does.Not.Contain(integration.Id),
+                "未勾选且不属于 Player Recipe 的第三方步骤不应进入执行计划。" );
+        }
+
         // ==================== 4.3 应用失败不改设置 ====================
 
         /// <summary>
@@ -307,7 +527,7 @@ namespace UnityRFramework.Editor.Tests
                 BuildRecipe.Player);
 
             UnityEngine.TestTools.LogAssert.Expect(
-                LogType.Error, new Regex("构建任务开始"));
+                LogType.Error, new Regex("构建结果详情"));
             BuildRunResult result = runner.Execute();
 
             Assert.That(result.Succeeded, Is.False);
@@ -398,7 +618,7 @@ namespace UnityRFramework.Editor.Tests
                 BuildRecipe.Player);
 
             UnityEngine.TestTools.LogAssert.Expect(
-                LogType.Error, new Regex("构建任务开始"));
+                LogType.Error, new Regex("构建结果详情"));
             BuildRunResult result = runner.Execute();
 
             Assert.That(result.Succeeded, Is.False);

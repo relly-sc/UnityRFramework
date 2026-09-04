@@ -15,7 +15,10 @@ namespace UnityRFramework.Editor
         [Tooltip("要构建的 YooAsset Package 名称。")]
         public string PackageName = string.Empty;
 
-        [Tooltip("资源包版本号；留空时使用 Builder 默认版本。")]
+        [Tooltip("是否使用自定义资源包版本号；关闭时实时采用 YooAsset Builder 默认版本。")]
+        public bool UseCustomPackageVersion;
+
+        [Tooltip("自定义资源包版本号；仅在 Use Custom Package Version 开启时生效。")]
         public string PackageVersion = string.Empty;
 
         [Tooltip("发布到工程 Bundles 目录下的子目录名。")]
@@ -31,6 +34,18 @@ namespace UnityRFramework.Editor
         {
             int totalMinutes = DateTime.Now.Hour * 60 + DateTime.Now.Minute;
             return DateTime.Now.ToString("yyyy-MM-dd") + "-" + totalMinutes;
+        }
+
+        /// <summary>
+        /// 获取本次构建使用的包版本。默认实时采用 YooAsset Builder 的版本规则，
+        /// 仅在明确启用且填写自定义值时使用配置资产中的版本。
+        /// </summary>
+        public string GetEffectivePackageVersion()
+        {
+            return UseCustomPackageVersion
+                && !string.IsNullOrWhiteSpace(PackageVersion)
+                    ? PackageVersion.Trim()
+                    : GetDefaultBuilderVersion();
         }
 
         public static string[] GetBuildPipelineOptions()

@@ -82,6 +82,50 @@ namespace UnityRFramework.Editor.Tests
                 BuildStepAvailability.GetUnavailableReason("missing.expansion"));
         }
 
+        [Test]
+        public void MissingOptionalStep_DisabledEntry_DoesNotInvalidateRecipe()
+        {
+            UnityRFrameworkBuildProfile profile = CreateProfile(BuildRecipe.Assets);
+            profile.Steps.Add(new BuildStepSettings
+            {
+                StepId = "missing.expansion",
+                Enabled = false
+            });
+
+            BuildRecipePlan plan = BuildRecipePlanner.Create(
+                profile,
+                Array.Empty<IBuildPipelineStep>(),
+                requireCoreSteps: false);
+
+            Assert.That(
+                plan.IsValid,
+                Is.True,
+                "未安装第三方插件且未启用对应步骤时不应阻断构建。");
+            Assert.That(plan.StepIds, Is.Empty);
+        }
+
+        [Test]
+        public void MissingOptionalStep_EnabledEntry_ReportsConfigurationError()
+        {
+            UnityRFrameworkBuildProfile profile = CreateProfile(BuildRecipe.Assets);
+            profile.Steps.Add(new BuildStepSettings
+            {
+                StepId = "missing.expansion",
+                Enabled = true
+            });
+
+            BuildRecipePlan plan = BuildRecipePlanner.Create(
+                profile,
+                Array.Empty<IBuildPipelineStep>(),
+                requireCoreSteps: false);
+
+            Assert.That(plan.IsValid, Is.False);
+            Assert.That(
+                plan.Issues,
+                Has.Some.Matches<BuildValidationIssue>(issue =>
+                    issue.Message.Contains("没有对应实现")));
+        }
+
         [TestCase("config", BuildPipelineStage.PrepareData)]
         [TestCase("hybridclr", BuildPipelineStage.PrepareCode)]
         [TestCase("obfuz", BuildPipelineStage.PrepareCode)]

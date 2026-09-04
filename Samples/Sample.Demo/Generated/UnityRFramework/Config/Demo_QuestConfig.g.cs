@@ -111,7 +111,7 @@ internal sealed class Demo_QuestConfigBinaryCodec : IBinaryConfigCodec
 /// </summary>
 internal static class Demo_QuestConfigBinaryCodecRegistration
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
     private static void RegisterRuntime()
     {
         ConfigSchemaRegistry.Register(typeof(Demo_QuestConfig), 0xAF7A35A9u, 0xBD799BBC2F0FF995UL);
