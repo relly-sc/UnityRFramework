@@ -3,12 +3,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using RFramework;
 using UnityRFramework.Runtime;
+using UnityEngine.Scripting;
 
 namespace UnityRFramework.Sample
 {
     /// <summary>
     /// 返回大厅流程。负责等待大厅场景加载完成后再进入菜单流程。
     /// </summary>
+    [Preserve]
     public sealed class DemoReturnProcedure : ProcedureStateBase
     {
         private CancellationTokenSource returnCts;

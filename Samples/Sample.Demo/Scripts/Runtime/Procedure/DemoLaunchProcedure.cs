@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using RFramework;
 using UnityRFramework.Runtime;
+using UnityEngine.Scripting;
 
 namespace UnityRFramework.Sample
 {
@@ -10,6 +11,7 @@ namespace UnityRFramework.Sample
     /// 状态的同步生命周期（OnEnter/OnLeave）只负责启动/取消内部异步任务，
     /// 真正的初始化与场景加载在 fire-and-forget 任务中完成，不阻塞主线程。
     /// </summary>
+    [Preserve]
     public class DemoLaunchProcedure : ProcedureStateBase
     {
         /// <summary>
