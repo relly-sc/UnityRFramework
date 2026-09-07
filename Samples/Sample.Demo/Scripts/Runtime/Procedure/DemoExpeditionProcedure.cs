@@ -3,12 +3,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using RFramework;
 using UnityRFramework.Runtime;
+using UnityEngine.Scripting;
 
 namespace UnityRFramework.Sample
 {
     /// <summary>
     /// 远征流程状态。同步生命周期只负责启动或取消远征场景加载任务。
     /// </summary>
+    [Preserve]
     public sealed class DemoExpeditionProcedure : ProcedureStateBase
     {
         private CancellationTokenSource expeditionCts;

@@ -4,12 +4,14 @@ using System.Threading.Tasks;
 using RFramework;
 using UnityRFramework.Runtime;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace UnityRFramework.Sample
 {
     /// <summary>
     /// 菜单流程状态。大厅场景加载完成后进入，负责实例化大厅 UI 预制体。
     /// </summary>
+    [Preserve]
     public class DemoMenuProcedure : ProcedureStateBase
     {
         private const string HallUIPrefabPath = "Prefabs/UI/DemoHallUI";
