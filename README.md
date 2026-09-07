@@ -19,6 +19,7 @@ Samples/Expansion.ExcelDataReader/ ← ExcelDataReader 配置表导出工具（E
 Samples/Expansion.Demo/         ← 官方 Demo 的第三方资源实现覆盖层
 Samples/Expansion.HybridCLR/    ← HybridCLR 通用代码热更新加载扩展
 Samples/Expansion.HybridCLR.Demo/ ← Expansion.Demo 的代码热更新覆盖层
+Samples/Expansion.Obfuz/        ← Obfuz 可选代码混淆构建扩展
 Samples/Expansion.Tests/        ← 第三方辅助器专项验收场景
 ```
 
@@ -104,6 +105,9 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   启动覆盖层；它使用独立的 YooAsset Package、收集分组和 Host 发布目录，不会把代码
   热更新资源写入普通 `Expansion.Demo` 的 Package。详细首包、Host 更新和 Player 验收
   顺序见该 Sample 的 README。
+- `Expansion.Obfuz`：可选 Obfuz 代码混淆构建扩展。需手动安装并配置 Obfuz 与
+  `Obfuz4HybridCLR`；导入后可在构建工具中启用 Obfuz 步骤。它不属于核心包强制依赖，
+  未导入 Obfuz 时不会影响框架、普通 Sample 或其他未启用 Obfuz 步骤的构建。
 - `Expansion`：与框架模块无关的通用组件和开发辅助能力。
 
 > 核心包仅依赖 Unity 官方维护的 `com.unity.nuget.newtonsoft-json`；当前已接入的

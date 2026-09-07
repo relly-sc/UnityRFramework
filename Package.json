@@ -46,6 +46,11 @@
       "path": "Samples~/Expansion.HybridCLR.Demo"
     },
     {
+      "displayName": "Expansion.Obfuz",
+      "description": "Obfuz 可选代码混淆构建扩展，提供构建工具中的 Obfuz 步骤，并支持与 HybridCLR 的 Obfuz4HybridCLR 扩展衔接。需手动安装并配置 Obfuz 与 Obfuz4HybridCLR；未导入时不影响核心框架。",
+      "path": "Samples~/Expansion.Obfuz"
+    },
+    {
       "displayName": "Expansion.Tests",
       "description": "第三方辅助器的专项验收场景，覆盖 YooAsset 运行模式、远程资源、UniTask Web 请求、取消、关闭和软重启。",
       "path": "Samples~/Expansion.Tests"
