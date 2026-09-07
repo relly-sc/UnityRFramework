@@ -36,15 +36,61 @@ namespace UnityRFramework.Expansion
         /// </summary>
         protected override async Task OnResourcesReadyAsync(CancellationToken ct)
         {
+            string runtimeManifestLocation = ResolveManifestLocation();
             HybridCLRHotUpdateContext context = new HybridCLRHotUpdateContext(
                 GameEntry.Resource,
                 ContinueToDemoAsync);
             await loader.LoadAndStartAsync(
                 GameEntry.Resource,
-                manifestLocation,
+                runtimeManifestLocation,
                 context,
                 ct);
         }
+
+        private string ResolveManifestLocation()
+        {
+            string runtimeTarget = GetRuntimeTargetName();
+            const string marker = "HotUpdate/";
+            int targetStart = manifestLocation.IndexOf(marker, StringComparison.Ordinal);
+            if (targetStart < 0)
+            {
+                return $"HotUpdate/{runtimeTarget}/Manifest";
+            }
+
+            targetStart += marker.Length;
+            int targetEnd = manifestLocation.IndexOf('/', targetStart);
+            if (targetEnd < 0)
+            {
+                return $"HotUpdate/{runtimeTarget}/Manifest";
+            }
+
+            return manifestLocation.Substring(0, targetStart)
+                + runtimeTarget
+                + manifestLocation.Substring(targetEnd);
+        }
+
+        private static string GetRuntimeTargetName()
+        {
+            switch (Application.platform)
+            {
+                case RuntimePlatform.Android:
+                    return "Android";
+                case RuntimePlatform.IPhonePlayer:
+                    return "iOS";
+                case RuntimePlatform.WebGLPlayer:
+                    return "WebGL";
+                case RuntimePlatform.WindowsPlayer:
+                    return "StandaloneWindows64";
+                case RuntimePlatform.LinuxPlayer:
+                    return "StandaloneLinux64";
+                case RuntimePlatform.OSXPlayer:
+                    return "StandaloneOSX";
+                default:
+                    return manifestFallbackTarget;
+            }
+        }
+
+        private const string manifestFallbackTarget = "StandaloneWindows64";
 
         /// <summary>
         /// 由热更新入口确认后继续进入现有 AOT Demo。

@@ -164,7 +164,7 @@ namespace UnityRFramework.Runtime
             return Path.GetFullPath(
                 Path.Combine(Application.dataPath, "..", "Logs"));
 #else
-            return Path.Combine(Application.persistentDataPath, "Logs"");
+            return Path.Combine(Application.persistentDataPath, "Logs");
 #endif
         }
 
