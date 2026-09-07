@@ -92,7 +92,7 @@ namespace UnityRFramework.Editor.Tests
         }
 
         [Test]
-        public void ReleaseRecipe_SortsByStageThenDependency()
+        public void ReleaseRecipe_BuildsPlayerBeforePreparingHotUpdateCode()
         {
             UnityRFrameworkBuildProfile profile = CreateProfile(BuildRecipe.Release);
             AddStep(profile, "prepare");
@@ -121,9 +121,9 @@ namespace UnityRFramework.Editor.Tests
                     "core.validate",
                     "core.switch-target",
                     "core.apply-profile",
+                    "core.build-player",
                     "prepare",
                     "obfuscate",
-                    "core.build-player",
                     "core.finalize"
                 },
                 plan.StepIds);

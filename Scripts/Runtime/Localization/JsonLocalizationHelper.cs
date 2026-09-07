@@ -8,6 +8,7 @@ namespace UnityRFramework.Runtime
     /// <summary>
     /// JSON 本地化解析器。每个文件只包含一种语言的 Key/Value 表。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public sealed class JsonLocalizationHelper : DictionaryLocalizationHelperBase,
         ILocalizationBundleHelper, ILocalizationLocationProvider
     {

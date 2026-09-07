@@ -20,6 +20,7 @@ namespace UnityRFramework.Runtime
     /// </code>
     /// 适用于实时性要求高、可容忍丢包的场景（如位置同步、语音数据）。
     /// </remarks>
+    [UnityEngine.Scripting.Preserve]
     public class UdpNetworkHelper : NetworkHelperBase
     {
         /// <summary>

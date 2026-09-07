@@ -9,6 +9,7 @@ namespace UnityRFramework.Runtime
     /// 使用 Unity JsonUtility 的零第三方 JSON Helper。
     /// 仅支持 JsonUtility 可序列化的字段和对象结构。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public sealed class DefaultJsonHelper : Utility.Json.IJsonHelper
     {
         /// <summary>

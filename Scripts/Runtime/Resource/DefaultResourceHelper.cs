@@ -14,6 +14,7 @@ namespace UnityRFramework.Runtime
     /// 适用于小体量快速原型项目，无需打资源包。
     /// 生产环境建议切换为 Expansion 层的 YooAssetResourceHelper。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public sealed class DefaultResourceHelper : ResourceHelperBase
     {
         /// <summary>

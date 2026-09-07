@@ -7,6 +7,7 @@ namespace UnityRFramework.Runtime
     /// 框架单配置表二进制协议解析器（URFC v1/v2）。
     /// JSON 字符串入口由 DictionaryConfigHelperBase 保留。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public sealed class BinaryConfigHelper : DictionaryConfigHelperBase, IConfigBundleHelper
     {
         /// <inheritdoc/>

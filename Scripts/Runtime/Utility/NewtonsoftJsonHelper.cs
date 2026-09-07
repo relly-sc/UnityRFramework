@@ -8,6 +8,7 @@ namespace UnityRFramework.Runtime
     /// 基于 Unity 官方 Newtonsoft Json 包的 JSON 辅助器。
     /// 支持属性、字段、集合、字典和顶层数组等 JsonUtility 不支持的常用 JSON 结构。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public sealed class NewtonsoftJsonHelper : Utility.Json.IJsonHelper
     {
         private static readonly JsonSerializerSettings SerializerSettings =

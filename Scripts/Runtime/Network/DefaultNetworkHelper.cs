@@ -7,6 +7,7 @@ namespace UnityRFramework.Runtime
     /// 默认网络辅助器（空实现）。网络传输层必须由项目自行实现。
     /// 请在 Expansion 层创建真实的 TcpHelper / WebSocketHelper 并替换。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public class DefaultNetworkHelper : NetworkHelperBase
     {
         /// <inheritdoc/>

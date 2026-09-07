@@ -10,6 +10,7 @@ namespace UnityRFramework.Runtime
     /// <summary>
     /// 使用 Unity Console 和本地滚动文本文件输出日志的默认辅助器。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public sealed class DefaultLogHelper : ILogHelper
     {
         private const long MaxFileBytes = 10L * 1024L * 1024L;

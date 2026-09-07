@@ -19,6 +19,7 @@ namespace UnityRFramework.Runtime
     /// </code>
     /// 包长度字段包含自身 4 字节，即最小有效包为 8 字节（空消息体）。
     /// </remarks>
+    [UnityEngine.Scripting.Preserve]
     public class TcpNetworkHelper : NetworkHelperBase
     {
         /// <summary>

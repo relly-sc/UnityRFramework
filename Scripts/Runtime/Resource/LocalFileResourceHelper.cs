@@ -17,6 +17,7 @@ namespace UnityRFramework.Runtime
     /// persistentDataPath、StreamingAssets、Resources 的顺序加载；
     /// 其他 Unity 资产与场景交给 DefaultResourceHelper。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public sealed class LocalFileResourceHelper : ResourceHelperBase, IResourceUrlProvider
     {
         private readonly Dictionary<AssetHandleKey, LoadedAssetHandle> loadedAssets =

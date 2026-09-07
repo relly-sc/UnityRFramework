@@ -7,6 +7,7 @@ namespace UnityRFramework.Runtime
     /// <summary>
     /// 默认 UI 辅助器实现。使用纯 Unity API（Instantiate / Destroy）完成 UI 实例化和销毁。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public class DefaultUIHelper : UIHelperBase
     {
         /// <inheritdoc cref="IUIHelper.InstantiateUI"/>

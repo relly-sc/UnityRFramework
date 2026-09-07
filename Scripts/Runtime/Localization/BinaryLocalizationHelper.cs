@@ -7,6 +7,7 @@ namespace UnityRFramework.Runtime
     /// 框架单语言二进制协议解析器（URFL v2）。
     /// JSON 字符串入口由 DictionaryLocalizationHelperBase 保留。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public sealed class BinaryLocalizationHelper : DictionaryLocalizationHelperBase,
         ILocalizationBundleHelper, ILocalizationLocationProvider
     {

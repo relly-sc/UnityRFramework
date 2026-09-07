@@ -10,6 +10,7 @@ namespace UnityRFramework.Runtime
     /// 两个公开入口相互独立，共享受保护的 JSON 解析核心。
     /// 配置行须符合 JsonUtility 约束（可序列化公开字段），并包含公开 Id/id 字段。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public sealed class JsonConfigHelper : DictionaryConfigHelperBase, IConfigBundleHelper
     {
         /// <inheritdoc/>
