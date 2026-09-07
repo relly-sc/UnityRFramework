@@ -10,6 +10,7 @@ namespace UnityRFramework.Runtime
     /// 默认音频辅助器。自建 BGM/SFX 池/UI 三组 AudioSource，
     /// 实现淡入淡出和完成回调协程。通过 Resource 模块同步加载 AudioClip。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public class DefaultAudioHelper : AudioHelperBase
     {
         /// <summary>

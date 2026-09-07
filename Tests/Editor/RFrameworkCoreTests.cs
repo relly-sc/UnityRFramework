@@ -39,6 +39,28 @@ namespace UnityRFramework.Editor.Tests
             Assert.AreNotSame(first, RFrameworkModuleHost.Get<IPoolModule>());
         }
 
+        /// <summary>验证所有内置模块均有显式创建入口，避免 IL2CPP 裁剪反射实现。</summary>
+        [Test]
+        public void RFrameworkModuleHostCanCreateEveryBuiltInModule()
+        {
+            Assert.NotNull(RFrameworkModuleHost.Get<IAudioModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<IConfigModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<IDownloadModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<IEntityModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<IEventModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<IFsmModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<ILocalizationModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<INetworkModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<IPoolModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<IProcedureModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<IResourceModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<ISceneModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<ITimerModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<IUIModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<IWebRequestModule>());
+            Assert.AreEqual(15, RFrameworkModuleHost.Count);
+        }
+
         /// <summary>验证强制日志与关闭后安全日志具有不同失败语义。</summary>
         [Test]
         public void LogHelperSupportsRequiredAndSafeWrites()

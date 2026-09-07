@@ -17,6 +17,7 @@ namespace UnityRFramework.Runtime
     /// WebRequestComponent 的 webRequestHelperTypeName 默认指向此类型，
     /// 创建后即可作为默认的 HTTP 通信通道使用，无需额外配置。
     /// </remarks>
+    [UnityEngine.Scripting.Preserve]
     public class DefaultWebRequestHelper : WebRequestHelperBase
     {
         private readonly Dictionary<UnityWebRequest, Action> activeRequests =

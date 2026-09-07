@@ -168,6 +168,10 @@ GameEntry.Framework.NeverSleep = true;
 | Log | `DefaultLogHelper` | 项目自定义 `ILogHelper` | 同时写 Unity Console 和日志文件。桌面平台写到应用数据目录同级的 `Logs/UnityRFramework`，移动平台写到 `persistentDataPath/Logs/UnityRFramework`；包含分卷和过期清理。 |
 | JSON | `DefaultJsonHelper` | `NewtonsoftJsonHelper`、项目自定义 `IJsonHelper` | 只服务 `Utility.Json`，不决定 Config/Localization 的文件格式。 |
 
+框架内置模块和内置 Helper 已处理 IL2CPP 裁剪。项目通过 Inspector 类型名接入自定义
+Helper 时，仍需由项目使用 `link.xml` 或 `UnityEngine.Scripting.Preserve` 保留对应类型及
+公共无参构造函数；仅把完整类型名写入字符串不会形成 Linker 可识别的静态引用。
+
 `UnityRFrameworkController` 的 `JSON Helper` 默认使用 `DefaultJsonHelper`（`JsonUtility`），
 保证最小配置即可启动。需要属性、字典、顶层数组或更完整的 JSON 兼容性时，可在
 Inspector 下拉框切换为 `UnityRFramework.Runtime.NewtonsoftJsonHelper`：

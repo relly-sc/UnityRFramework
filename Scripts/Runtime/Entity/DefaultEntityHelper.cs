@@ -7,6 +7,7 @@ namespace UnityRFramework.Runtime
     /// <summary>
     /// 基于 Unity Instantiate/Destroy 的默认实体 Helper。
     /// </summary>
+    [UnityEngine.Scripting.Preserve]
     public sealed class DefaultEntityHelper : EntityHelperBase
     {
         /// <inheritdoc/>

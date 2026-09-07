@@ -21,6 +21,7 @@ namespace UnityRFramework.Runtime
     /// 发送和接收均在同一帧内完成，无需额外的粘包处理。
     /// 适用于 H5 游戏、与 Node.js/Web 服务端通信等场景。
     /// </remarks>
+    [UnityEngine.Scripting.Preserve]
     public class WebSocketNetworkHelper : NetworkHelperBase
     {
         /// <summary>
