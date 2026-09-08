@@ -510,13 +510,31 @@ namespace UnityRFramework.Editor
                 typeof(Text));
             result.transform.SetParent(parent, false);
             Text text = result.GetComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.font = FindDemoFont();
             text.text = value;
             text.fontSize = fontSize;
             text.alignment = alignment;
             text.color = color;
             text.raycastTarget = false;
             return text;
+        }
+
+        private static Font FindDemoFont()
+        {
+            string[] guids = AssetDatabase.FindAssets("NotoSansSC-Regular t:Font");
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (path.EndsWith(
+                        "/NotoSansSC-Regular.ttf",
+                        StringComparison.Ordinal))
+                {
+                    return AssetDatabase.LoadAssetAtPath<Font>(path);
+                }
+            }
+
+            throw new InvalidOperationException(
+                "ExpansionHybridCLRDemoBuilder: 未找到 NotoSansSC-Regular.ttf，请先完整导入 Sample.Demo。");
         }
 
         private static Button CreateButton(
