@@ -272,7 +272,9 @@ namespace UnityRFramework.Expansion
             package = YooAssets.CreatePackage(packageName);
             try
             {
-                string cachePackageRoot = playMode == ResourcePlayMode.Host
+                bool useDiskCache = playMode == ResourcePlayMode.Host
+                    && Application.platform != RuntimePlatform.WebGLPlayer;
+                string cachePackageRoot = useDiskCache
                     ? YooAssetCacheController.GetDefaultPackageRoot(packageName)
                     : null;
                 InitializePackageOptions options = CreateInitializeOptions(
@@ -280,7 +282,8 @@ namespace UnityRFramework.Expansion
                     playMode,
                     defaultHostServer,
                     fallbackHostServer,
-                    cachePackageRoot);
+                    cachePackageRoot,
+                    Application.platform);
                 InitializePackageOperation operation = package.InitializePackageAsync(options);
                 await operation;
 
@@ -319,7 +322,7 @@ namespace UnityRFramework.Expansion
                 }
 
                 if (activePackageVersion == null
-                    && playMode == ResourcePlayMode.Host
+                    && useDiskCache
                     && TryReadLastKnownPackageVersion(
                         cachePackageRoot,
                         out string lastKnownPackageVersion))
@@ -351,7 +354,7 @@ namespace UnityRFramework.Expansion
                         + $"'{packageName}'. {remoteFailure}");
                 }
 
-                if (playMode == ResourcePlayMode.Host)
+                if (useDiskCache)
                 {
                     TryWriteLastKnownPackageVersion(
                         cachePackageRoot,
@@ -359,7 +362,7 @@ namespace UnityRFramework.Expansion
                 }
 
                 currentPlayMode = playMode;
-                if (playMode == ResourcePlayMode.Host)
+                if (useDiskCache)
                 {
                     cacheController = new YooAssetCacheController(cachePackageRoot);
                     await TryAutoTrimCacheAsync();
@@ -718,7 +721,8 @@ namespace UnityRFramework.Expansion
             ResourcePlayMode playMode,
             string defaultHostServer,
             string fallbackHostServer,
-            string cachePackageRoot)
+            string cachePackageRoot,
+            RuntimePlatform platform)
         {
             switch (playMode)
             {
@@ -738,6 +742,15 @@ namespace UnityRFramework.Expansion
 #endif
 
                 case ResourcePlayMode.Offline:
+                    if (platform == RuntimePlatform.WebGLPlayer)
+                    {
+                        return new WebPlayModeOptions
+                        {
+                            WebServerFileSystemParameters =
+                                FileSystemParameters.CreateDefaultWebServerFileSystemParameters()
+                        };
+                    }
+
                     return new OfflinePlayModeOptions
                     {
                         BuiltinFileSystemParameters =
@@ -753,6 +766,17 @@ namespace UnityRFramework.Expansion
 
                     DefaultRemoteService remoteService =
                         new DefaultRemoteService(defaultHostServer, fallbackHostServer);
+                    if (platform == RuntimePlatform.WebGLPlayer)
+                    {
+                        // 浏览器直接从远端按需加载，不创建原生磁盘文件系统。
+                        return new WebPlayModeOptions
+                        {
+                            WebNetworkFileSystemParameters =
+                                FileSystemParameters.CreateDefaultWebNetworkFileSystemParameters(
+                                    remoteService)
+                        };
+                    }
+
                     return new HostPlayModeOptions
                     {
                         BuiltinFileSystemParameters =
