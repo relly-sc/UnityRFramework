@@ -49,8 +49,8 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 验证产物存在性并输出产物信息；iOS 校验 Xcode 工程目录，
-        /// Windows/Android 校验产物文件。
+        /// 验证产物存在性并输出产物信息；iOS 和 macOS 的产物是目录，
+        /// 其他平台通常是文件。
         /// </summary>
         /// <param name="context">构建上下文。</param>
         /// <returns>产物存在返回成功，缺失返回失败。</returns>
@@ -98,18 +98,49 @@ namespace UnityRFramework.Editor
                     + "临时构建设置将在任务结束后按快照恢复（活动平台保留）。");
             }
 
-            if (!File.Exists(productPath))
+            if (!File.Exists(productPath) && !Directory.Exists(productPath))
             {
                 return BuildStepResult.Failed(
                     $"构建产物不存在：{productPath}",
                     null);
             }
 
-            FileInfo info = new FileInfo(productPath);
+            long size = File.Exists(productPath)
+                ? new FileInfo(productPath).Length
+                : CalculateDirectorySize(productPath);
             return BuildStepResult.Succeeded(
                 $"构建收尾：产物已就绪：{productPath}"
-                + $"（{FormatSize(info.Length)}）。"
+                + $"（{FormatSize(size)}）。"
                 + "临时构建设置将在任务结束后按快照恢复（活动平台保留）。");
+        }
+
+        /// <summary>
+        /// 计算目录产物大小，例如 macOS 的 .app 包。
+        /// </summary>
+        private static long CalculateDirectorySize(string directoryPath)
+        {
+            long total = 0L;
+            string[] files = Directory.GetFiles(
+                directoryPath,
+                "*",
+                SearchOption.AllDirectories);
+            for (int i = 0; i < files.Length; i++)
+            {
+                try
+                {
+                    total += new FileInfo(files[i]).Length;
+                }
+                catch (FileNotFoundException)
+                {
+                    // 构建目录可能仍被系统或杀毒软件扫描，忽略瞬时消失的文件。
+                }
+                catch (DirectoryNotFoundException)
+                {
+                    // 同上，目录被并发清理时保留已统计结果。
+                }
+            }
+
+            return total;
         }
 
         /// <summary>
