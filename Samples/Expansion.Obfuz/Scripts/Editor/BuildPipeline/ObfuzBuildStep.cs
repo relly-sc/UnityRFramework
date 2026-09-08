@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using HybridCLR.Editor;
 using HybridCLR.Editor.Settings;
+using Obfuz.ObfusPasses;
 using Obfuz.Settings;
 using Obfuz4HybridCLR;
 using UnityEditor;
@@ -216,6 +217,21 @@ namespace UnityRFramework.Editor
                     StepGroup));
             }
 
+            if (ObfuscatesAssembly(obfuzSettings, "Assembly-CSharp")
+                && obfuzSettings.obfuscationPassSettings.enabledPasses
+                    .HasFlag(ObfuscationPassType.CallObfus)
+                && (obfuzSettings.callObfusSettings.ruleFiles == null
+                    || obfuzSettings.callObfusSettings.ruleFiles.Length == 0))
+            {
+                issues.Add(BuildValidationIssue.Warning(
+                    StepCode,
+                    "Assembly-CSharp 已启用 Call Obfus，但未配置调用规则。"
+                    + "请在 Obfuz Settings/Call Obfus Settings/Rule Files 中加入 "
+                    + "Expansion.Obfuz 提供的 UnityRFrameworkCallObfuscation.xml，"
+                    + "避免 UnityEngine API 调用被代理改写。",
+                    StepGroup));
+            }
+
             if (!HasAotBaseline(context.Target))
             {
                 bool willCreateBaseline = context.Recipe == BuildRecipe.Player
@@ -383,6 +399,20 @@ namespace UnityRFramework.Editor
             }
 
             return false;
+        }
+
+        /// <summary>判断指定程序集是否位于 Obfuz 混淆清单。</summary>
+        /// <param name="obfuzSettings">Obfuz 设置。</param>
+        /// <param name="assemblyName">不含 .dll 的程序集名称。</param>
+        /// <returns>位于混淆清单时返回 true。</returns>
+        private static bool ObfuscatesAssembly(
+            ObfuzSettings obfuzSettings,
+            string assemblyName)
+        {
+            List<string> assemblies = obfuzSettings.assemblySettings
+                .GetAssembliesToObfuscate();
+            return assemblies != null
+                && assemblies.Contains(assemblyName);
         }
 
         /// <summary>

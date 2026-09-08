@@ -47,7 +47,7 @@
     },
     {
       "displayName": "Expansion.Obfuz",
-      "description": "Obfuz 可选代码混淆构建扩展，提供构建工具中的 Obfuz 步骤，并支持与 HybridCLR 的 Obfuz4HybridCLR 扩展衔接。需手动安装并配置 Obfuz 与 Obfuz4HybridCLR；未导入时不影响核心框架。",
+      "description": "Obfuz 可选代码混淆构建扩展，提供构建步骤、HybridCLR 联合流程及 UnityEngine 调用白名单。需手动安装并配置 Obfuz 与 Obfuz4HybridCLR；未导入时不影响核心框架。",
       "path": "Samples~/Expansion.Obfuz"
     },
     {
