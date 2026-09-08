@@ -804,6 +804,20 @@ namespace UnityRFramework.Editor
         {
             EditorGUILayout.Space(8f);
             EditorGUILayout.LabelField("命令", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "构建资源执行 Assets Recipe；构建 Player 执行 Player Recipe；"
+                + "按 Recipe 构建执行 Profile 当前选择的 Recipe。"
+                + "所有入口均由统一规划器校验阶段、依赖和步骤配置。"
+                + "构建命令使用临时设置事务：任务结束（成功、失败、取消）后自动恢复项目设置，"
+                + "活动构建平台按契约保留。构建中可点击「取消任务」。",
+                MessageType.Info);
+            EditorGUILayout.HelpBox(
+                "请勿在构建期间强制关闭 Unity——尤其在「构建 Player」阶段被强杀后，"
+                + "Unity 增量状态可能损坏，后续构建会跳过原生编译并报告假成功（无 exe 产出）；"
+                + "此时需先用官方 Build Settings 完整构建一次修复状态，再用本工具构建。",
+                MessageType.Warning);
+
+            EditorGUILayout.Space(4f);
             using (new EditorGUI.DisabledScope(IsTaskActive))
             {
                 using (new EditorGUILayout.HorizontalScope())
@@ -871,19 +885,6 @@ namespace UnityRFramework.Editor
                 }
             }
 
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.HelpBox(
-                "构建资源执行 Assets Recipe；构建 Player 执行 Player Recipe；"
-                + "按 Recipe 构建执行 Profile 当前选择的 Recipe。"
-                + "所有入口均由统一规划器校验阶段、依赖和步骤配置。"
-                + "构建命令使用临时设置事务：任务结束（成功、失败、取消）后自动恢复项目设置，"
-                + "活动构建平台按契约保留。构建中可点击「取消任务」。",
-                MessageType.Info);
-            EditorGUILayout.HelpBox(
-                "请勿在构建期间强制关闭 Unity——尤其在「构建 Player」阶段被强杀后，"
-                + "Unity 增量状态可能损坏，后续构建会跳过原生编译并报告假成功（无 exe 产出）；"
-                + "此时需先用官方 Build Settings 完整构建一次修复状态，再用本工具构建。",
-                MessageType.Warning);
         }
 
         /// <summary>

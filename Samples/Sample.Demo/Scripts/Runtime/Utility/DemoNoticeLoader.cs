@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using RFramework;
 using UnityRFramework.Runtime;
@@ -58,17 +59,24 @@ namespace UnityRFramework.Sample
         }
 
         /// <summary>
-        /// 构造公告文件 URL。编辑器/单机使用 file:// 协议，WebGL 使用 streamingAssets 直链。
+        /// 构造公告文件 URL。Android/WebGL 的 StreamingAssets 路径已经是 URL，
+        /// 其他平台将本地绝对路径转换为标准 file:// URL。
         /// </summary>
         private static string BuildNoticeUrl()
         {
             string basePath = Application.streamingAssetsPath + "/Demo/Demo_Notice.json";
-            if (Application.platform == RuntimePlatform.WebGLPlayer)
+            if (basePath.IndexOf("://", StringComparison.Ordinal) >= 0)
             {
                 return basePath;
             }
 
-            return "file:///" + RFramework.Utility.Path.GetRegularPath(basePath);
+            var uriBuilder = new UriBuilder
+            {
+                Scheme = Uri.UriSchemeFile,
+                Host = string.Empty,
+                Path = RFramework.Utility.Path.GetRegularPath(basePath)
+            };
+            return uriBuilder.Uri.AbsoluteUri;
         }
     }
 }

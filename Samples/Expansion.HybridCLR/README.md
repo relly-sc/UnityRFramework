@@ -39,6 +39,9 @@ Editor 运行时只验证 Manifest、资源加载、入口和 UI 链路；真正
 目标平台的 IL2CPP Player 验收。AOT 补充元数据必须来自同平台、同主包构建生成的裁剪后
 程序集，不能跨平台或跨主包混用。
 
+Unity 2022 导出 iOS Simulator 工程时，本扩展会在 HybridCLR 后处理完成后自动从
+`UnityFramework` 取消链接重复的 `libil2cpp.a`；`Device SDK` 真机工程不受影响。
+
 ## 项目接入步骤
 
 ### 1. 安装与配置
