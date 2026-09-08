@@ -43,6 +43,10 @@
    `GameAssets/OnDemand/Elastigirl/Elastigirl.fbx` 按需验证模型。
 5. 将 ExpansionDemoBoot、DemoHall、DemoExpedition 放入 Build Settings 前三项。
 
+本 Sample 随附 `link.xml`，用于在启用 Player 代码裁剪时保留按需模型所需的
+`UnityEngine.SkinnedMeshRenderer`。YooAsset 构建目录中生成的 `link.xml` 只是资源构建
+报告，不会自动参与 Player 裁剪。
+
 Demo Collector 使用 Asset GUID 生成短 Bundle 名，不把 UPM Sample 的完整安装路径写入
 文件名。这样导入到 `Assets/Samples/UnityRFramework/<版本号>/...` 后也不会因 Windows
 路径长度限制导致构建失败。Host 构建菜单会读取 YooAsset Bundle Builder 为当前 Package
