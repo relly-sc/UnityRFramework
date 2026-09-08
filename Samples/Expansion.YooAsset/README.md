@@ -50,6 +50,20 @@ YooAsset 可在加载过程中下载所需 Bundle；也可通过更新接口提�
 
 ## 更新与缓存
 
+### WebGL 平台差异
+
+WebGL Player 仍选择 `Offline` 或 `Host`，Helper 自动使用 YooAsset `WebPlayModeOptions`：
+
+- `Offline` 使用 `WebServerFileSystem`，从网站的 StreamingAssets/yoo 下加载随构建部署的资源。
+- `Host` 使用 `WebNetworkFileSystem`，从配置的主/备用服务器加载清单和资源，不初始化
+  `BuiltinFileSystem` 或 `SandboxFileSystem`，也不要求空 Builtin Catalog。
+- Web 文件系统按加载请求获取 Bundle，YooAsset 3.0.5 的预下载列表不代表浏览器缺失资源列表；
+  更新检查显示无需下载，不代表资源已全部缓存。不要承诺桌面版的预下载进度、磁盘缓存
+  配额/LRU 清理或断网回退能力，浏览器缓存由 Unity Web 缓存及浏览器管理。
+- 资源必须构建为 WebGL 平台，并通过 HTTP/HTTPS 部署；跨域访问需由服务器允许 CORS。
+
+以下磁盘缓存说明适用于非 WebGL 平台。
+
 `YooAssetResourceHelper` 同时实现以下扩展接口：
 
 - `IResourceUpdateService`：准备并下载全部差量资源。
@@ -77,7 +91,7 @@ Helper 加载场景时先检查 Player Build Settings。已加入 Build Settings
 - 全部资源远程时所需的空 `BuiltinCatalog.bytes`。
 - 部分资源内置时，与实际内置 Bundle 对应的 Catalog。
 
-Host 模式即使没有内置 Bundle，也仍需要有效的空 Builtin Catalog 来初始化 YooAsset
+非 WebGL 的 Host 模式即使没有内置 Bundle，也仍需要有效的空 Builtin Catalog 来初始化 YooAsset
 内置文件系统。
 
 ## 验收示例
