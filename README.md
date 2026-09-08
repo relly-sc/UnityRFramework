@@ -107,7 +107,9 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   顺序见该 Sample 的 README。
 - `Expansion.Obfuz`：可选 Obfuz 代码混淆构建扩展。需手动安装并配置 Obfuz 与
   `Obfuz4HybridCLR`；导入后可在构建工具中启用 Obfuz 步骤。它不属于核心包强制依赖，
-  未导入 Obfuz 时不会影响框架、普通 Sample 或其他未启用 Obfuz 步骤的构建。
+  未导入 Obfuz 时不会影响框架、普通 Sample 或其他未启用 Obfuz 步骤的构建。混淆
+  `Assembly-CSharp` 并启用 Call Obfus 时，需按该 Sample README 配置随附的 UnityEngine
+  调用白名单。
 - `Expansion`：与框架模块无关的通用组件和开发辅助能力。
 
 > 核心包仅依赖 Unity 官方维护的 `com.unity.nuget.newtonsoft-json`；当前已接入的
