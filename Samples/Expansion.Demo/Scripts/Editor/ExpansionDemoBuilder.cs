@@ -41,6 +41,9 @@ namespace UnityRFramework.Expansion
 
         private static string DemoScenes => DemoRoot + "/GameAssets/Scenes";
 
+        private static string DemoFont =>
+            DemoRoot + "/GameAssets/Fonts/Noto_Sans_SC/NotoSansSC-Regular.ttf";
+
         private static string OnDemandModel =>
             Root + "/GameAssets/OnDemand/Elastigirl/Elastigirl.fbx";
 
@@ -298,7 +301,8 @@ namespace UnityRFramework.Expansion
                 || AssetDatabase.LoadAssetAtPath<SceneAsset>(SourceBootScene) == null
                 || AssetDatabase.LoadAssetAtPath<SceneAsset>(HallScene) == null
                 || AssetDatabase.LoadAssetAtPath<SceneAsset>(ExpeditionScene) == null
-                || AssetDatabase.LoadAssetAtPath<GameObject>(OnDemandModel) == null)
+                || AssetDatabase.LoadAssetAtPath<GameObject>(OnDemandModel) == null
+                || AssetDatabase.LoadAssetAtPath<Font>(DemoFont) == null)
             {
                 throw new InvalidOperationException(
                     "ExpansionDemoBuilder: Demo 资源、场景或按需验证模型不完整。");
@@ -994,7 +998,7 @@ namespace UnityRFramework.Expansion
                 typeof(Text));
             gameObject.transform.SetParent(parent, false);
             Text text = gameObject.GetComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.font = AssetDatabase.LoadAssetAtPath<Font>(DemoFont);
             text.text = value;
             text.fontSize = fontSize;
             text.alignment = alignment;
