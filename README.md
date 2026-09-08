@@ -725,6 +725,20 @@ GameEntry.UI.UnregisterSceneUIForm("BattleHUD");
 `DefaultUIHelper` 只负责实例化和销毁 Resource 返回的 UI Prefab，不负责加载和地址转换。
 因此默认 Resources 模式使用相对 Resources 的路径；切换 YooAsset 后使用对应 Address。
 场景内 UI 通过 `SceneUIFormBinder` 登记，所有权仍属于场景，不经过 Helper 实例化或销毁。
+同一资源地址不能重复打开或重复加载；加载期间调用关闭会取消本次打开。相同层级按打开顺序
+排列，后打开的窗口位于更上层。框架加载的窗口在关闭、取消或创建失败时会销毁实例并归还
+资源引用；当前 UI 模块不使用对象池。
+
+`UnityRFramework.prefab` 的 `UI` 节点已提供默认 `Screen Space - Overlay` Canvas，以及
+Bottom、HUD、Panel、Popup、System、Top 六个普通层级。普通 UI Prefab 不需要自带 Canvas，
+会按 `WindowLayer` 挂到对应容器并随框架跨场景保留。
+
+根节点自带 Canvas 的 UI 会挂到 `Canvas Root` 下对应的 `Canvas Layer Roots`。框架只管理其
+父节点、生命周期和逻辑窗口栈，不修改该 Prefab 的 Render Mode、Camera、CanvasScaler、
+Sorting Layer、Order in Layer 或 GraphicRaycaster；独立 Canvas 之间的实际渲染顺序由项目
+自行配置。场景 UI 如需跨场景保留，应放在框架的普通或独立 Canvas 层级下再登记。
+UGUI 交互还需要场景中存在一个有效的 `EventSystem` 和与项目输入方案匹配的 Input Module；
+框架不自动选择旧输入系统或新输入系统的实现，项目中应避免同时存在多个 EventSystem。
 
 ### Audio
 

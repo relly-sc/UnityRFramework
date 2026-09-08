@@ -31,6 +31,11 @@
       "path": "Samples~/Sample.Download"
     },
     {
+      "displayName": "Sample.UI",
+      "description": "内置 UI 模块的独立 UGUI 验收场景，覆盖实际层级、同层顺序、栈顶返回、全屏遮挡、场景 UI 和强类型参数。",
+      "path": "Samples~/Sample.UI"
+    },
+    {
       "displayName": "Expansion.Demo",
       "description": "复用官方 Demo 业务并切换到 YooAsset、UniTask 等第三方辅助器的覆盖层。需同时导入 Sample.Demo 与对应 Expansion.* 目录。",
       "path": "Samples~/Expansion.Demo"
