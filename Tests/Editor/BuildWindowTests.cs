@@ -21,8 +21,7 @@ namespace UnityRFramework.Editor.Tests
         public void CleanStateKeys()
         {
             EditorPrefs.DeleteKey(KeyPrefix + "ProfileGuid");
-            EditorPrefs.DeleteKey(KeyPrefix + "Scroll.x");
-            EditorPrefs.DeleteKey(KeyPrefix + "Scroll.y");
+            DeleteTabStateKeys();
             EditorPrefs.DeleteKey(KeyPrefix + "Folds");
             EditorPrefs.DeleteKey(KeyPrefix + "LastBuild");
         }
@@ -34,21 +33,23 @@ namespace UnityRFramework.Editor.Tests
         public void CleanStateKeysAfter()
         {
             EditorPrefs.DeleteKey(KeyPrefix + "ProfileGuid");
-            EditorPrefs.DeleteKey(KeyPrefix + "Scroll.x");
-            EditorPrefs.DeleteKey(KeyPrefix + "Scroll.y");
+            DeleteTabStateKeys();
             EditorPrefs.DeleteKey(KeyPrefix + "Folds");
             EditorPrefs.DeleteKey(KeyPrefix + "LastBuild");
         }
 
         /// <summary>
-        /// 窗口状态保存后新实例可完整恢复：GUID、滚动位置与折叠分区。
+        /// 窗口状态保存后新实例可完整恢复：GUID、页签、滚动位置与折叠分区。
         /// </summary>
         [Test]
         public void WindowState_SaveLoad_RoundTrip()
         {
             BuildWindowState state = new BuildWindowState();
             state.SelectedProfileGuid = "guid-123";
-            state.ScrollPosition = new Vector2(12.5f, 88f);
+            state.SelectedTab = 2;
+            state.TabScrollPositions[0] = new Vector2(12.5f, 88f);
+            state.TabScrollPositions[1] = new Vector2(3f, 45f);
+            state.TabScrollPositions[2] = new Vector2(9f, 120f);
             state.SetSectionFolded("Summary", true);
             state.Save();
 
@@ -56,10 +57,23 @@ namespace UnityRFramework.Editor.Tests
             loaded.Load();
 
             Assert.That(loaded.SelectedProfileGuid, Is.EqualTo("guid-123"));
-            Assert.That(loaded.ScrollPosition.x, Is.EqualTo(12.5f).Within(0.0001f));
-            Assert.That(loaded.ScrollPosition.y, Is.EqualTo(88f).Within(0.0001f));
+            Assert.That(loaded.SelectedTab, Is.EqualTo(2));
+            Assert.That(loaded.TabScrollPositions[0], Is.EqualTo(new Vector2(12.5f, 88f)));
+            Assert.That(loaded.TabScrollPositions[1], Is.EqualTo(new Vector2(3f, 45f)));
+            Assert.That(loaded.TabScrollPositions[2], Is.EqualTo(new Vector2(9f, 120f)));
             Assert.That(loaded.IsSectionFolded("Summary"), Is.True);
             Assert.That(loaded.IsSectionFolded("Diffs"), Is.False);
+        }
+
+        private static void DeleteTabStateKeys()
+        {
+            EditorPrefs.DeleteKey(KeyPrefix + "SelectedTab");
+            for (int i = 0; i < 3; i++)
+            {
+                string key = KeyPrefix + "TabScroll." + i;
+                EditorPrefs.DeleteKey(key + ".x");
+                EditorPrefs.DeleteKey(key + ".y");
+            }
         }
 
         /// <summary>

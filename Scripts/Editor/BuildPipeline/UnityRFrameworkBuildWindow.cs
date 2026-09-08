@@ -8,10 +8,9 @@ using UnityEngine;
 namespace UnityRFramework.Editor
 {
     /// <summary>
-    /// 构建工具主窗口：Profile 选择、Profile 全参数编辑（平台 / 输出 / 场景）、
-    /// 步骤挂载与步骤配置参数编辑、差异预览、校验、任务控制与状态展示。
-    /// 本窗口是全部构建参数的编辑主场：Profile 参数在「Profile 参数」分区内联编辑，
-    /// 步骤配置参数在步骤区嵌套编辑器编辑，即改即存；
+    /// 构建工具主窗口：使用 Profile、平台输出与场景、构建步骤三个页签，
+    /// 分别承载构建控制、Player 参数和步骤配置。
+    /// 本窗口是全部构建参数的编辑主场：Profile 与步骤配置均在对应页签内即改即存；
     /// Profile 资产 Inspector 只负责步骤条目的挂载、启停与类型识别。
     /// 窗口只调用构建服务与配置模型，不实现任何具体构建步骤逻辑，
     /// 也不直接同步执行流水线：构建命令经 <see cref="BuildPipelineRunner"/>
@@ -21,6 +20,23 @@ namespace UnityRFramework.Editor
     /// </summary>
     public sealed class UnityRFrameworkBuildWindow : EditorWindow
     {
+        /// <summary>构建窗口的三个功能页签。</summary>
+        private static readonly string[] TabNames =
+        {
+            "Profile",
+            "平台、输出与场景",
+            "构建步骤"
+        };
+
+        /// <summary>页签工具栏样式。</summary>
+        private static GUIStyle tabToolbarStyle;
+
+        /// <summary>普通页签样式。</summary>
+        private static GUIStyle tabStyle;
+
+        /// <summary>选中页签样式。</summary>
+        private static GUIStyle selectedTabStyle;
+
         /// <summary>分区折叠键：Profile 参数。</summary>
         private const string FoldProfileParameters = "ProfileParameters";
 
@@ -202,35 +218,30 @@ namespace UnityRFramework.Editor
             EditorGUIUtility.labelWidth = 200f;
             try
             {
-                DrawProfileSection();
-                if (selectedProfile == null)
-                {
-                    EditorGUILayout.Space(6f);
-                    EditorGUILayout.HelpBox(
-                        "未选择 Profile。请先创建或选择一个构建配置，"
-                        + "在选中前不会修改任何项目参数。",
-                        MessageType.Info);
-                    return;
-                }
+                DrawTabBar();
 
-                // 基础 Profile 参数固定显示；其余设置和命令位于滚动区域。
-                DrawCurrentTaskSection();
-                DrawProfileBasicSection();
-
-                // 其余内容使用一个滚动容器。让 GUILayout 直接分配剩余高度，
-                // 避免 BeginArea 使用布局阶段尚未稳定的矩形而绘制成空白区域。
-                windowState.ScrollPosition = EditorGUILayout.BeginScrollView(
-                    windowState.ScrollPosition,
+                Vector2 scrollPosition = EditorGUILayout.BeginScrollView(
+                    windowState.TabScrollPositions[windowState.SelectedTab],
                     false,
                     true,
                     GUILayout.ExpandWidth(true),
                     GUILayout.ExpandHeight(true));
-                DrawProfileAdvancedSection();
-                DrawStepsSection();
-                DrawValidationSection();
-                DrawLastBuildSection();
-                DrawCommandSection();
+
+                switch (windowState.SelectedTab)
+                {
+                    case 0:
+                        DrawProfileTab();
+                        break;
+                    case 1:
+                        DrawProfileRequiredContent(DrawProfileAdvancedSection);
+                        break;
+                    case 2:
+                        DrawProfileRequiredContent(DrawStepsSection);
+                        break;
+                }
+
                 EditorGUILayout.EndScrollView();
+                windowState.TabScrollPositions[windowState.SelectedTab] = scrollPosition;
             }
             finally
             {
@@ -239,7 +250,82 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 在顶部固定区域显示 Profile 基础参数：Description、Enabled、Flavor、Recipe
+        /// 绘制浏览器风格页签。选中页签使用更深的灰色背景和粗体文字，
+        /// 页签栏与下方内容使用不同底色，避免深色皮肤下难以辨认当前页面。
+        /// </summary>
+        private void DrawTabBar()
+        {
+            if (tabToolbarStyle == null)
+            {
+                tabToolbarStyle = new GUIStyle(EditorStyles.toolbar);
+                tabStyle = new GUIStyle(EditorStyles.toolbarButton)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontStyle = FontStyle.Normal
+                };
+                selectedTabStyle = new GUIStyle(tabStyle)
+                {
+                    fontStyle = FontStyle.Bold
+                };
+            }
+
+            using (new EditorGUILayout.HorizontalScope(tabToolbarStyle, GUILayout.Height(28f)))
+            {
+                for (int i = 0; i < TabNames.Length; i++)
+                {
+                    bool selected = windowState.SelectedTab == i;
+                    Color previousColor = GUI.backgroundColor;
+                    GUI.backgroundColor = selected
+                        ? new Color(0.62f, 0.62f, 0.62f, 1f)
+                        : Color.white;
+
+                    if (GUILayout.Toggle(
+                            selected,
+                            TabNames[i],
+                            selected ? selectedTabStyle : tabStyle,
+                            GUILayout.ExpandWidth(true),
+                            GUILayout.Height(26f)) != selected)
+                    {
+                        windowState.SelectedTab = i;
+                    }
+
+                    GUI.backgroundColor = previousColor;
+                }
+            }
+        }
+
+        /// <summary>绘制 Profile 页签：配置选择、任务状态、基础参数、校验、记录与命令。</summary>
+        private void DrawProfileTab()
+        {
+            DrawProfileSection();
+            DrawProfileRequiredContent(() =>
+            {
+                DrawProfileBasicSection();
+                DrawCurrentTaskSection();
+                DrawValidationSection();
+                DrawLastBuildSection();
+                DrawCommandSection();
+            });
+        }
+
+        /// <summary>仅在已选择 Profile 时绘制页签内容，否则显示统一提示。</summary>
+        private void DrawProfileRequiredContent(Action drawContent)
+        {
+            if (selectedProfile == null)
+            {
+                EditorGUILayout.Space(6f);
+                EditorGUILayout.HelpBox(
+                    "未选择 Profile。请先在 Profile 页签创建或选择一个构建配置，"
+                    + "在选中前不会修改任何项目参数。",
+                    MessageType.Info);
+                return;
+            }
+
+            drawContent();
+        }
+
+        /// <summary>
+        /// 在 Profile 页签显示基础参数：Description、Enabled、Flavor、Recipe
         /// 及 Recipe 执行范围提示。
         /// </summary>
         private void DrawProfileBasicSection()
@@ -412,7 +498,7 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 绘制滚动区域中的 Profile 其余设置：平台、输出、场景和宏定义。
+        /// 绘制平台、输出与场景页签内容。
         /// </summary>
         private void DrawProfileAdvancedSection()
         {
