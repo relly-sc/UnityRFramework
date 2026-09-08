@@ -118,6 +118,65 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 > YooAsset、UniTask、ExcelDataReader 和 HybridCLR 分别位于对应的可选 Expansion Sample，
 > 均不会成为核心包的强制第三方依赖。
 
+## 编辑器构建工具
+
+通过 `UnityRFramework → 构建工具` 打开窗口。构建工具使用项目自己的 Profile 资产统一
+管理平台参数、输出目录、构建场景和可选步骤；Profile 默认创建在
+`Assets/BuildProfiles`，不会写入框架包目录。
+
+窗口分为三个页签：
+
+- **Profile**：选择或创建 Profile，设置用途分档（Flavor）和构建方案（Recipe），查看
+  校验结果、当前任务、最近构建及执行构建命令。
+- **平台、输出与场景**：设置目标平台、PlayerSettings 参数、脚本后端、裁剪级别、版本与
+  构建号、输出规则和参与构建的场景。
+- **构建步骤**：挂载并启用当前项目已经注册的 Config、YooAsset、HybridCLR、Obfuz 等
+  步骤。未导入对应 Expansion 或第三方插件时，不会影响核心构建工具；只有主动启用缺失
+  能力才会阻止构建。
+
+### Flavor 与 Recipe
+
+Flavor 只表示构建用途，并提供一组可显式应用的调试参数建议，不会自动切换 Mono/IL2CPP：
+
+| Flavor | 推荐用途 | 推荐调试参数 |
+|--------|----------|--------------|
+| `Release` | 正式发布 | 关闭 Development Build、脚本调试和 Profiler |
+| `Qa` | 测试验收 | 开启 Development Build 与脚本调试 |
+| `Development` | 开发调试 | 开启 Development Build、脚本调试和自动连接 Profiler |
+
+Recipe 决定本次实际执行范围：
+
+| Recipe | 执行范围 |
+|--------|----------|
+| `Player` | 应用 Profile 参数并构建 Player，不发布资源或热更代码 |
+| `Assets` | 导出 Config 并构建 YooAsset 资源包，不构建 Player |
+| `HotUpdate` | 准备 HybridCLR/Obfuz 热更代码并构建 YooAsset 资源包，不构建 Player |
+| `Release` | 配置导出、Player 准备与构建、热更代码发布和资源构建的完整流程 |
+
+具体步骤仍以 Profile 中已启用的条目为准。脚本后端必须根据项目技术栈单独选择；例如
+使用 HybridCLR 时应选择 IL2CPP，不能依赖 Flavor 自动修改。
+
+### 构建与产物
+
+1. 创建或选择 Profile，填写平台、输出和场景设置。
+2. 在“构建步骤”页签点击“初始化全部已注册”，只启用本次需要的步骤并完成其配置。
+3. 点击“重新校验”，处理全部错误；警告应根据项目发布要求确认。
+4. 使用“构建资源”执行 Assets Recipe，使用“构建 Player”执行 Player Recipe，或使用
+   “按 Recipe 构建”执行 Profile 当前选择的 Recipe。
+
+“应用参数”会立即把 Profile 参数持久写入当前 Unity 工程设置；普通构建任务则使用临时
+设置事务，并在成功、失败或取消后恢复构建前设置。构建期间不要强制关闭 Unity，尤其不要
+中断 Player 原生编译；若发生强制中断，应先作废残留任务，再使用 Unity 官方 Build
+完整构建一次 Player 后继续。
+
+Player 与 Release 的 `build-report.json` 位于对应 Player 产物目录；Assets 与 HotUpdate
+报告位于 `Bundles/BuildReports/{创建时间}_{Recipe}`。只有 Player 或 Release 成功产出
+Player 后才会按 Profile 设置递增 Build Number。
+
+当前已实际验收 Windows、Android、macOS、iOS 与 WebGL 构建和运行。Linux 目标选项保留，
+但暂未纳入当前版本的实际验收范围。YooAsset、HybridCLR 和 Obfuz 的安装、配置及产物准备
+要求见各自 Expansion README。
+
 ## 模块
 
 | 模块 | 职责 | 入口 |
