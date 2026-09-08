@@ -8,7 +8,7 @@ namespace UnityRFramework.Editor
 {
     /// <summary>
     /// 构建工具窗口的持久化状态，保存到 EditorPrefs。
-    /// 包含上次选中的 Profile、滚动位置、折叠分区与最近一次构建摘要。
+    /// 包含上次选中的 Profile、页签、各页签滚动位置、折叠分区与最近一次构建摘要。
     /// </summary>
     public sealed class BuildWindowState
     {
@@ -18,8 +18,11 @@ namespace UnityRFramework.Editor
         /// <summary>上次选中 Profile GUID 的 EditorPrefs 键。</summary>
         private const string ProfileGuidKey = KeyPrefix + "ProfileGuid";
 
-        /// <summary>滚动位置的 EditorPrefs 键。</summary>
-        private const string ScrollKey = KeyPrefix + "Scroll";
+        /// <summary>当前页签的 EditorPrefs 键。</summary>
+        private const string SelectedTabKey = KeyPrefix + "SelectedTab";
+
+        /// <summary>各页签滚动位置的 EditorPrefs 键前缀。</summary>
+        private const string TabScrollKey = KeyPrefix + "TabScroll";
 
         /// <summary>折叠分区列表的 EditorPrefs 键。</summary>
         private const string FoldsKey = KeyPrefix + "Folds";
@@ -30,8 +33,11 @@ namespace UnityRFramework.Editor
         /// <summary>上次选中的 Profile GUID；为空表示尚未选择。</summary>
         public string SelectedProfileGuid = string.Empty;
 
-        /// <summary>窗口滚动位置。</summary>
-        public Vector2 ScrollPosition;
+        /// <summary>当前页签索引。</summary>
+        public int SelectedTab;
+
+        /// <summary>三个页签各自的滚动位置。</summary>
+        public Vector2[] TabScrollPositions = new Vector2[3];
 
         /// <summary>当前处于折叠状态的分区键列表；不在列表中的分区默认展开。</summary>
         public List<string> FoldedSections = new List<string>();
@@ -46,9 +52,14 @@ namespace UnityRFramework.Editor
         {
             SelectedProfileGuid = EditorPrefs.GetString(ProfileGuidKey, string.Empty);
 
-            ScrollPosition = new Vector2(
-                EditorPrefs.GetFloat(ScrollKey + ".x", 0f),
-                EditorPrefs.GetFloat(ScrollKey + ".y", 0f));
+            SelectedTab = Mathf.Clamp(EditorPrefs.GetInt(SelectedTabKey, 0), 0, 2);
+            for (int i = 0; i < TabScrollPositions.Length; i++)
+            {
+                string key = TabScrollKey + "." + i;
+                TabScrollPositions[i] = new Vector2(
+                    EditorPrefs.GetFloat(key + ".x", 0f),
+                    EditorPrefs.GetFloat(key + ".y", 0f));
+            }
 
             string foldsJson = EditorPrefs.GetString(FoldsKey, string.Empty);
             if (!string.IsNullOrEmpty(foldsJson))
@@ -85,8 +96,13 @@ namespace UnityRFramework.Editor
         public void Save()
         {
             EditorPrefs.SetString(ProfileGuidKey, SelectedProfileGuid);
-            EditorPrefs.SetFloat(ScrollKey + ".x", ScrollPosition.x);
-            EditorPrefs.SetFloat(ScrollKey + ".y", ScrollPosition.y);
+            EditorPrefs.SetInt(SelectedTabKey, SelectedTab);
+            for (int i = 0; i < TabScrollPositions.Length; i++)
+            {
+                string key = TabScrollKey + "." + i;
+                EditorPrefs.SetFloat(key + ".x", TabScrollPositions[i].x);
+                EditorPrefs.SetFloat(key + ".y", TabScrollPositions[i].y);
+            }
 
             StringListWrapper wrapper = new StringListWrapper();
             wrapper.Items = FoldedSections;
