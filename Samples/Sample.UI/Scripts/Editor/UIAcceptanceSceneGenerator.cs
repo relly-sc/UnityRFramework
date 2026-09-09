@@ -26,6 +26,7 @@ namespace UnityRFramework.Sample.UI.Editor
             EnsureFolder(Root + "/GameAssets/Scenes");
 
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            CreateMainCamera();
             GameObject framework = (GameObject)PrefabUtility.InstantiatePrefab(
                 AssetDatabase.LoadAssetAtPath<GameObject>(FrameworkPrefabPath));
             framework.name = "UnityRFramework";
@@ -33,9 +34,9 @@ namespace UnityRFramework.Sample.UI.Editor
             UIComponent uiComponent = framework.GetComponentInChildren<UIComponent>();
             Canvas canvas = uiComponent.transform.Find("Canvas").GetComponent<Canvas>();
 
-            CreateFormPrefab("PanelA", "Panel A", new Color(0.16f, 0.28f, 0.48f, 0.96f));
-            CreateFormPrefab("PanelB", "Panel B", new Color(0.18f, 0.44f, 0.30f, 0.96f));
-            CreateFormPrefab("FullScreen", "Full-screen Popup", new Color(0.48f, 0.20f, 0.18f, 0.98f));
+            CreateFormPrefab("PanelA", "普通面板 A", new Color(0.16f, 0.28f, 0.48f, 0.96f));
+            CreateFormPrefab("PanelB", "普通面板 B", new Color(0.18f, 0.44f, 0.30f, 0.96f));
+            CreateFormPrefab("FullScreen", "全屏弹窗", new Color(0.48f, 0.20f, 0.18f, 0.98f));
             CreateCanvasFormPrefab();
 
             UIAcceptanceController controller = CreateController(canvas.transform);
@@ -45,6 +46,13 @@ namespace UnityRFramework.Sample.UI.Editor
             Debug.Log("Sample.UI 验收场景已生成：" + ScenePath);
         }
 
+        private static void CreateMainCamera()
+        {
+            GameObject cameraObject = new GameObject("Main Camera", typeof(Camera), typeof(AudioListener));
+            cameraObject.tag = "MainCamera";
+            cameraObject.transform.position = new Vector3(0f, 0f, -10f);
+        }
+
         private static UIAcceptanceController CreateController(Transform parent)
         {
             GameObject root = new GameObject("UIAcceptance", typeof(RectTransform));
@@ -52,15 +60,15 @@ namespace UnityRFramework.Sample.UI.Editor
             Stretch(root.GetComponent<RectTransform>());
             UIAcceptanceController controller = root.AddComponent<UIAcceptanceController>();
 
-            Button panelA = CreateButton(root.transform, "Open Panel A", new Vector2(180, -80));
-            Button panelB = CreateButton(root.transform, "Open Panel B", new Vector2(180, -140));
-            Button popup = CreateButton(root.transform, "Open Full-screen", new Vector2(180, -200));
-            Button independentCanvas = CreateButton(root.transform, "Open Independent Canvas",
+            Button panelA = CreateButton(root.transform, "打开普通面板 A", new Vector2(180, -80));
+            Button panelB = CreateButton(root.transform, "打开普通面板 B", new Vector2(180, -140));
+            Button popup = CreateButton(root.transform, "打开全屏弹窗", new Vector2(180, -200));
+            Button independentCanvas = CreateButton(root.transform, "打开独立画布界面",
                 new Vector2(180, -260));
-            Button closeTop = CreateButton(root.transform, "Close Top / Return", new Vector2(180, -320));
-            Button closeAll = CreateButton(root.transform, "Close All", new Vector2(180, -380));
-            Button restart = CreateButton(root.transform, "Soft Restart", new Vector2(180, -440));
-            Text status = CreateText(root.transform, "Status", "Ready", new Vector2(570, -95), 22);
+            Button closeTop = CreateButton(root.transform, "关闭顶部界面 / 返回", new Vector2(180, -320));
+            Button closeAll = CreateButton(root.transform, "关闭全部界面", new Vector2(180, -380));
+            Button restart = CreateButton(root.transform, "软重启框架", new Vector2(180, -440));
+            Text status = CreateText(root.transform, "Status", "准备完成", new Vector2(570, -95), 22);
 
             SerializedObject serialized = new SerializedObject(controller);
             serialized.FindProperty("openPanelAButton").objectReferenceValue = panelA;
@@ -85,7 +93,7 @@ namespace UnityRFramework.Sample.UI.Editor
             root.GetComponent<Image>().color = color;
             UIAcceptanceFormLogic logic = root.AddComponent<UIAcceptanceFormLogic>();
             Text titleText = CreateText(root.transform, "Title", title, Vector2.zero, 30);
-            Text lifecycleText = CreateText(root.transform, "Lifecycle", "Waiting", new Vector2(0, -60), 20);
+            Text lifecycleText = CreateText(root.transform, "Lifecycle", "等待打开", new Vector2(0, -60), 20);
             SerializedObject serialized = new SerializedObject(logic);
             serialized.FindProperty("titleText").objectReferenceValue = titleText;
             serialized.FindProperty("lifecycleText").objectReferenceValue = lifecycleText;
@@ -117,8 +125,8 @@ namespace UnityRFramework.Sample.UI.Editor
             panelRect.sizeDelta = new Vector2(560, 260);
             panel.GetComponent<Image>().color = new Color(0.38f, 0.22f, 0.50f, 0.98f);
 
-            Text titleText = CreateText(panel.transform, "Title", "Independent Canvas", Vector2.zero, 30);
-            Text lifecycleText = CreateText(panel.transform, "Lifecycle", "Waiting", new Vector2(0, -60), 20);
+            Text titleText = CreateText(panel.transform, "Title", "独立画布界面", Vector2.zero, 30);
+            Text lifecycleText = CreateText(panel.transform, "Lifecycle", "等待打开", new Vector2(0, -60), 20);
             SerializedObject serialized = new SerializedObject(logic);
             serialized.FindProperty("titleText").objectReferenceValue = titleText;
             serialized.FindProperty("lifecycleText").objectReferenceValue = lifecycleText;

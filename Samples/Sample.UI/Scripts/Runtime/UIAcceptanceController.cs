@@ -41,7 +41,7 @@ namespace UnityRFramework.Sample.UI
             closeTopButton.onClick.AddListener(CloseTop);
             closeAllButton.onClick.AddListener(CloseAll);
             restartButton.onClick.AddListener(GameEntry.Restart);
-            RefreshStatus("Ready");
+            RefreshStatus("准备完成");
         }
 
         private void OnDestroy()
@@ -67,17 +67,17 @@ namespace UnityRFramework.Sample.UI
             try
             {
                 string title = fullScreen
-                    ? "Full-screen Popup"
+                    ? "全屏弹窗"
                     : path.EndsWith("PanelA")
-                        ? "Panel A"
-                        : path.EndsWith("PanelB") ? "Panel B" : "Independent Canvas";
+                        ? "普通面板 A"
+                        : path.EndsWith("PanelB") ? "普通面板 B" : "独立画布界面";
                 UIAcceptancePayload payload = new UIAcceptancePayload(title, ++sequence);
                 await GameEntry.UI.OpenUIFormAsync(path, layer, fullScreen, userData: payload);
-                RefreshStatus("Opened " + payload.Title);
+                RefreshStatus("已打开" + payload.Title);
             }
             catch (Exception ex)
             {
-                RefreshStatus("Open failed: " + ex.Message);
+                RefreshStatus("打开失败：" + ex.Message);
             }
             finally
             {
@@ -89,13 +89,13 @@ namespace UnityRFramework.Sample.UI
         private void CloseTop()
         {
             bool closed = GameEntry.UI != null && GameEntry.UI.CloseTopUIForm();
-            RefreshStatus(closed ? "Closed top window" : "No window to close");
+            RefreshStatus(closed ? "已关闭顶部界面" : "没有可关闭的界面");
         }
 
         private void CloseAll()
         {
             GameEntry.UI?.CloseAllUIForms();
-            RefreshStatus("Closed all windows");
+            RefreshStatus("已关闭全部界面");
         }
 
         private void SetButtonsInteractable(bool value)
@@ -110,9 +110,9 @@ namespace UnityRFramework.Sample.UI
         {
             IUIForm top = GameEntry.UI?.GetTopUIForm();
             int count = GameEntry.UI?.UIFormCount ?? 0;
-            statusText.text = message + "\nManaged: " + count +
-                "   Top: " + (top?.AssetName ?? "None") +
-                "\nScene HUD remains externally owned.";
+            statusText.text = message + "\n已管理：" + count +
+                "   顶部界面：" + (top?.AssetName ?? "无") +
+                "\n场景 HUD 仍由外部管理。";
         }
     }
 }

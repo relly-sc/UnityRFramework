@@ -18,22 +18,22 @@ namespace UnityRFramework.Sample.UI
             titleText.text = payload == null
                 ? Owner.AssetName
                 : payload.Title + "  #" + payload.Sequence;
-            lifecycleText.text = "Opened";
+            lifecycleText.text = "已打开";
         }
 
         protected override void OnPause()
         {
-            lifecycleText.text = "Paused by full-screen window";
+            lifecycleText.text = "已被全屏界面暂停";
         }
 
         protected override void OnResume()
         {
-            lifecycleText.text = "Resumed";
+            lifecycleText.text = "已恢复";
         }
 
         protected override void OnClose(object userData)
         {
-            lifecycleText.text = "Closed";
+            lifecycleText.text = "已关闭";
         }
     }
 }
