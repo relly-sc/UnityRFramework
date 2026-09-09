@@ -1,0 +1,6 @@
+Id,NameKey,ClassKey,BaseAtk,BaseDef,BaseHp,UpgradeCost
+int,string,string,int,int,int,int
+主键ID（唯一标识）,名称本地化键,职业本地化键,基础攻击力,基础防御力,基础生命值,升级消耗
+1,char_warrior,class_warrior,12,8,100,50
+2,char_mage,class_mage,18,3,60,50
+3,char_priest,class_priest,5,6,80,50

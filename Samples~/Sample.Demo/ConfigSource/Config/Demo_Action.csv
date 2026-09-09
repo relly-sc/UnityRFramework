@@ -1,0 +1,6 @@
+Id,NameKey,Type,Power,Cooldown
+int,string,string,float,int
+主键ID（唯一标识）,名称本地化键,动作类型（attack/defend/skill）,威力/伤害系数,冷却（回合/秒）
+1,action_attack,attack,1,0
+2,action_defend,defend,0.5,0
+3,action_skill,skill,1.8,2
