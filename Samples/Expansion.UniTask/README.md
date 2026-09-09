@@ -32,4 +32,4 @@ UniTask 是可选第三方依赖。导入本 Sample 前应先在宿主项目安�
 本实现仍受 UnityWebRequest 和目标平台网络栈限制。正式发布前应在目标平台验证 HTTPS
 证书、代理、超时、后台切换和网络中断等项目实际使用场景。
 
-完整的成功请求、主动取消和框架重启验收流程见 `Expansion.Tests` Sample。
+完整的成功请求、主动取消和框架重启验收流程见 `Expansion.YooAsset.Demo/Acceptance`。

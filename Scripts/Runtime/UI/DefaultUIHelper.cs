@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using RFramework;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -10,6 +11,53 @@ namespace UnityRFramework.Runtime
     [UnityEngine.Scripting.Preserve]
     public class DefaultUIHelper : UIHelperBase
     {
+        private readonly Dictionary<int, RectTransform> layerRoots =
+            new Dictionary<int, RectTransform>();
+
+        private readonly Dictionary<int, RectTransform> canvasLayerRoots =
+            new Dictionary<int, RectTransform>();
+
+        private RectTransform uiRoot;
+        private RectTransform canvasRoot;
+
+        /// <inheritdoc cref="UIHelperBase.SetUIRoot"/>
+        public override void SetUIRoot(RectTransform root)
+        {
+            uiRoot = root;
+            layerRoots.Clear();
+            canvasLayerRoots.Clear();
+        }
+
+        /// <inheritdoc cref="UIHelperBase.SetCanvasRoot"/>
+        public override void SetCanvasRoot(RectTransform root)
+        {
+            canvasRoot = root;
+        }
+
+        /// <inheritdoc cref="UIHelperBase.SetLayerRoot"/>
+        public override void SetLayerRoot(int windowLayer, RectTransform layerRoot)
+        {
+            if (layerRoot == null)
+            {
+                layerRoots.Remove(windowLayer);
+                return;
+            }
+
+            layerRoots[windowLayer] = layerRoot;
+        }
+
+        /// <inheritdoc cref="UIHelperBase.SetCanvasLayerRoot"/>
+        public override void SetCanvasLayerRoot(int windowLayer, RectTransform layerRoot)
+        {
+            if (layerRoot == null)
+            {
+                canvasLayerRoots.Remove(windowLayer);
+                return;
+            }
+
+            canvasLayerRoots[windowLayer] = layerRoot;
+        }
+
         /// <inheritdoc cref="IUIHelper.InstantiateUI"/>
         public override object InstantiateUI(object uiAsset)
         {
@@ -47,6 +95,19 @@ namespace UnityRFramework.Runtime
 
             UIForm uiForm = go.GetOrAddComponent<UIForm>();
             uiForm.Init(assetName, windowLayer, fullScreen);
+
+            bool hasRootCanvas = go.GetComponent<Canvas>() != null;
+            Dictionary<int, RectTransform> roots = hasRootCanvas ? canvasLayerRoots : layerRoots;
+            RectTransform parent = roots.TryGetValue(windowLayer, out RectTransform layerRoot)
+                && layerRoot != null
+                ? layerRoot
+                : hasRootCanvas ? canvasRoot : uiRoot;
+            if (parent != null)
+            {
+                go.transform.SetParent(parent, false);
+                go.transform.SetAsLastSibling();
+            }
+
             return uiForm;
         }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,6 +15,22 @@ namespace UnityRFramework.Runtime
     [DisallowMultipleComponent]
     public sealed class UIComponent : UnityRFrameworkComponent
     {
+        [Serializable]
+        private struct LayerRoot
+        {
+            [SerializeField]
+            [Tooltip("逻辑窗口层级，需与打开 UI 时传入的 Window Layer 一致。")]
+            private int windowLayer;
+
+            [SerializeField]
+            [Tooltip("该逻辑层级对应的 UGUI RectTransform 容器。")]
+            private RectTransform root;
+
+            public int WindowLayer => windowLayer;
+
+            public RectTransform Root => root;
+        }
+
         /// <summary>
         /// UI 模块引用。
         /// </summary>
@@ -23,6 +40,34 @@ namespace UnityRFramework.Runtime
         /// UI 辅助器类型名称。
         /// </summary>
         [SerializeField] private string uiHelperTypeName = "UnityRFramework.Runtime.DefaultUIHelper";
+
+        /// <summary>
+        /// 未匹配到专用层级时使用的 UI 根节点。留空保持原有场景根节点实例化行为。
+        /// </summary>
+        [SerializeField]
+        [Tooltip("未匹配到专用层级时使用的 UI 根节点。留空时不自动设置父节点。")]
+        private RectTransform uiRoot;
+
+        /// <summary>
+        /// 带根 Canvas 的 UI 使用的持久化根节点。未配置专用层级时回退到普通层级容器。
+        /// </summary>
+        [SerializeField]
+        [Tooltip("带根 Canvas 的 UI 使用的持久化根节点。未配置专用层级时回退到普通层级容器。")]
+        private RectTransform canvasRoot;
+
+        /// <summary>
+        /// 逻辑窗口层级与 UGUI 容器的对应关系。
+        /// </summary>
+        [SerializeField]
+        [Tooltip("逻辑窗口层级与 UGUI RectTransform 容器的对应关系。")]
+        private LayerRoot[] layerRoots = Array.Empty<LayerRoot>();
+
+        /// <summary>
+        /// 带根 Canvas 的 UI 使用的逻辑层级容器。
+        /// </summary>
+        [SerializeField]
+        [Tooltip("带根 Canvas 的 UI 使用的逻辑层级容器。")]
+        private LayerRoot[] canvasLayerRoots = Array.Empty<LayerRoot>();
 
         /// <summary>
         /// 获取当前打开的 UI 数量。
@@ -46,14 +91,13 @@ namespace UnityRFramework.Runtime
             // 注入依赖模块
             IResourceModule resourceModule = RFrameworkModuleHost.Get<IResourceModule>();
             IEventModule eventModule = RFrameworkModuleHost.Get<IEventModule>();
-            IPoolModule poolModule = RFrameworkModuleHost.Get<IPoolModule>();
-            uiModule.SetDependencies(resourceModule, eventModule, poolModule);
+            uiModule.SetDependencies(resourceModule, eventModule);
 
             // 创建并注入 UI 辅助器
             UIHelperBase uiHelper = ComponentFactory.Create<UIHelperBase>(uiHelperTypeName, null);
             if (uiHelper != null)
             {
-                uiModule.SetHelper(uiHelper);
+                SetHelper(uiHelper);
                 uiHelper.transform.SetParent(transform);
             }
         }
@@ -63,7 +107,109 @@ namespace UnityRFramework.Runtime
         /// </summary>
         public void SetHelper(IUIHelper helper)
         {
+            if (helper is UIHelperBase unityHelper)
+            {
+                ConfigureLayerRoots(unityHelper);
+            }
+
             uiModule.SetHelper(helper);
+        }
+
+        private void ConfigureLayerRoots(UIHelperBase helper)
+        {
+            helper.SetUIRoot(uiRoot);
+            helper.SetCanvasRoot(canvasRoot);
+
+            HashSet<int> configuredLayers = new HashSet<int>();
+            List<LayerRoot> orderedRoots = new List<LayerRoot>();
+            HashSet<RectTransform> configuredRoots = new HashSet<RectTransform>();
+            for (int i = 0; layerRoots != null && i < layerRoots.Length; i++)
+            {
+                LayerRoot layerRoot = layerRoots[i];
+                if (layerRoot.Root == null)
+                {
+                    continue;
+                }
+
+                if (!configuredLayers.Add(layerRoot.WindowLayer))
+                {
+                    Log.Warning("Duplicate UI layer root '{0}' was ignored.", layerRoot.WindowLayer);
+                    continue;
+                }
+
+                if (!configuredRoots.Add(layerRoot.Root))
+                {
+                    Log.Warning("UI layer root '{0}' is assigned to multiple layers and was ignored.",
+                        layerRoot.Root.name);
+                    continue;
+                }
+
+                if (uiRoot != null && layerRoot.Root.parent != uiRoot)
+                {
+                    Log.Warning(
+                        "UI layer root '{0}' is not a direct child of UI Root and was ignored.",
+                        layerRoot.WindowLayer);
+                    continue;
+                }
+
+                helper.SetLayerRoot(layerRoot.WindowLayer, layerRoot.Root);
+                if (uiRoot != null)
+                {
+                    orderedRoots.Add(layerRoot);
+                }
+            }
+
+            HashSet<int> configuredCanvasLayers = new HashSet<int>();
+            List<LayerRoot> orderedCanvasRoots = new List<LayerRoot>();
+            HashSet<RectTransform> configuredCanvasRoots = new HashSet<RectTransform>();
+            for (int i = 0; canvasLayerRoots != null && i < canvasLayerRoots.Length; i++)
+            {
+                LayerRoot layerRoot = canvasLayerRoots[i];
+                if (layerRoot.Root == null)
+                {
+                    continue;
+                }
+
+                if (!configuredCanvasLayers.Add(layerRoot.WindowLayer))
+                {
+                    Log.Warning("Duplicate independent Canvas layer root '{0}' was ignored.",
+                        layerRoot.WindowLayer);
+                    continue;
+                }
+
+                if (!configuredCanvasRoots.Add(layerRoot.Root))
+                {
+                    Log.Warning("Independent Canvas root '{0}' is assigned to multiple layers and was ignored.",
+                        layerRoot.Root.name);
+                    continue;
+                }
+
+                if (canvasRoot != null && layerRoot.Root.parent != canvasRoot)
+                {
+                    Log.Warning(
+                        "Independent Canvas layer root '{0}' is not a direct child of Canvas Root and was ignored.",
+                        layerRoot.WindowLayer);
+                    continue;
+                }
+
+                helper.SetCanvasLayerRoot(layerRoot.WindowLayer, layerRoot.Root);
+                if (canvasRoot != null)
+                {
+                    orderedCanvasRoots.Add(layerRoot);
+                }
+            }
+
+            orderedRoots.Sort((left, right) => left.WindowLayer.CompareTo(right.WindowLayer));
+            for (int i = 0; i < orderedRoots.Count; i++)
+            {
+                orderedRoots[i].Root.SetAsLastSibling();
+            }
+
+            orderedCanvasRoots.Sort((left, right) => left.WindowLayer.CompareTo(right.WindowLayer));
+            for (int i = 0; i < orderedCanvasRoots.Count; i++)
+            {
+                orderedCanvasRoots[i].Root.SetAsLastSibling();
+            }
         }
 
         /// <inheritdoc cref="IUIModule.OpenUIFormAsync"/>
@@ -130,6 +276,18 @@ namespace UnityRFramework.Runtime
         public IUIForm GetUIForm(string assetName)
         {
             return uiModule.GetUIForm(assetName);
+        }
+
+        /// <inheritdoc cref="IUIModule.GetTopUIForm"/>
+        public IUIForm GetTopUIForm()
+        {
+            return uiModule.GetTopUIForm();
+        }
+
+        /// <inheritdoc cref="IUIModule.CloseTopUIForm"/>
+        public bool CloseTopUIForm(object userData = null)
+        {
+            return uiModule.CloseTopUIForm(userData);
         }
     }
 }

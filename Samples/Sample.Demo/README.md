@@ -26,7 +26,7 @@ Manager 导入后的目录。配置、本地化、音频或公告发生变化后
 - `JsonLocalizationHelper`：加载 JSON 本地化语言包。
 - 默认 UI、Scene、Event、WebRequest、Procedure 等框架实现。
 
-Demo 的职责是验证默认框架能够完成启动、加载数据、进入大厅、交互、切换语言与场景切换；第三方 Helper 的对照示例应放在 `Samples/Expansion.Demo`。
+Demo 的职责是验证默认框架能够完成启动、加载数据、进入大厅、交互、切换语言与场景切换；YooAsset、UniTask 等第三方 Helper 的完整对照示例位于 `Samples/Expansion.YooAsset.Demo`。
 
 ## 当前功能
 

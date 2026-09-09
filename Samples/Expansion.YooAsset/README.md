@@ -96,8 +96,8 @@ Helper 加载场景时先检查 Player Build Settings。已加入 Build Settings
 
 ## 验收示例
 
-- `Expansion.Tests`：验证 EditorSimulate、Offline、Host、混合内置/远程、缓存与框架重启。
-- `Expansion.Demo`：验证启动更新提示、差量下载、进度显示和资源按需静默下载。
+- `Expansion.YooAsset.Demo/Acceptance`：验证 EditorSimulate、Offline、Host、混合内置/远程、缓存与框架重启。
+- `Expansion.YooAsset.Demo`：验证启动更新提示、差量下载、进度显示和资源按需静默下载。
 
 本 Sample 只提供资源后端及配套编辑器工具，不包含代码热更新，也不替业务层决定资源
 标签、发布目录、更新确认界面或失败重试交互。

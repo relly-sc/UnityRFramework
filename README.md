@@ -12,19 +12,20 @@
 Library/RFramework/RFramework/  ← 纯 C# 核心（.NET Standard 2.0，零 Unity/第三方依赖）
 Scripts/Runtime/                ← Unity 运行时（Component + Helper 默认实现）
 Scripts/Editor/                 ← 编辑器工具（Inspector、菜单项）
-Samples/Expansion/                ← 与框架模块无关的可选通用组件
-Samples/Sample.Demo/            ← 官方示例（仅用内置 Helper，串通全部模块）
-Samples/Sample.Download/        ← DownloadModule 独立轻量验收示例
-Samples/Expansion.YooAsset/     ← YooAsset 资源辅助器桥接实现
-Samples/Expansion.UniTask/      ← UniTask Web 请求辅助器桥接实现
-Samples/Expansion.SharpZipLib/  ← SharpZipLib ZIP 解压辅助器桥接实现
+Samples/Sample.Demo/              ← 官方示例（仅用内置 Helper，串通全部模块）
+Samples/Sample.Download/          ← DownloadModule 独立轻量验收示例
+Samples/Sample.UI/                ← 核心 UI Module 验收示例
+Samples/Expansion.UI/             ← UGUI 通用组件与编辑器工具
+Samples/Expansion.UI.Demo/        ← UI 扩展功能 Demo 与验收场景
+Samples/Expansion.YooAsset/       ← YooAsset 资源辅助器桥接实现
+Samples/Expansion.YooAsset.Demo/  ← YooAsset 资源热更 Demo 与专项验收
+Samples/Expansion.UniTask/        ← UniTask Web 请求辅助器桥接实现
+Samples/Expansion.SharpZipLib/   ← SharpZipLib ZIP 解压辅助器桥接实现
 Samples/Expansion.SharpCompress/ ← SharpCompress 多格式解压辅助器桥接实现
 Samples/Expansion.ExcelDataReader/ ← ExcelDataReader 配置表导出工具（EditorOnly）
-Samples/Expansion.Demo/         ← 官方 Demo 的第三方资源实现覆盖层
-Samples/Expansion.HybridCLR/    ← HybridCLR 通用代码热更新加载扩展
-Samples/Expansion.HybridCLR.Demo/ ← Expansion.Demo 的代码热更新覆盖层
-Samples/Expansion.Obfuz/        ← Obfuz 可选代码混淆构建扩展
-Samples/Expansion.Tests/        ← 第三方辅助器专项验收场景
+Samples/Expansion.HybridCLR/      ← HybridCLR 通用代码热更新加载扩展
+Samples/Expansion.HybridCLR.Demo/ ← HybridCLR 代码热更新 Demo 与验收覆盖层
+Samples/Expansion.Obfuz/          ← Obfuz 可选代码混淆构建扩展
 ```
 
 `main` 开发分支使用 `Samples/` 便于直接编译和维护；GitHub Actions 发布 UPM
@@ -84,16 +85,15 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 - `Expansion.UniTask`：UniTask Web 请求辅助器桥接实现。需手动安装 UniTask。
 - `Expansion.ExcelDataReader`：ExcelDataReader 配置表导出工具，支持从 XLSX/XLS
   生成 Config 与 Localization 数据；已内置 EditorOnly 依赖 DLL，无需手动安装。
-- `Expansion.Tests`：第三方 Helper 的可运行专项验收示例。必须先导入
-  `Expansion.YooAsset` 与 `Expansion.UniTask`、安装 YooAsset 与 UniTask，再执行菜单
-  `UnityRFramework/ExpansionAcceptance/Rebuild Acceptance Assets`。UPM 只复制
-  Sample 目录，不会自动生成 `Assets/StreamingAssets` 下的 Web 探针和 YooAsset
-  内置包文件；完整准备步骤见 Expansion.Tests 自带 README。
-- `Expansion.Demo`：官方 Demo 的第三方 Helper 覆盖层。必须同时导入 `Sample.Demo` 与
-  `Expansion.YooAsset`、`Expansion.UniTask`、安装
-  YooAsset 与 UniTask，再执行菜单
-  `UnityRFramework/ExpansionDemo/Rebuild Demo Overlay`。它复用 Sample.Demo 的业务脚本
-  和资源，只生成第三方框架预制体、启动场景与 YooAsset 收集规则。
+- `Sample.UI`：只验收框架核心 UI Module，不依赖 Expansion 或第三方插件；详见其 README。
+- `Expansion.UI`：可选 UGUI 通用组件和编辑器工具，不含验收场景；需要验收时同时导入
+  `Expansion.UI.Demo`。
+- `Expansion.UI.Demo`：验收 `Expansion.UI` 的自动绑定、Prefab 检查、SpriteAtlas、Safe Area、
+  模态弹窗、Toast、虚拟列表和红点树，不依赖 YooAsset、HybridCLR 或其他第三方插件。
+- `Expansion.YooAsset.Demo`：官方 Demo 的 YooAsset/UniTask 资源热更覆盖层，必须同时导入
+  `Sample.Demo`、`Expansion.YooAsset`、`Expansion.UniTask` 并安装对应第三方包，再执行
+  `UnityRFramework/Expansion/YooAsset Demo/Rebuild Demo Overlay`。其 `Acceptance` 子目录
+  提供 YooAsset 与 UniTask 的专项验收，不单独注册为 Package Manager Sample。
 - `Expansion.SharpZipLib`：可选 ZIP 解压扩展，随 Sample 提供 SharpZipLib 1.4.2 Runtime DLL
   与 MIT 许可证。通过 `GameEntry.Download.SetArchiveHelper(...)` 注入后支持 Zip64、加密 ZIP
   和解压进度；完整用法见该 Sample 的 README。
@@ -102,12 +102,12 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   见该 Sample 的 README。
 - `Expansion.HybridCLR`：可选 HybridCLR 代码热更新加载扩展。需手动安装并通过
   `HybridCLR/Installer...` 初始化 HybridCLR；核心包和普通 Demo 不依赖它。
-- `Expansion.HybridCLR.Demo`：在 `Expansion.Demo` 的 YooAsset 资源热更闭环上叠加代码
-  热更新。必须同时导入 `Sample.Demo`、`Expansion.Demo`、`Expansion.YooAsset`、
+- `Expansion.HybridCLR.Demo`：在 `Expansion.YooAsset.Demo` 的 YooAsset 资源热更闭环上叠加代码
+  热更新。必须同时导入 `Sample.Demo`、`Expansion.YooAsset.Demo`、`Expansion.YooAsset`、
   `Expansion.UniTask` 与 `Expansion.HybridCLR`。执行
   `UnityRFramework/Expansion/HybridCLR Demo/重建当前平台覆盖层` 生成当前平台代码产物和
   启动覆盖层；它使用独立的 YooAsset Package、收集分组和 Host 发布目录，不会把代码
-  热更新资源写入普通 `Expansion.Demo` 的 Package。详细首包、Host 更新和 Player 验收
+  热更新资源使用独立 Package，不写入普通 YooAsset Demo 的 Package。详细首包、Host 更新和 Player 验收
   顺序见该 Sample 的 README。
 - `Expansion.Obfuz`：可选 Obfuz 代码混淆构建扩展。需手动安装并配置 Obfuz 与
   `Obfuz4HybridCLR`；导入后可在构建工具中启用 Obfuz 步骤。它不属于核心包强制依赖，
@@ -725,6 +725,20 @@ GameEntry.UI.UnregisterSceneUIForm("BattleHUD");
 `DefaultUIHelper` 只负责实例化和销毁 Resource 返回的 UI Prefab，不负责加载和地址转换。
 因此默认 Resources 模式使用相对 Resources 的路径；切换 YooAsset 后使用对应 Address。
 场景内 UI 通过 `SceneUIFormBinder` 登记，所有权仍属于场景，不经过 Helper 实例化或销毁。
+同一资源地址不能重复打开或重复加载；加载期间调用关闭会取消本次打开。相同层级按打开顺序
+排列，后打开的窗口位于更上层。框架加载的窗口在关闭、取消或创建失败时会销毁实例并归还
+资源引用；当前 UI 模块不使用对象池。
+
+`UnityRFramework.prefab` 的 `UI` 节点已提供默认 `Screen Space - Overlay` Canvas，以及
+Bottom、HUD、Panel、Popup、System、Top 六个普通层级。普通 UI Prefab 不需要自带 Canvas，
+会按 `WindowLayer` 挂到对应容器并随框架跨场景保留。
+
+根节点自带 Canvas 的 UI 会挂到 `Canvas Root` 下对应的 `Canvas Layer Roots`。框架只管理其
+父节点、生命周期和逻辑窗口栈，不修改该 Prefab 的 Render Mode、Camera、CanvasScaler、
+Sorting Layer、Order in Layer 或 GraphicRaycaster；独立 Canvas 之间的实际渲染顺序由项目
+自行配置。场景 UI 如需跨场景保留，应放在框架的普通或独立 Canvas 层级下再登记。
+UGUI 交互还需要场景中存在一个有效的 `EventSystem` 和与项目输入方案匹配的 Input Module；
+框架不自动选择旧输入系统或新输入系统的实现，项目中应避免同时存在多个 EventSystem。
 
 ### Audio
 

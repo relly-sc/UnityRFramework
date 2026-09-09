@@ -1,11 +1,11 @@
 # Expansion.HybridCLR.Demo
 
-这是 `Expansion.Demo` 的可选代码热更新覆盖层。它复用已有的官方 Demo 业务、更新 UI
+这是 `Expansion.YooAsset.Demo` 的可选代码热更新覆盖层。它复用已有的官方 Demo 业务、更新 UI
 和资源热更流程，但使用独立的 `ExpansionHybridCLRDemoPackage`、收集分组、生成预制体、
 启动场景与 Host 发布目录，并增加 HybridCLR DLL、AOT 补充元数据、代码版本 Manifest
 与热更新入口 UI。
 
-不需要代码热更新的项目只导入 `Expansion.Demo`，无需导入本 Sample。
+不需要代码热更新的项目只导入 `Expansion.YooAsset.Demo`，无需导入本 Sample。
 
 ## 导入依赖
 
@@ -14,7 +14,7 @@
 1. `Sample.Demo`
 2. `Expansion.YooAsset`，并安装 YooAsset 3.0.5+
 3. `Expansion.UniTask`，并安装 UniTask
-4. `Expansion.Demo`
+4. `Expansion.YooAsset.Demo`
 5. `Expansion.HybridCLR`，并安装 HybridCLR 8.13.0+
 6. `Expansion.HybridCLR.Demo`
 7. 执行 `HybridCLR/Installer...` 完成 HybridCLR 本机初始化
@@ -29,14 +29,14 @@
 3. 为 `ExpansionHybridCLRDemoPackage` 准备内置目录。全部资源远程时，通过
    `UnityRFramework/Expansion/YooAsset Builtin Catalog` 选择该 Package 并生成空
    `BuiltinCatalog`；存在内置 Bundle 时，按实际内置文件生成 Catalog。不能复用
-   `ExpansionDemoPackage` 的 Catalog。
+   `ExpansionHybridCLRDemoPackage` 的 Catalog。
 4. 构建该平台 Player。此步骤会生成与该 Player 严格对应的裁剪后 AOT 程序集。
 5. 执行
    `UnityRFramework/Expansion/HybridCLR Demo/构建 Host Package`。工具只重编热更新 DLL，
    并使用第 4 步 Player 留下的 AOT 裁剪产物生成 Manifest 和 Host Package，产物发布到
    `Bundles/ExpansionHybridCLRDemoServer`。不要在第 4、5 步之间再次执行 `Generate/All`。
    工具会校验 Player Build 后记录的 AOT 哈希；缺少基线或文件被改写时会拒绝发布。
-6. 按 `Expansion.Demo` README 配置 Host URL 和本地 HTTP 服务，但使用本 Sample 的
+6. 按 `Expansion.YooAsset.Demo` README 配置 Host URL 和本地 HTTP 服务，但使用本 Sample 的
    `ExpansionHybridCLRDemoServer` 服务目录。
 
 构建 Player 前，必须在
@@ -48,13 +48,13 @@ Resource 组件上把模式设为 `Host`，并填写直接指向服务器包目�
 生成的启动场景位于
 `Expansion.HybridCLR.Demo/Generated/Scenes/ExpansionHybridCLRDemoBoot.unity`，挂载
 `ExpansionHybridCLRDemoGameEntry`；普通 Expansion Demo 继续使用自己的
-`Expansion.Demo/Generated/Scenes/ExpansionDemoBoot.unity` 和 `ExpansionDemoGameEntry`。
+`Expansion.YooAsset.Demo/Generated/Scenes/ExpansionDemoBoot.unity` 和 `ExpansionDemoGameEntry`。
 两个 Builder 不再覆盖对方的生成物，执行哪个重建菜单，哪个启动场景就会成为 Build
-Settings 第一项。HybridCLR Demo 仍复用 Expansion.Demo 的业务资源和流程，因此导入依赖
+Settings 第一项。HybridCLR Demo 仍复用 Expansion.YooAsset.Demo 的业务资源和流程，因此导入依赖
 顺序保持不变，但这些业务资源会被独立收集到 `ExpansionHybridCLRDemoPackage`；运行时
 不会依赖或加载 `ExpansionDemoPackage`。
 
-本 Sample 沿用 Expansion.Demo 的 GUID 短 Bundle 命名规则，不把 UPM Sample 完整安装
+本 Sample 沿用 Expansion.YooAsset.Demo 的 GUID 短 Bundle 命名规则，不把 UPM Sample 完整安装
 路径写入 Bundle 文件名；热更新 DLL、AOT 元数据和代码 Manifest 也使用相同短名规则。
 
 启动入口会检查 `preload + hotupdate` 两类标签：有差量时沿用现有 UI 显示文件数、大小、

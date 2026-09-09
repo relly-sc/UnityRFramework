@@ -31,9 +31,19 @@
       "path": "Samples~/Sample.Download"
     },
     {
-      "displayName": "Expansion.Demo",
-      "description": "复用官方 Demo 业务并切换到 YooAsset、UniTask 等第三方辅助器的覆盖层。需同时导入 Sample.Demo 与对应 Expansion.* 目录。",
-      "path": "Samples~/Expansion.Demo"
+      "displayName": "Sample.UI",
+      "description": "内置 UI 模块的独立 UGUI 验收场景，覆盖实际层级、同层顺序、栈顶返回、全屏遮挡、场景 UI 和强类型参数。",
+      "path": "Samples~/Sample.UI"
+    },
+    {
+      "displayName": "Expansion.UI",
+      "description": "可选 UGUI 通用组件与编辑器工具，包含自动绑定、Prefab 检查、SpriteAtlas、模态弹窗、Toast、Safe Area、虚拟列表和红点树；不含验收场景。",
+      "path": "Samples~/Expansion.UI"
+    },
+    {
+      "displayName": "Expansion.UI.Demo",
+      "description": "Expansion.UI 的 UI 绑定与工具、交互与列表、红点树功能示例和验收场景，不依赖第三方插件。",
+      "path": "Samples~/Expansion.UI.Demo"
     },
     {
       "displayName": "Expansion.HybridCLR",
@@ -42,7 +52,7 @@
     },
     {
       "displayName": "Expansion.HybridCLR.Demo",
-      "description": "在 Expansion.Demo 资源热更闭环上叠加 HybridCLR 代码热更新的完整验收覆盖层，支持版本检查、下载、入口执行及进入现有 Demo。",
+      "description": "在 Expansion.YooAsset.Demo 资源热更闭环上叠加 HybridCLR 代码热更新的完整 Demo 与验收覆盖层。",
       "path": "Samples~/Expansion.HybridCLR.Demo"
     },
     {
@@ -51,9 +61,9 @@
       "path": "Samples~/Expansion.Obfuz"
     },
     {
-      "displayName": "Expansion.Tests",
-      "description": "第三方辅助器的专项验收场景，覆盖 YooAsset 运行模式、远程资源、UniTask Web 请求、取消、关闭和软重启。",
-      "path": "Samples~/Expansion.Tests"
+      "displayName": "Expansion.YooAsset.Demo",
+      "description": "基于 YooAsset 与 UniTask 的完整资源热更 Demo，内含资源更新、按需加载和专项 Acceptance 验收场景。",
+      "path": "Samples~/Expansion.YooAsset.Demo"
     },
     {
       "displayName": "Expansion.YooAsset",
@@ -79,11 +89,6 @@
       "displayName": "Expansion.ExcelDataReader",
       "description": "ExcelDataReader 配置表导出工具，支持从 XLSX/XLS 生成 Config 与 Localization 数据；已内置 EditorOnly 依赖 DLL。",
       "path": "Samples~/Expansion.ExcelDataReader"
-    },
-    {
-      "displayName": "Expansion",
-      "description": "与框架模块无关的可选通用组件和开发辅助能力，按需导入。",
-      "path": "Samples~/Expansion"
     }
   ]
 }

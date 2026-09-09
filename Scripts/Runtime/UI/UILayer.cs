@@ -1,8 +1,7 @@
 namespace UnityRFramework.Runtime
 {
     /// <summary>
-    /// UI 层级预设常量。数值越大越靠前。
-    /// 参考 UniWindow 的 WindowLayer 设计，以 100 为步进便于插入自定义层级。
+    /// UI 层级预设常量。数值越大越靠前，以 100 为步进便于插入自定义层级。
     /// </summary>
     public static class UILayer
     {
