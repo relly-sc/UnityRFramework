@@ -48,6 +48,7 @@ namespace UnityRFramework.Expansion
             GameObject root = new GameObject("Root");
             try
             {
+                string selfCheckSourcePath = FindSelfCheckSourcePath();
                 Button button = new GameObject("SubmitButton")
                     .AddComponent<Button>();
                 button.transform.SetParent(root.transform, false);
@@ -88,8 +89,7 @@ namespace UnityRFramework.Expansion
                     UIBindingCodeGenerator.Validate(
                         typeof(UIBindingGeneratorSelfCheckTarget),
                         root.transform,
-                        "Assets/UnityRFramework/Samples/Expansion.UI/Scripts/Editor/UI/"
-                        + "UIBindingGeneratorSelfCheckTarget.cs",
+                        selfCheckSourcePath,
                         string.Empty,
                         bindings);
                 Require(validation.IsValid, string.Join(string.Empty, validation.Errors));
@@ -222,8 +222,7 @@ namespace UnityRFramework.Expansion
                 validation = UIBindingCodeGenerator.Validate(
                     typeof(UIBindingGeneratorSelfCheckTarget),
                     root.transform,
-                    "Assets/UnityRFramework/Samples/Expansion.UI/Scripts/Editor/UI/"
-                    + "UIBindingGeneratorSelfCheckTarget.cs",
+                    selfCheckSourcePath,
                     string.Empty,
                     bindings);
                 Require(!validation.IsValid, "重复组件引用未被拦截。");
@@ -256,6 +255,21 @@ namespace UnityRFramework.Expansion
             }
 
             return null;
+        }
+
+        private static string FindSelfCheckSourcePath()
+        {
+            string[] guids = AssetDatabase.FindAssets("UIBindingGeneratorSelfCheckTarget t:MonoScript");
+            for (int i = 0; i < guids.Length; i++)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+                if (path.EndsWith("/UIBindingGeneratorSelfCheckTarget.cs", StringComparison.Ordinal))
+                {
+                    return path;
+                }
+            }
+
+            throw new InvalidOperationException("无法定位 UI 自动绑定自检脚本。");
         }
     }
 }

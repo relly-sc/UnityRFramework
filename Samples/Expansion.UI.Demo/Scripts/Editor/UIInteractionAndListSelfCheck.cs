@@ -7,9 +7,9 @@ using UnityEngine.UI;
 namespace UnityRFramework.Expansion
 {
     /// <summary>
-    /// 阶段 5 队列和固定高度虚拟列表的轻量回归检查。
+    /// UI 交互队列和固定高度虚拟列表的轻量回归检查。
     /// </summary>
-    internal static class UIStage5SelfCheck
+    internal static class UIInteractionAndListSelfCheck
     {
         [MenuItem("GameObject/UnityRFramework/UI 交互与列表自检", false, 23)]
         private static void Run()

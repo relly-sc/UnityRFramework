@@ -88,8 +88,8 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 - `Sample.UI`：只验收框架核心 UI Module，不依赖 Expansion 或第三方插件；详见其 README。
 - `Expansion.UI`：可选 UGUI 通用组件和编辑器工具，不含验收场景；需要验收时同时导入
   `Expansion.UI.Demo`。
-- `Expansion.UI.Demo`：验收 `Expansion.UI` 的自动绑定、Prefab 检查、SpriteAtlas、Safe Area
-  和可选交互组件，不依赖 YooAsset、HybridCLR 或其他第三方插件。
+- `Expansion.UI.Demo`：验收 `Expansion.UI` 的自动绑定、Prefab 检查、SpriteAtlas、Safe Area、
+  模态弹窗、Toast、虚拟列表和红点树，不依赖 YooAsset、HybridCLR 或其他第三方插件。
 - `Expansion.YooAsset.Demo`：官方 Demo 的 YooAsset/UniTask 资源热更覆盖层，必须同时导入
   `Sample.Demo`、`Expansion.YooAsset`、`Expansion.UniTask` 并安装对应第三方包，再执行
   `UnityRFramework/Expansion/YooAsset Demo/Rebuild Demo Overlay`。其 `Acceptance` 子目录

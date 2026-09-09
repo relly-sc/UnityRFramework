@@ -14,10 +14,10 @@ namespace UnityRFramework.Expansion.UI.Demo.Editor
     /// <summary>
     /// 生成可直接运行的 UI 交互与列表验收场景。
     /// </summary>
-    internal static class UIStage5AcceptanceSceneGenerator
+    internal static class UIInteractionAcceptanceSceneGenerator
     {
         private const string Root = "Assets/UnityRFramework/Samples/Expansion.UI.Demo";
-        private const string ScenePath = Root + "/GameAssets/Scenes/UIStage5Acceptance.unity";
+        private const string ScenePath = Root + "/GameAssets/Scenes/UIInteractionAcceptance.unity";
         private const string FrameworkPrefabPath =
             "Assets/UnityRFramework/Prefabs/UnityRFramework.prefab";
 
@@ -40,7 +40,7 @@ namespace UnityRFramework.Expansion.UI.Demo.Editor
             Canvas canvas = framework.GetComponentInChildren<UIComponent>().GetComponentInChildren<Canvas>();
             EnsureEventSystem();
 
-            GameObject root = CreateUI("UIStage5Acceptance", canvas.transform, typeof(Image));
+            GameObject root = CreateUI("UIInteractionAcceptance", canvas.transform, typeof(Image));
             Stretch(root.GetComponent<RectTransform>());
             root.GetComponent<Image>().color = new Color32(28, 32, 38, 255);
 
@@ -72,11 +72,20 @@ namespace UnityRFramework.Expansion.UI.Demo.Editor
             status.rectTransform.anchorMax = new Vector2(0f, 0f);
             status.rectTransform.pivot = new Vector2(0f, 0f);
 
+            RedPointTree redPointTree = root.AddComponent<RedPointTree>();
+            GameObject redPointPanel = CreateRedPointPanel(root.transform);
+            Button addSystem = CreateCompactButton(redPointPanel.transform, "系统邮件 +1", 12f);
+            Button addFriend = CreateCompactButton(redPointPanel.transform, "好友申请 +1", 198f);
+            Button removeSystem = CreateCompactButton(redPointPanel.transform, "删除系统分支", 384f);
+            CreateRedPointView(redPointPanel.transform, redPointTree, "Mail", "邮件总数", 12f);
+            CreateRedPointView(redPointPanel.transform, redPointTree, "Mail/System", "系统视图 A", 198f);
+            CreateRedPointView(redPointPanel.transform, redPointTree, "Mail/System", "系统视图 B", 384f);
+
             VirtualizedVerticalList list = CreateList(root.transform);
             ConfirmationDialogQueue confirmation = CreateConfirmation(root.transform);
             ToastQueue toastQueue = CreateToast(root.transform);
 
-            UIStage5AcceptanceController controller = root.AddComponent<UIStage5AcceptanceController>();
+            UIInteractionAcceptanceController controller = root.AddComponent<UIInteractionAcceptanceController>();
             SetObject(controller, "confirmationQueue", confirmation);
             SetObject(controller, "toastQueue", toastQueue);
             SetObject(controller, "virtualList", list);
@@ -89,6 +98,10 @@ namespace UnityRFramework.Expansion.UI.Demo.Editor
             SetObject(controller, "scrollToLastButton", last);
             SetObject(controller, "restartButton", restart);
             SetObject(controller, "statusText", status);
+            SetObject(controller, "redPointTree", redPointTree);
+            SetObject(controller, "addSystemRedPointButton", addSystem);
+            SetObject(controller, "addFriendRedPointButton", addFriend);
+            SetObject(controller, "removeSystemRedPointButton", removeSystem);
 
             Selection.activeGameObject = root;
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -166,7 +179,7 @@ namespace UnityRFramework.Expansion.UI.Demo.Editor
             scrollRectTransform.anchorMin = new Vector2(0f, 0f);
             scrollRectTransform.anchorMax = new Vector2(1f, 1f);
             scrollRectTransform.offsetMin = new Vector2(420f, 40f);
-            scrollRectTransform.offsetMax = new Vector2(-40f, -110f);
+            scrollRectTransform.offsetMax = new Vector2(-40f, -240f);
             scroll.GetComponent<Image>().color = new Color32(21, 24, 29, 255);
 
             GameObject viewportObject = CreateUI("Viewport", scroll.transform, typeof(Image), typeof(Mask));
@@ -212,6 +225,62 @@ namespace UnityRFramework.Expansion.UI.Demo.Editor
             SetFloat(list, "paddingTop", 4f);
             SetFloat(list, "paddingBottom", 4f);
             return list;
+        }
+
+        private static GameObject CreateRedPointPanel(Transform parent)
+        {
+            GameObject panel = CreateUI("RedPointPanel", parent, typeof(Image));
+            RectTransform rect = panel.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.offsetMin = new Vector2(420f, -222f);
+            rect.offsetMax = new Vector2(-40f, -82f);
+            panel.GetComponent<Image>().color = new Color32(42, 48, 56, 255);
+            return panel;
+        }
+
+        private static Button CreateCompactButton(Transform parent, string label, float x)
+        {
+            GameObject node = CreateUI(label, parent, typeof(Image), typeof(Button));
+            RectTransform rect = node.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(x, -10f);
+            rect.sizeDelta = new Vector2(174f, 40f);
+            node.GetComponent<Image>().color = new Color32(64, 84, 104, 255);
+            Text text = CreateText(node.transform, "Label", label, Vector2.zero,
+                new Vector2(164f, 36f), 16, TextAnchor.MiddleCenter);
+            Stretch(text.rectTransform);
+            return node.GetComponent<Button>();
+        }
+
+        private static void CreateRedPointView(Transform parent, RedPointTree tree, string path,
+            string label, float x)
+        {
+            GameObject host = CreateUI(label, parent, typeof(RectTransform), typeof(RedPointView));
+            RectTransform hostRect = host.GetComponent<RectTransform>();
+            hostRect.anchorMin = hostRect.anchorMax = new Vector2(0f, 1f);
+            hostRect.pivot = new Vector2(0f, 1f);
+            hostRect.anchoredPosition = new Vector2(x, -62f);
+            hostRect.sizeDelta = new Vector2(174f, 60f);
+            CreateText(host.transform, "Label", label, new Vector2(-10f, 0f),
+                new Vector2(122f, 40f), 15, TextAnchor.MiddleLeft);
+
+            GameObject indicator = CreateUI("Indicator", host.transform, typeof(Image));
+            RectTransform indicatorRect = indicator.GetComponent<RectTransform>();
+            indicatorRect.anchorMin = indicatorRect.anchorMax = new Vector2(1f, 0.5f);
+            indicatorRect.anchoredPosition = new Vector2(-20f, 0f);
+            indicatorRect.sizeDelta = new Vector2(38f, 38f);
+            indicator.GetComponent<Image>().color = new Color32(210, 58, 66, 255);
+            Text count = CreateText(indicator.transform, "Count", string.Empty, Vector2.zero,
+                new Vector2(34f, 34f), 15, TextAnchor.MiddleCenter);
+            Stretch(count.rectTransform);
+
+            RedPointView view = host.GetComponent<RedPointView>();
+            SetObject(view, "indicatorRoot", indicator);
+            SetObject(view, "countText", count);
+            view.Configure(tree, path);
         }
 
         private static Button CreateButton(Transform parent, string label, float y)

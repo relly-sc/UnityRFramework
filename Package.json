@@ -37,12 +37,12 @@
     },
     {
       "displayName": "Expansion.UI",
-      "description": "可选 UGUI 通用组件与编辑器工具，包含自动绑定、Prefab 检查、SpriteAtlas 工作流、模态弹窗、Toast、Safe Area 和虚拟列表；不含验收场景。",
+      "description": "可选 UGUI 通用组件与编辑器工具，包含自动绑定、Prefab 检查、SpriteAtlas、模态弹窗、Toast、Safe Area、虚拟列表和红点树；不含验收场景。",
       "path": "Samples~/Expansion.UI"
     },
     {
       "displayName": "Expansion.UI.Demo",
-      "description": "Expansion.UI 的功能示例与验收场景，不依赖 YooAsset、HybridCLR 或其他第三方插件。",
+      "description": "Expansion.UI 的 UI 绑定与工具、交互与列表、红点树功能示例和验收场景，不依赖第三方插件。",
       "path": "Samples~/Expansion.UI.Demo"
     },
     {

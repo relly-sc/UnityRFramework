@@ -9,7 +9,7 @@ public sealed class SpriteAtlasAcceptance : MonoBehaviour
     [SerializeField] private Image targetImage;
     [SerializeField] private string spriteName = "01_warrior_portrait";
 
-    private const string AtlasLocation = "UI/Common/New Sprite Atlas";
+    private const string AtlasLocation = "UI/Common/UIAcceptanceAtlas";
     private SpriteAtlas atlas;
 
     private async void Start()
@@ -44,8 +44,12 @@ public sealed class SpriteAtlasAcceptance : MonoBehaviour
             return;
         }
 
-        targetImage.sprite = null;
-        GameEntry.Resource.UnloadAsset<SpriteAtlas>(AtlasLocation);
+        if (targetImage != null)
+        {
+            targetImage.sprite = null;
+        }
+
+        GameEntry.Resource?.UnloadAsset<SpriteAtlas>(AtlasLocation);
         atlas = null;
     }
 }

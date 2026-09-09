@@ -6,7 +6,7 @@ SpriteAtlas:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: New Sprite Atlas
+  m_Name: UIAcceptanceAtlas
   m_EditorData:
     serializedVersion: 2
     textureSettings:
@@ -48,5 +48,5 @@ SpriteAtlas:
   - 01_warrior_portrait
   - 02_mage_portrait
   m_RenderDataMap: {}
-  m_Tag: New Sprite Atlas
+  m_Tag: UIAcceptanceAtlas
   m_IsVariant: 0

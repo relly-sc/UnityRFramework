@@ -11,7 +11,7 @@ namespace UnityRFramework.Expansion.UI.Demo
     /// UI 交互与列表验收场景控制器，仅负责把按钮操作映射到待验收组件。
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class UIStage5AcceptanceController : MonoBehaviour
+    public sealed class UIInteractionAcceptanceController : MonoBehaviour
     {
         [SerializeField] private ConfirmationDialogQueue confirmationQueue;
         [SerializeField] private ToastQueue toastQueue;
@@ -25,9 +25,15 @@ namespace UnityRFramework.Expansion.UI.Demo
         [SerializeField] private Button scrollToLastButton;
         [SerializeField] private Button restartButton;
         [SerializeField] private Text statusText;
+        [SerializeField] private RedPointTree redPointTree;
+        [SerializeField] private Button addSystemRedPointButton;
+        [SerializeField] private Button addFriendRedPointButton;
+        [SerializeField] private Button removeSystemRedPointButton;
 
         private readonly Queue<string> statusLines = new Queue<string>();
         private int confirmationSequence;
+        private int systemRedPointCount;
+        private int friendRedPointCount;
 
         private void Start()
         {
@@ -39,6 +45,10 @@ namespace UnityRFramework.Expansion.UI.Demo
             showTenItemsButton.onClick.AddListener(ShowTenItems);
             scrollToLastButton.onClick.AddListener(ScrollToLast);
             restartButton.onClick.AddListener(GameEntry.Restart);
+            addSystemRedPointButton.onClick.AddListener(AddSystemRedPoint);
+            addFriendRedPointButton.onClick.AddListener(AddFriendRedPoint);
+            removeSystemRedPointButton.onClick.AddListener(RemoveSystemRedPoint);
+            GameEntry.Event?.Subscribe<RedPointChangedEvent>(OnRedPointChanged);
             SetListCount(1000);
             AddStatus("准备完成，请连续点击三次确认按钮验证队列顺序。");
         }
@@ -53,6 +63,10 @@ namespace UnityRFramework.Expansion.UI.Demo
             showTenItemsButton.onClick.RemoveListener(ShowTenItems);
             scrollToLastButton.onClick.RemoveListener(ScrollToLast);
             restartButton.onClick.RemoveListener(GameEntry.Restart);
+            addSystemRedPointButton.onClick.RemoveListener(AddSystemRedPoint);
+            addFriendRedPointButton.onClick.RemoveListener(AddFriendRedPoint);
+            removeSystemRedPointButton.onClick.RemoveListener(RemoveSystemRedPoint);
+            GameEntry.Event?.Unsubscribe<RedPointChangedEvent>(OnRedPointChanged);
         }
 
         private async void RequestConfirmation()
@@ -126,6 +140,27 @@ namespace UnityRFramework.Expansion.UI.Demo
             {
                 label.text = "虚拟列表项 " + index;
             }
+        }
+
+        private void AddSystemRedPoint()
+        {
+            redPointTree.SetValue("Mail/System/Notice", ++systemRedPointCount);
+        }
+
+        private void AddFriendRedPoint()
+        {
+            redPointTree.SetValue("Mail/Friend/Request", ++friendRedPointCount);
+        }
+
+        private void RemoveSystemRedPoint()
+        {
+            systemRedPointCount = 0;
+            redPointTree.Remove("Mail/System");
+        }
+
+        private void OnRedPointChanged(RedPointChangedEvent args)
+        {
+            AddStatus("红点 " + args.Path + " = " + args.Value);
         }
 
         private void AddStatus(string message)

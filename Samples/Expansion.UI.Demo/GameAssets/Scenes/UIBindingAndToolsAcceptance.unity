@@ -361,7 +361,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1105461728495692956, guid: 9ed619e20c7f30a4784b988295fd29ac, type: 3}
       propertyPath: m_Name
-      value: UIAcceptance
+      value: UIBindingAcceptance
       objectReference: {fileID: 0}
     - target: {fileID: 6624768316135705368, guid: 9ed619e20c7f30a4784b988295fd29ac, type: 3}
       propertyPath: m_Pivot.x

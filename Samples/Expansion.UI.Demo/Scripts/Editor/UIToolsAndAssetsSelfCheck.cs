@@ -9,9 +9,9 @@ using UnityEngine.U2D;
 namespace UnityRFramework.Expansion
 {
     /// <summary>
-    /// 阶段 4 编辑器与运行时规则的轻量回归检查；临时 Prefab 会在检查后删除。
+    /// UI 编辑器工具与基础组件规则的轻量回归检查；临时 Prefab 会在检查后删除。
     /// </summary>
-    internal static class UIStage4SelfCheck
+    internal static class UIToolsAndAssetsSelfCheck
     {
         [MenuItem("GameObject/UnityRFramework/UI 工具与资源自检", false, 22)]
         private static void Run()
@@ -26,7 +26,7 @@ namespace UnityRFramework.Expansion
         {
             var root = new GameObject("Root", typeof(RectTransform), typeof(Canvas));
             string prefabPath = AssetDatabase.GenerateUniqueAssetPath(
-                "Assets/UIStage4SelfCheck.prefab");
+                "Assets/UIToolsAndAssetsSelfCheck.prefab");
             try
             {
                 var button = new GameObject(

@@ -154,6 +154,24 @@ virtualList.ScrollToIndex(500);
 首版只支持固定高度纵向列表。它根据视口高度创建少量对象并循环复用，支持重新绑定当前数据、
 运行时修改数量及滚动到指定索引；动态高度、横向列表和网格不在当前能力范围内。
 
+## 红点树
+
+`RedPointTree` 使用斜杠路径组织节点，并在帧末合并同一帧内的多次修改。父节点的显示值等于
+自身值与全部子节点聚合值之和：
+
+```csharp
+redPointTree.SetValue("Mail/System", 2);
+redPointTree.SetValue("Mail/Friend", 3);
+// 帧末 Mail 的聚合值为 5。
+```
+
+将 `RedPointView` 挂在常驻 UI 节点上，指定 `Tree`、`Path`、子级 `Indicator Root` 和可选的
+UGUI `Text`。同一路径可绑定多个视图；视图禁用或销毁时自动解除绑定。不要把
+`Indicator Root` 指向 `RedPointView` 自身，否则隐藏标记时会同时禁用绑定组件。
+
+数值变化在刷新视图后通过 `GameEntry.Event` 发布 `RedPointChangedEvent`。需要在帧末前立即
+读取聚合结果时，可调用 `FlushPendingChanges()`；删除节点及其后代使用 `Remove(path)`。
+
 ## UGUI 组件
 
 ### ButtonState / ButtonStateGroup

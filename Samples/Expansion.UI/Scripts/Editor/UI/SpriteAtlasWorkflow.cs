@@ -19,7 +19,7 @@ namespace UnityRFramework.Expansion
             UnityEngine.Object[] packables = GetSelectedPackables();
             string path = EditorUtility.SaveFilePanelInProject(
                 "创建 SpriteAtlas",
-                "New Sprite Atlas",
+                "UISpriteAtlas",
                 "spriteatlas",
                 "选择 SpriteAtlas 保存位置。");
             if (string.IsNullOrEmpty(path))
