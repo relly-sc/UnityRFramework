@@ -6,6 +6,20 @@
 
 框架当前以 **Unity 2022.3.49f1c1** 作为开发与验证基线。建议项目使用相同的 Unity 版本；低于该版本的 Unity 尚未进行适配测试，不保证编辑器工具、构建流程及相关 API 均可正常使用。
 
+## Package 版本
+
+框架 UPM Package 采用 [Semantic Versioning](https://semver.org/)（SemVer），版本格式为
+`Major.Minor.Patch`，并以包根目录 `package.json` 的 `version` 字段作为唯一事实源：
+
+- `Major`：存在不兼容的公共 API、序列化数据、配置格式或 Sample 使用契约变更。
+- `Minor`：新增向后兼容的模块、公共 API、编辑器能力、Expansion 或 Sample。
+- `Patch`：向后兼容的缺陷修复、兼容性修正、文档或发布流程修正。
+
+预发布版本使用 `Major.Minor.Patch-preview.N`，例如 `1.3.0-preview.1`；稳定版本不带后缀。
+每次对外更新 `upm` 分支前必须先递增版本，避免不同内容复用同一版本号导致 Package Manager
+缓存和依赖解析结果不明确。Package 版本与 Player 公共版本、Player Build Number、YooAsset
+Package Version 相互独立，不得混用。
+
 ## 架构
 
 ```
