@@ -149,6 +149,11 @@ namespace UnityRFramework.Editor
                     + "RawFileBuildPipeline。",
                     StepGroup));
             }
+
+            ValidateBundleEncryption(
+                settings.PackageName,
+                pipelineName,
+                issues);
         }
 
         /// <summary>
@@ -623,6 +628,35 @@ namespace UnityRFramework.Editor
             return Activator.CreateInstance(classType) as T
                    ?? throw new InvalidOperationException(
                        $"创建 {settingName} 实例失败：'{className}'。");
+        }
+
+        private static void ValidateBundleEncryption(
+            string packageName,
+            string pipelineName,
+            ICollection<BuildValidationIssue> issues)
+        {
+            string encryptorName =
+                BundleBuilderSetting.GetPackageBundleEncryptorClassName(
+                    packageName,
+                    pipelineName);
+            Type frameworkEncryptor = typeof(
+                global::UnityRFramework.Expansion.Editor.UnityRFrameworkBundleEncryptor);
+            if (!string.Equals(
+                    encryptorName,
+                    frameworkEncryptor.FullName,
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (!global::UnityRFramework.Expansion.Editor.UnityRFrameworkBundleEncryptor
+                    .TryValidateEnvironment(out string error))
+            {
+                issues.Add(BuildValidationIssue.Error(
+                    StepCode,
+                    "YooAsset Bundle 加密配置无效：" + error,
+                    StepGroup));
+            }
         }
 
     }

@@ -217,6 +217,10 @@ namespace UnityRFramework.Editor
                     "Downloaded Parts",
                     string.Format("{0:0.00} MB", downloadComponent.ActiveDownloadedBytes / (1024d * 1024d)));
             }
+            else if (component is Runtime.StorageComponent storageComponent)
+            {
+                DrawValue("Storage Root", EmptyFallback(storageComponent.StorageRootPath));
+            }
 
             EditorGUILayout.EndVertical();
         }

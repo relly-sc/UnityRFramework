@@ -15,6 +15,9 @@ namespace UnityRFramework.Editor
         /// <summary>获取实际写入的输出文件数量。</summary>
         public int WrittenFileCount { get; private set; }
 
+        /// <summary>获取内容未变化的输出文件数量。</summary>
+        public int UnchangedFileCount { get; private set; }
+
         /// <summary>获取操作消息。</summary>
         public IReadOnlyList<string> Messages => messages;
 
@@ -32,6 +35,13 @@ namespace UnityRFramework.Editor
         {
             WrittenFileCount++;
             messages.Add("Written: " + path);
+        }
+
+        /// <summary>记录一个无需重写的输出文件。</summary>
+        public void FileUnchanged(string path)
+        {
+            UnchangedFileCount++;
+            messages.Add("Unchanged: " + path);
         }
 
         /// <summary>

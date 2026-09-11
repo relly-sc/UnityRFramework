@@ -48,6 +48,41 @@ Host 初始化会请求服务器 Package Version 并激活对应 Manifest。成�
 资源本地不可用时，
 YooAsset 可在加载过程中下载所需 Bundle；也可通过更新接口提前计算并下载差量资源。
 
+## Bundle 可选加密
+
+`Expansion.YooAsset` 提供 YooAsset Builder 可直接选择的
+`UnityRFramework.Expansion.Editor.UnityRFrameworkBundleEncryptor`。它使用框架的
+AES-256-CBC + HMAC-SHA256 数据保护封装，对 Bundle 同时加密并认证；默认仍为
+YooAsset 的 `EncryptionNone`，未选择时不会读取密钥或增加运行开销。
+
+启用步骤：
+
+1. 为 Unity Editor 进程设置环境变量 `UNITY_RFRAMEWORK_YOOASSET_KEY`，值为 Base64 编码的
+   32 字节密钥。可选设置 `UNITY_RFRAMEWORK_YOOASSET_KEY_ID`；未设置时使用
+   `YooAssetBundle`。
+2. 重启 Unity，在 `YooAsset/AssetBundle Builder` 中选择目标 Package 和 Pipeline，将
+   `Bundle Encryptor` 设为 `UnityRFrameworkBundleEncryptor`。
+3. 项目启动时，在调用 `GameEntry.Resource.InitializeAsync()` 前统一注册发布内容密钥：
+
+```csharp
+RuntimeKeyProviderRegistry.ConfigureContentKeys(projectKeyProvider);
+```
+
+`projectKeyProvider` 必须实现 `RFramework.IKeyProvider`，并能按加密数据中保存的 `KeyId`
+返回密钥副本。不要把正式密钥直接序列化到 Prefab、ScriptableObject 或源码中。框架构建步骤
+会读取 YooAsset Builder 的当前加密器选择，并在正式打包前校验环境变量，不维护第二份加密开关。
+同一注册入口也供受保护 Config 使用；未启用 Config 或 Bundle 加密时，注册提供器不会改变
+明文加载流程。`YooAssetBundleProtection.Configure` 仍保留为 YooAsset 专用显式覆盖入口。
+
+当前实现属于整包内存解密，适合提高常规资源提取成本，但加载时会同时占用加密数据和解密后
+数据的内存。应控制单个 Bundle 大小；超大资源需要项目自行提供流式解密器。该能力不替代
+Config 的可选数据保护，也不承诺客户端密钥无法被提取。
+
+Config 加密与 Bundle 加密可以叠加：YooAsset 先还原 Bundle，ConfigModule 再还原其中的
+配置 `.bytes`，两层保护格式和认证上下文互不冲突。通常只为同一保护目标选择一层即可；项目
+同时需要保护其他资源时允许叠加，并应为 Config 与 YooAsset Bundle 使用不同的环境变量、
+`KeyId` 和密钥材料，避免一个密钥泄漏同时失去两层保护。
+
 ## 更新与缓存
 
 ### WebGL 平台差异

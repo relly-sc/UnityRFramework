@@ -733,8 +733,9 @@ namespace UnityRFramework.Expansion
                     return new EditorSimulateModeOptions
                     {
                         EditorFileSystemParameters =
-                            FileSystemParameters.CreateDefaultEditorFileSystemParameters(
-                                buildResult.PackageRootDirectory)
+                            ConfigureBundleDecryption(
+                                FileSystemParameters.CreateDefaultEditorFileSystemParameters(
+                                    buildResult.PackageRootDirectory))
                     };
 #else
                     throw new PlatformNotSupportedException(
@@ -747,14 +748,16 @@ namespace UnityRFramework.Expansion
                         return new WebPlayModeOptions
                         {
                             WebServerFileSystemParameters =
-                                FileSystemParameters.CreateDefaultWebServerFileSystemParameters()
+                                ConfigureBundleDecryption(
+                                    FileSystemParameters.CreateDefaultWebServerFileSystemParameters())
                         };
                     }
 
                     return new OfflinePlayModeOptions
                     {
                         BuiltinFileSystemParameters =
-                            FileSystemParameters.CreateDefaultBuiltinFileSystemParameters()
+                            ConfigureBundleDecryption(
+                                FileSystemParameters.CreateDefaultBuiltinFileSystemParameters())
                     };
 
                 case ResourcePlayMode.Host:
@@ -772,25 +775,53 @@ namespace UnityRFramework.Expansion
                         return new WebPlayModeOptions
                         {
                             WebNetworkFileSystemParameters =
-                                FileSystemParameters.CreateDefaultWebNetworkFileSystemParameters(
-                                    remoteService)
+                                ConfigureBundleDecryption(
+                                    FileSystemParameters.CreateDefaultWebNetworkFileSystemParameters(
+                                        remoteService))
                         };
                     }
 
                     return new HostPlayModeOptions
                     {
                         BuiltinFileSystemParameters =
-                            FileSystemParameters.CreateDefaultBuiltinFileSystemParameters(),
+                            ConfigureBundleDecryption(
+                                FileSystemParameters.CreateDefaultBuiltinFileSystemParameters()),
                         CacheFileSystemParameters =
-                            FileSystemParameters.CreateDefaultSandboxFileSystemParameters(
-                                remoteService,
-                                cachePackageRoot)
+                            ConfigureBundleDecryption(
+                                FileSystemParameters.CreateDefaultSandboxFileSystemParameters(
+                                    remoteService,
+                                    cachePackageRoot))
                     };
 
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(playMode), playMode, "Unsupported resource play mode.");
             }
+        }
+
+        private static FileSystemParameters ConfigureBundleDecryption(
+            FileSystemParameters parameters)
+        {
+            if (!YooAssetBundleProtection.IsConfigured)
+            {
+                return parameters;
+            }
+
+            UnityRFrameworkBundleDecryptor decryptor =
+                new UnityRFrameworkBundleDecryptor();
+            parameters.AddParameter(
+                EFileSystemParameter.AssetBundleDecryptor,
+                decryptor);
+            parameters.AddParameter(
+                EFileSystemParameter.AssetBundleFallbackDecryptor,
+                decryptor);
+            parameters.AddParameter(
+                EFileSystemParameter.RawBundleDecryptor,
+                decryptor);
+            parameters.AddParameter(
+                EFileSystemParameter.ArchiveBundleDecryptor,
+                decryptor);
+            return parameters;
         }
 
         /// <summary>

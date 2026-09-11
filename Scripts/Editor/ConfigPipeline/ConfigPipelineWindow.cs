@@ -57,6 +57,9 @@ namespace UnityRFramework.Editor
             DrawFolderField("CSV 目录", ref options.ConfigSourceDirectory);
             DrawFolderField("生成代码目录", ref options.GeneratedCodeDirectory);
             DrawFolderField("输出目录", ref options.ConfigOutputDirectory);
+            EditorGUILayout.HelpBox(
+                "Json 子目录用于开发查看；Binary 子目录存放正式发布的 .bytes。",
+                MessageType.None);
             options.ExportConfigBundle = EditorGUILayout.Toggle(
                 new GUIContent("导出多表容器", "同时导出 JSON 与二进制多表容器。"),
                 options.ExportConfigBundle);
@@ -65,6 +68,33 @@ namespace UnityRFramework.Editor
                 options.ConfigBundleName = EditorGUILayout.TextField(
                     new GUIContent("容器文件名", "不含 .json 或 .bytes 扩展名。"),
                     options.ConfigBundleName);
+            }
+            options.ConfigReleaseFormat = (ConfigReleaseDataFormat)EditorGUILayout.Popup(
+                "正式数据格式",
+                (int)options.ConfigReleaseFormat,
+                new[] { "框架二进制", "JSON 内容（仍输出 .bytes）" });
+            options.ConfigBinaryProtection = (RFramework.ConfigProtectionMode)
+                EditorGUILayout.Popup(
+                    "正式二进制保护",
+                    (int)options.ConfigBinaryProtection,
+                    new[] { "不加密", "加密并校验完整性" });
+            if (options.ConfigBinaryProtection
+                == RFramework.ConfigProtectionMode.EncryptedAndAuthenticated)
+            {
+                options.ConfigProtectionKeyId = EditorGUILayout.TextField(
+                    new GUIContent("密钥编号", "写入产物用于密钥轮换，不是密钥内容。"),
+                    options.ConfigProtectionKeyId);
+                options.ConfigProtectionKeyEnvironmentVariable = EditorGUILayout.TextField(
+                    new GUIContent("密钥环境变量", "变量值必须是 Base64 编码的 32 字节密钥。"),
+                    options.ConfigProtectionKeyEnvironmentVariable);
+                options.ConfigProtectionSourceRoot = EditorGUILayout.TextField(
+                    new GUIContent(
+                        "运行时加载路径前缀",
+                        "必须与 LoadConfigAsync 使用的路径一致，例如 Config/Binary。"),
+                    options.ConfigProtectionSourceRoot);
+                EditorGUILayout.HelpBox(
+                    "密钥只从环境变量读取，不会保存到配置资产、EditorPrefs、报告或导出目录。",
+                    MessageType.Info);
             }
             options.GeneratedNamespace = EditorGUILayout.TextField(
                 new GUIContent(

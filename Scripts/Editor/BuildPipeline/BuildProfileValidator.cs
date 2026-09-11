@@ -256,7 +256,7 @@ namespace UnityRFramework.Editor
             {
                 ValidateScenes(profile, issues);
             }
-            ValidateOutput(profile, state, issues, out BuildValidationContext context);
+            ValidateOutput(profile, recipe, state, issues, out BuildValidationContext context);
             ValidatePlatform(profile, context, issues);
             ValidateDefineSymbols(profile, issues);
             ValidateEnvironment(state, issues);
@@ -400,6 +400,7 @@ namespace UnityRFramework.Editor
         /// <param name="context">解析成功时输出校验上下文；失败时输出字段为空的上下文。</param>
         private static void ValidateOutput(
             UnityRFrameworkBuildProfile profile,
+            BuildRecipe recipe,
             BuildEnvironmentState state,
             ICollection<BuildValidationIssue> issues,
             out BuildValidationContext context)
@@ -461,7 +462,8 @@ namespace UnityRFramework.Editor
                 projectRoot,
                 outputRoot,
                 directory,
-                fileName);
+                fileName,
+                recipe);
         }
 
         /// <summary>

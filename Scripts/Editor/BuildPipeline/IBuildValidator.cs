@@ -44,16 +44,19 @@ namespace UnityRFramework.Editor
         /// <param name="outputRootAbsolute">输出根目录绝对路径；解析失败时为空字符串。</param>
         /// <param name="outputDirectory">解析后的输出目录（相对输出根）；失败时为空字符串。</param>
         /// <param name="outputFileName">解析后的输出文件名（不含扩展名）；失败时为空字符串。</param>
+        /// <param name="recipe">本次实际构建方案；为空时使用 Profile 保存值。</param>
         public BuildValidationContext(
             UnityRFrameworkBuildProfile profile,
             BuildTarget activeTarget,
             string projectRoot,
             string outputRootAbsolute,
             string outputDirectory,
-            string outputFileName)
+            string outputFileName,
+            BuildRecipe? recipe = null)
         {
             Profile = profile;
             ActiveTarget = activeTarget;
+            Recipe = recipe ?? profile?.Recipe ?? BuildRecipe.Player;
             ProjectRoot = projectRoot ?? string.Empty;
             OutputRootAbsolute = outputRootAbsolute ?? string.Empty;
             OutputDirectory = outputDirectory ?? string.Empty;
@@ -65,6 +68,9 @@ namespace UnityRFramework.Editor
 
         /// <summary>获取当前活动构建目标。</summary>
         public BuildTarget ActiveTarget { get; }
+
+        /// <summary>获取本次校验实际使用的构建方案。</summary>
+        public BuildRecipe Recipe { get; }
 
         /// <summary>获取当前活动构建目标对应的组。</summary>
         public BuildTargetGroup ActiveGroup

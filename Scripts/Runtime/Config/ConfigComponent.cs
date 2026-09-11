@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using RFramework;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace UnityRFramework.Runtime
 {
@@ -28,10 +29,24 @@ namespace UnityRFramework.Runtime
         [Tooltip("配置辅助器类型全名。必须是继承自 ConfigHelperBase 的 MonoBehaviour。")]
         private string configHelperTypeName = JsonHelperTypeName;
 
+        [SerializeField]
+        [Tooltip("配置资源保护模式。默认不启用；启用后必须在加载前注入 IDataProtector。")]
+        private ConfigProtectionMode protectionMode = ConfigProtectionMode.None;
+
+        [SerializeField]
+        [FormerlySerializedAs("protectedPayloadFormat")]
+        [Tooltip("单表解密后交给当前 Config Helper 的数据格式。")]
+        private ConfigPayloadFormat protectedSingleTableFormat = ConfigPayloadFormat.Custom;
+
+        [SerializeField]
+        [Tooltip("多表容器解密后交给当前 Config Helper 的数据格式。")]
+        private ConfigPayloadFormat protectedTableBundleFormat = ConfigPayloadFormat.Custom;
+
         /// <summary>
         /// 配置模块引用，由 Awake 从 RFrameworkModuleHost 获取并缓存。
         /// </summary>
         private IConfigModule configModule;
+        private bool hasExplicitDataProtector;
 
         protected override void Awake()
         {
@@ -78,6 +93,13 @@ namespace UnityRFramework.Runtime
             configModule.SetHelper(helper);
         }
 
+        /// <summary>注入或移除配置数据保护器。传入 null 不影响明文配置加载。</summary>
+        public void SetDataProtector(IDataProtector protector)
+        {
+            hasExplicitDataProtector = protector != null;
+            configModule.SetDataProtector(protector);
+        }
+
         /// <summary>
         /// 异步加载配置表。
         /// 通过 ResourceComponent 加载原始字节，再调用 ConfigModule 解析并缓存。
@@ -112,7 +134,20 @@ namespace UnityRFramework.Runtime
 
             try
             {
-                configModule.LoadConfig<T>(bytes);
+                if (protectionMode == ConfigProtectionMode.None)
+                {
+                    configModule.LoadConfig<T>(bytes);
+                }
+                else
+                {
+                    EnsureRegisteredDataProtector();
+                    ConfigProtectionContext context = new ConfigProtectionContext(
+                        protectionMode,
+                        assetPath,
+                        ConfigPayloadType.Single,
+                        protectedSingleTableFormat);
+                    configModule.LoadConfig<T>(bytes, context);
+                }
             }
             finally
             {
@@ -126,6 +161,13 @@ namespace UnityRFramework.Runtime
         public void LoadConfig<T>(byte[] bytes) where T : class
         {
             configModule.LoadConfig<T>(bytes);
+        }
+
+        /// <summary>从字节数据按显式保护上下文加载配置表。</summary>
+        public void LoadConfig<T>(byte[] bytes, ConfigProtectionContext context) where T : class
+        {
+            EnsureRegisteredDataProtector();
+            configModule.LoadConfig<T>(bytes, context);
         }
 
         /// <summary>
@@ -157,7 +199,20 @@ namespace UnityRFramework.Runtime
 
             try
             {
-                configModule.LoadConfigBundle(bytes);
+                if (protectionMode == ConfigProtectionMode.None)
+                {
+                    configModule.LoadConfigBundle(bytes);
+                }
+                else
+                {
+                    EnsureRegisteredDataProtector();
+                    ConfigProtectionContext context = new ConfigProtectionContext(
+                        protectionMode,
+                        assetPath,
+                        ConfigPayloadType.Bundle,
+                        protectedTableBundleFormat);
+                    configModule.LoadConfigBundle(bytes, context);
+                }
             }
             finally
             {
@@ -169,6 +224,24 @@ namespace UnityRFramework.Runtime
         public void LoadConfigBundle(byte[] bytes)
         {
             configModule.LoadConfigBundle(bytes);
+        }
+
+        /// <summary>从字节数据按显式保护上下文加载多表配置容器。</summary>
+        public void LoadConfigBundle(byte[] bytes, ConfigProtectionContext context)
+        {
+            EnsureRegisteredDataProtector();
+            configModule.LoadConfigBundle(bytes, context);
+        }
+
+        private void EnsureRegisteredDataProtector()
+        {
+            if (hasExplicitDataProtector
+                || !RuntimeKeyProviderRegistry.TryGetContentKeys(out IKeyProvider provider))
+            {
+                return;
+            }
+
+            configModule.SetDataProtector(new DefaultDataProtector(provider));
         }
 
         /// <summary>

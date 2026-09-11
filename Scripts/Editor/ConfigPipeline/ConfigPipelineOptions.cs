@@ -1,8 +1,19 @@
 using System;
+using RFramework;
 using UnityEngine.Serialization;
 
 namespace UnityRFramework.Editor
 {
+    /// <summary>正式发布的 Config 数据格式。</summary>
+    public enum ConfigReleaseDataFormat
+    {
+        /// <summary>框架单表和多表二进制格式。</summary>
+        FrameworkBinary = 0,
+
+        /// <summary>JSON 内容，文件仍使用 .bytes 扩展名。</summary>
+        JsonContent = 1
+    }
+
     /// <summary>
     /// Config 转换工具的输入和输出路径配置。
     /// </summary>
@@ -27,6 +38,23 @@ namespace UnityRFramework.Editor
 
         /// <summary>Config 多表容器文件名，不含扩展名。</summary>
         public string ConfigBundleName = "ConfigBundle";
+
+        /// <summary>正式 .bytes 文件解密后的数据格式。</summary>
+        public ConfigReleaseDataFormat ConfigReleaseFormat =
+            ConfigReleaseDataFormat.FrameworkBinary;
+
+        /// <summary>正式 Config 二进制的保护模式，默认不加密。</summary>
+        public ConfigProtectionMode ConfigBinaryProtection = ConfigProtectionMode.None;
+
+        /// <summary>加密产物写入的密钥编号，不包含密钥本身。</summary>
+        public string ConfigProtectionKeyId = "config-v1";
+
+        /// <summary>保存 Base64 32 字节密钥的环境变量名。</summary>
+        public string ConfigProtectionKeyEnvironmentVariable =
+            "UNITYRFRAMEWORK_CONFIG_KEY";
+
+        /// <summary>运行时传给 LoadConfigAsync 的加载路径前缀。</summary>
+        public string ConfigProtectionSourceRoot = "Config/Binary";
 
         /// <summary>Localization 统一输出根目录，内部自动分为 Json/Binary。</summary>
         [FormerlySerializedAs("LocalizationBinaryDirectory")]

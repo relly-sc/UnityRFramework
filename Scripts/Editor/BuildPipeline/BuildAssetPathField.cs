@@ -42,6 +42,12 @@ namespace UnityRFramework.Editor
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUILayout.PropertyField(property, label);
+                HandlePathDrop(
+                    GUILayoutUtility.GetLastRect(),
+                    property,
+                    true,
+                    string.Empty,
+                    requireProjectDirectory);
                 if (GUILayout.Button("选择", GUILayout.Width(SelectButtonWidth)))
                 {
                     string selected = PickDirectory(
@@ -83,6 +89,12 @@ namespace UnityRFramework.Editor
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUILayout.PropertyField(property, label);
+                HandlePathDrop(
+                    GUILayoutUtility.GetLastRect(),
+                    property,
+                    false,
+                    extension,
+                    requireProjectFile);
                 if (GUILayout.Button("选择", GUILayout.Width(SelectButtonWidth)))
                 {
                     string selected = PickFile(
@@ -271,6 +283,118 @@ namespace UnityRFramework.Editor
         private static string NormalizePath(string path)
         {
             return Path.GetFullPath(path).Replace('\\', '/');
+        }
+
+        /// <summary>
+        /// 允许把 Project 视图或文件管理器中的单个文件、目录拖到路径文本框。
+        /// 输出目录等尚不存在的路径仍可继续手填或使用原选择按钮。
+        /// </summary>
+        private static void HandlePathDrop(
+            Rect fieldRect,
+            SerializedProperty property,
+            bool requireDirectory,
+            string extension,
+            bool requireProjectPath)
+        {
+            Event current = Event.current;
+            if (!fieldRect.Contains(current.mousePosition)
+                || (current.type != EventType.DragUpdated
+                    && current.type != EventType.DragPerform))
+            {
+                return;
+            }
+
+            string path;
+            bool accepted = TryGetDraggedPath(
+                requireDirectory,
+                extension,
+                requireProjectPath,
+                out path);
+            DragAndDrop.visualMode = accepted
+                ? DragAndDropVisualMode.Copy
+                : DragAndDropVisualMode.Rejected;
+
+            if (current.type == EventType.DragPerform && accepted)
+            {
+                DragAndDrop.AcceptDrag();
+                property.stringValue = path;
+                GUI.changed = true;
+            }
+
+            current.Use();
+        }
+
+        private static bool TryGetDraggedPath(
+            bool requireDirectory,
+            string extension,
+            bool requireProjectPath,
+            out string path)
+        {
+            path = null;
+            UnityEngine.Object[] references = DragAndDrop.objectReferences;
+            string draggedPath = null;
+            if (references != null && references.Length > 0)
+            {
+                if (references.Length != 1 || references[0] == null)
+                {
+                    return false;
+                }
+
+                draggedPath = AssetDatabase.GetAssetPath(references[0]);
+            }
+
+            if (string.IsNullOrWhiteSpace(draggedPath))
+            {
+                string[] draggedPaths = DragAndDrop.paths;
+                if (draggedPaths == null || draggedPaths.Length != 1)
+                {
+                    return false;
+                }
+
+                draggedPath = draggedPaths[0];
+            }
+
+            string projectRoot = GetProjectRoot();
+            string absolutePath;
+            try
+            {
+                absolutePath = ResolveAbsolute(draggedPath, projectRoot);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            bool isDirectory = Directory.Exists(absolutePath);
+            bool isFile = File.Exists(absolutePath);
+            if (!isDirectory && !isFile)
+            {
+                return false;
+            }
+
+            if (requireDirectory != isDirectory)
+            {
+                return false;
+            }
+
+            if (!requireDirectory
+                && !string.IsNullOrWhiteSpace(extension)
+                && !string.Equals(
+                    Path.GetExtension(absolutePath).TrimStart('.'),
+                    extension.TrimStart('.'),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string relativePath = ToProjectRelative(absolutePath, projectRoot);
+            if (requireProjectPath && relativePath == null)
+            {
+                return false;
+            }
+
+            path = relativePath ?? NormalizePath(absolutePath);
+            return true;
         }
     }
 }

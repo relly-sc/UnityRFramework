@@ -114,15 +114,18 @@ namespace UnityRFramework.Editor
                     StepGroup));
             }
 
-            bool exportJson = settings.ExportJson;
-            bool leakCheck = settings.JsonLeakCheck;
-            if (!exportJson
-                && leakCheck
-                && context.Profile.Flavor == BuildProfileFlavor.Release)
+            try
             {
-                CheckJsonLeak(options.ConfigOutputDirectory, "Config", issues);
-                CheckJsonLeak(options.LocalizationOutputDirectory, "Localization", issues);
+                ConfigProtectionExporter.Create(options, null);
             }
+            catch (Exception exception)
+            {
+                issues.Add(BuildValidationIssue.Error(
+                    StepCode,
+                    exception.Message,
+                    StepGroup));
+            }
+
         }
 
         /// <summary>
@@ -176,38 +179,6 @@ namespace UnityRFramework.Editor
                     $"Config/Localization 导出失败：{exception.Message}",
                     exception);
             }
-        }
-
-        /// <summary>
-        /// 检查指定输出目录的 Json 子目录是否残留开发 JSON，残留时追加警告。
-        /// </summary>
-        /// <param name="outputDirectory">Assets 相对输出目录。</param>
-        /// <param name="displayName">展示名称，用于消息。</param>
-        /// <param name="issues">追加问题条目的目标集合。</param>
-        private static void CheckJsonLeak(
-            string outputDirectory,
-            string displayName,
-            ICollection<BuildValidationIssue> issues)
-        {
-            string jsonDirectory = ResolveJsonDirectory(outputDirectory);
-            if (string.IsNullOrEmpty(jsonDirectory) || !Directory.Exists(jsonDirectory))
-            {
-                return;
-            }
-
-            if (Directory.GetFiles(
-                jsonDirectory,
-                "*.json",
-                SearchOption.TopDirectoryOnly).Length == 0)
-            {
-                return;
-            }
-
-            issues.Add(BuildValidationIssue.Warning(
-                StepCode,
-                $"检测到 {displayName} 输出目录残留开发 JSON：{jsonDirectory}。"
-                + "执行导出时会自动清除，产物仅保留二进制。",
-                StepGroup));
         }
 
         /// <summary>

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using RFramework;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace UnityRFramework.Runtime
 {
@@ -18,6 +19,12 @@ namespace UnityRFramework.Runtime
         [Serializable]
         private struct LayerRoot
         {
+            public LayerRoot(int windowLayer, RectTransform root)
+            {
+                this.windowLayer = windowLayer;
+                this.root = root;
+            }
+
             [SerializeField]
             [Tooltip("逻辑窗口层级，需与打开 UI 时传入的 Window Layer 一致。")]
             private int windowLayer;
@@ -35,6 +42,26 @@ namespace UnityRFramework.Runtime
         /// UI 模块引用。
         /// </summary>
         private IUIModule uiModule;
+
+        private static readonly int[] DefaultLayers =
+        {
+            UILayer.Bottom,
+            UILayer.HUD,
+            UILayer.Panel,
+            UILayer.Popup,
+            UILayer.System,
+            UILayer.Top
+        };
+
+        private static readonly string[] DefaultLayerNames =
+        {
+            "Bottom",
+            "HUD",
+            "Panel",
+            "Popup",
+            "System",
+            "Top"
+        };
 
         /// <summary>
         /// UI 辅助器类型名称。
@@ -81,6 +108,9 @@ namespace UnityRFramework.Runtime
         {
             base.Awake();
 
+            // 旧 Prefab 可能只保留 UIComponent，根节点补齐不依赖模块注册顺序。
+            EnsureLayerRoots();
+
             uiModule = RFrameworkModuleHost.Get<IUIModule>();
             if (uiModule == null)
             {
@@ -109,10 +139,174 @@ namespace UnityRFramework.Runtime
         {
             if (helper is UIHelperBase unityHelper)
             {
+                EnsureLayerRoots();
                 ConfigureLayerRoots(unityHelper);
             }
 
-            uiModule.SetHelper(helper);
+            // 允许在 Awake 完成模块注入前预配置辅助器，避免旧场景或编辑器测试触发空引用。
+            if (uiModule != null)
+            {
+                uiModule.SetHelper(helper);
+            }
+        }
+
+        private void EnsureLayerRoots()
+        {
+            if (uiRoot == null)
+            {
+                uiRoot = FindExistingRect("Canvas/UIRoot");
+                if (uiRoot == null)
+                {
+                    RectTransform canvasTransform = EnsureDefaultCanvas();
+                    uiRoot = CreateRectRoot("UIRoot", canvasTransform);
+                }
+                else
+                {
+                    EnsureCanvasComponents(uiRoot.parent.gameObject, false);
+                }
+            }
+
+            if (canvasRoot == null)
+            {
+                canvasRoot = FindExistingRect("CanvasRoot")
+                    ?? CreateRectRoot("CanvasRoot", transform);
+            }
+
+            layerRoots = EnsureDefaultLayerRoots(uiRoot, layerRoots);
+            canvasLayerRoots = EnsureDefaultLayerRoots(canvasRoot, canvasLayerRoots);
+        }
+
+        private RectTransform EnsureDefaultCanvas()
+        {
+            Transform existing = transform.Find("Canvas");
+            GameObject canvasObject = existing != null
+                ? existing.gameObject
+                : new GameObject("Canvas", typeof(RectTransform));
+            if (canvasObject.transform.parent != transform)
+            {
+                canvasObject.transform.SetParent(transform, false);
+            }
+
+            EnsureCanvasComponents(canvasObject, existing == null);
+            return canvasObject.GetComponent<RectTransform>();
+        }
+
+        private static void EnsureCanvasComponents(GameObject canvasObject, bool isNewCanvasObject)
+        {
+            int uiLayer = LayerMask.NameToLayer("UI");
+            if (uiLayer >= 0 && isNewCanvasObject)
+            {
+                canvasObject.layer = uiLayer;
+            }
+
+            Canvas canvas = canvasObject.GetComponent<Canvas>();
+            bool canvasAdded = canvas == null;
+            if (canvas == null)
+            {
+                canvas = canvasObject.AddComponent<Canvas>();
+            }
+
+            CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+            bool scalerAdded = scaler == null;
+            if (scaler == null)
+            {
+                scaler = canvasObject.AddComponent<CanvasScaler>();
+            }
+
+            GraphicRaycaster raycaster = canvasObject.GetComponent<GraphicRaycaster>();
+            bool raycasterAdded = raycaster == null;
+            if (raycaster == null)
+            {
+                raycaster = canvasObject.AddComponent<GraphicRaycaster>();
+            }
+
+            if (isNewCanvasObject || canvasAdded)
+            {
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.pixelPerfect = false;
+                canvas.sortingOrder = 0;
+                canvas.targetDisplay = 0;
+                canvas.additionalShaderChannels = AdditionalCanvasShaderChannels.None;
+            }
+
+            if (isNewCanvasObject || scalerAdded)
+            {
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+                scaler.scaleFactor = 1f;
+                scaler.referencePixelsPerUnit = 100f;
+            }
+
+            if (isNewCanvasObject || raycasterAdded)
+            {
+                raycaster.ignoreReversedGraphics = true;
+                raycaster.blockingObjects = GraphicRaycaster.BlockingObjects.None;
+                raycaster.blockingMask = -1;
+            }
+        }
+
+        private RectTransform FindExistingRect(string path)
+        {
+            Transform existing = transform.Find(path);
+            return existing != null ? existing as RectTransform : null;
+        }
+
+        private static LayerRoot[] EnsureDefaultLayerRoots(
+            RectTransform parent,
+            LayerRoot[] configured)
+        {
+            List<LayerRoot> result = configured != null
+                ? new List<LayerRoot>(configured)
+                : new List<LayerRoot>();
+            HashSet<int> existingLayers = new HashSet<int>();
+            for (int i = 0; i < result.Count; i++)
+            {
+                if (result[i].Root != null)
+                {
+                    existingLayers.Add(result[i].WindowLayer);
+                }
+            }
+
+            for (int i = 0; i < DefaultLayers.Length; i++)
+            {
+                if (existingLayers.Contains(DefaultLayers[i]))
+                {
+                    continue;
+                }
+
+                RectTransform root = FindDirectRect(parent, DefaultLayerNames[i])
+                    ?? CreateRectRoot(DefaultLayerNames[i], parent);
+                result.Add(new LayerRoot(DefaultLayers[i], root));
+            }
+
+            return result.ToArray();
+        }
+
+        private static RectTransform FindDirectRect(RectTransform parent, string name)
+        {
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                RectTransform child = parent.GetChild(i) as RectTransform;
+                if (child != null && child.name == name)
+                {
+                    return child;
+                }
+            }
+
+            return null;
+        }
+
+        private static RectTransform CreateRectRoot(string name, Transform parent)
+        {
+            GameObject rootObject = new GameObject(name, typeof(RectTransform));
+            RectTransform root = rootObject.GetComponent<RectTransform>();
+            root.SetParent(parent, false);
+            root.anchorMin = Vector2.zero;
+            root.anchorMax = Vector2.one;
+            root.offsetMin = Vector2.zero;
+            root.offsetMax = Vector2.zero;
+            root.localScale = Vector3.one;
+            rootObject.layer = parent.gameObject.layer;
+            return root;
         }
 
         private void ConfigureLayerRoots(UIHelperBase helper)

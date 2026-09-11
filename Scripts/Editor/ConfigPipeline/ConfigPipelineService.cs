@@ -122,11 +122,21 @@ namespace UnityRFramework.Editor
         /// <returns>导出报告。</returns>
         public static ConfigPipelineReport ExportAll(ConfigPipelineOptions options)
         {
+            return ExportAll(options, null);
+        }
+
+        /// <summary>使用调用方提供的密钥源导出全部配置。</summary>
+        public static ConfigPipelineReport ExportAll(
+            ConfigPipelineOptions options,
+            IKeyProvider keyProvider)
+        {
             ValidateOptions(options, true, true);
+            ConfigProtectionExporter protection =
+                ConfigProtectionExporter.Create(options, keyProvider);
             ConfigPipelineReport report = new ConfigPipelineReport();
             List<ConfigTableSchema> configs = ParseConfigSchemas(options, report);
             List<LocalizationTable> localizations = ParseLocalizations(options, report);
-            bool changed = ExportConfigs(options, configs, report);
+            bool changed = ExportConfigs(options, configs, report, protection);
             changed |= ExportLocalizations(options, localizations, report);
             if (changed)
             {
@@ -135,7 +145,8 @@ namespace UnityRFramework.Editor
 
             report.AddMessage(
                 $"Export complete. {report.ProcessedFileCount} source file(s), "
-                + $"{report.WrittenFileCount} changed output file(s).");
+                + $"{report.WrittenFileCount} changed output file(s), "
+                + $"{report.UnchangedFileCount} unchanged output file(s).");
             return report;
         }
 
@@ -146,17 +157,28 @@ namespace UnityRFramework.Editor
         /// <returns>导出报告。</returns>
         public static ConfigPipelineReport ExportConfig(ConfigPipelineOptions options)
         {
+            return ExportConfig(options, null);
+        }
+
+        /// <summary>使用调用方提供的密钥源导出 Config。</summary>
+        public static ConfigPipelineReport ExportConfig(
+            ConfigPipelineOptions options,
+            IKeyProvider keyProvider)
+        {
             ValidateOptions(options, true, false);
+            ConfigProtectionExporter protection =
+                ConfigProtectionExporter.Create(options, keyProvider);
             ConfigPipelineReport report = new ConfigPipelineReport();
             List<ConfigTableSchema> configs = ParseConfigSchemas(options, report);
-            if (ExportConfigs(options, configs, report))
+            if (ExportConfigs(options, configs, report, protection))
             {
                 AssetDatabase.Refresh();
             }
 
             report.AddMessage(
                 $"Config export complete. {report.ProcessedFileCount} source file(s), "
-                + $"{report.WrittenFileCount} changed output file(s).");
+                + $"{report.WrittenFileCount} changed output file(s), "
+                + $"{report.UnchangedFileCount} unchanged output file(s).");
             return report;
         }
 
@@ -403,7 +425,8 @@ namespace UnityRFramework.Editor
         private static bool ExportConfigs(
             ConfigPipelineOptions options,
             IReadOnlyList<ConfigTableSchema> configs,
-            ConfigPipelineReport report)
+            ConfigPipelineReport report,
+            ConfigProtectionExporter protection)
         {
             string codeRoot = ResolveDirectory(options.GeneratedCodeDirectory, false);
             string outputRoot = ResolveDirectory(options.ConfigOutputDirectory, false);
@@ -435,6 +458,10 @@ namespace UnityRFramework.Editor
                         changed = true;
                         report.FileWritten(ToProjectPath(codePath));
                     }
+                    else
+                    {
+                        report.FileUnchanged(ToProjectPath(codePath));
+                    }
                 }
 
                 string jsonPath = Path.Combine(jsonRoot, jsonFile);
@@ -444,13 +471,33 @@ namespace UnityRFramework.Editor
                     changed = true;
                     report.FileWritten(ToProjectPath(jsonPath));
                 }
+                else
+                {
+                    report.FileUnchanged(ToProjectPath(jsonPath));
+                }
 
                 string binaryPath = Path.Combine(binaryRoot, binaryFile);
-                if (ConfigBinaryExporter.WriteBytesIfChanged(
-                    binaryPath, ConfigBinaryExporter.BuildV2(schema)))
+                byte[] releaseBytes = options.ConfigReleaseFormat
+                    == ConfigReleaseDataFormat.JsonContent
+                    ? Encoding.UTF8.GetBytes(ConfigJsonExporter.Build(schema))
+                    : ConfigBinaryExporter.BuildV2(schema);
+                ConfigPayloadFormat releaseFormat = options.ConfigReleaseFormat
+                    == ConfigReleaseDataFormat.JsonContent
+                    ? ConfigPayloadFormat.Json
+                    : ConfigPayloadFormat.BinarySingleTable;
+                if (protection.WriteBytesIfChanged(
+                    binaryPath,
+                    binaryFile,
+                    ConfigPayloadType.Single,
+                    releaseFormat,
+                    releaseBytes))
                 {
                     changed = true;
                     report.FileWritten(ToProjectPath(binaryPath));
+                }
+                else
+                {
+                    report.FileUnchanged(ToProjectPath(binaryPath));
                 }
             }
 
@@ -468,15 +515,56 @@ namespace UnityRFramework.Editor
                     changed = true;
                     report.FileWritten(ToProjectPath(jsonPath));
                 }
+                else
+                {
+                    report.FileUnchanged(ToProjectPath(jsonPath));
+                }
 
                 string binaryPath = Path.Combine(binaryRoot, binaryFile);
-                if (ConfigBinaryExporter.WriteBytesIfChanged(
-                    binaryPath, ConfigBinaryExporter.BuildBundle(configs)))
+                byte[] releaseBytes = options.ConfigReleaseFormat
+                    == ConfigReleaseDataFormat.JsonContent
+                    ? Encoding.UTF8.GetBytes(ConfigJsonExporter.BuildBundle(configs))
+                    : ConfigBinaryExporter.BuildBundle(configs);
+                ConfigPayloadFormat releaseFormat = options.ConfigReleaseFormat
+                    == ConfigReleaseDataFormat.JsonContent
+                    ? ConfigPayloadFormat.Json
+                    : ConfigPayloadFormat.BinaryTableBundle;
+                if (protection.WriteBytesIfChanged(
+                    binaryPath,
+                    binaryFile,
+                    ConfigPayloadType.Bundle,
+                    releaseFormat,
+                    releaseBytes))
                 {
                     changed = true;
                     report.FileWritten(ToProjectPath(binaryPath));
                 }
+                else
+                {
+                    report.FileUnchanged(ToProjectPath(binaryPath));
+                }
             }
+
+            binaryFiles.Add(ConfigProtectionExporter.ManifestName);
+            string protectionManifestPath = Path.Combine(
+                binaryRoot, ConfigProtectionExporter.ManifestName);
+            if (protection.WriteManifest(binaryRoot))
+            {
+                changed = true;
+                report.FileWritten(ToProjectPath(protectionManifestPath));
+            }
+            else
+            {
+                report.FileUnchanged(ToProjectPath(protectionManifestPath));
+            }
+
+            report.AddMessage(
+                options.ConfigBinaryProtection == ConfigProtectionMode.None
+                    ? "Release Config bytes protection: disabled."
+                    : $"Release Config bytes protection: encrypted and authenticated; "
+                        + $"format={options.ConfigReleaseFormat}; "
+                        + $"KeyId={options.ConfigProtectionKeyId}; "
+                        + $"runtime path prefix={options.ConfigProtectionSourceRoot}.");
 
             changed |= SynchronizeManifest(
                 codeRoot, ConfigCodeManifestName, codeFiles, report);

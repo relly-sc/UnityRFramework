@@ -107,6 +107,132 @@ namespace UnityRFramework.Editor.Tests
                 Utility.Encryption.Decrypt(encrypted, key));
         }
 
+        /// <summary>验证数据保护封装使用随机密文，并绑定密钥、负载类型和调用上下文。</summary>
+        [Test]
+        public void DataProtectorRoundTripBindsProtectionContext()
+        {
+            byte[] key = Utility.Encryption.CreateKey();
+            IDataProtector protector = new DefaultDataProtector(
+                new TestKeyProvider("content-v1", key));
+            byte[] source = Encoding.UTF8.GetBytes("protected config");
+            byte[] context = Encoding.UTF8.GetBytes("Config/Items.bytes");
+
+            byte[] first = protector.Protect(
+                source, ProtectedDataPayloadKind.Config, "content-v1", context);
+            byte[] second = protector.Protect(
+                source, ProtectedDataPayloadKind.Config, "content-v1", context);
+
+            CollectionAssert.AreNotEqual(first, second);
+            CollectionAssert.AreEqual(
+                source,
+                protector.Unprotect(first, ProtectedDataPayloadKind.Config, context));
+            Assert.Throws<RFrameworkException>(() => protector.Unprotect(
+                first,
+                ProtectedDataPayloadKind.Storage,
+                context));
+            Assert.Throws<RFrameworkException>(() => protector.Unprotect(
+                first,
+                ProtectedDataPayloadKind.Config,
+                Encoding.UTF8.GetBytes("Config/Other.bytes")));
+        }
+
+        /// <summary>验证封装头、密文或认证标签被修改时均拒绝还原。</summary>
+        [Test]
+        public void DataProtectorRejectsTamperedData()
+        {
+            byte[] key = Utility.Encryption.CreateKey();
+            IDataProtector protector = new DefaultDataProtector(
+                new TestKeyProvider("content-v1", key));
+            byte[] protectedData = protector.Protect(
+                Encoding.UTF8.GetBytes("tamper check"),
+                ProtectedDataPayloadKind.Config,
+                "content-v1");
+            for (int i = 0; i < protectedData.Length; i++)
+            {
+                byte[] tampered = (byte[])protectedData.Clone();
+                tampered[i] ^= 0x40;
+                Assert.Throws<RFrameworkException>(() => protector.Unprotect(
+                    tampered,
+                    ProtectedDataPayloadKind.Config));
+            }
+
+            byte[] truncated = new byte[protectedData.Length - 1];
+            Buffer.BlockCopy(protectedData, 0, truncated, 0, truncated.Length);
+            Assert.Throws<RFrameworkException>(() => protector.Unprotect(
+                truncated,
+                ProtectedDataPayloadKind.Config));
+        }
+
+        /// <summary>验证未知密钥、空数据和大数据具有明确且稳定的处理结果。</summary>
+        [Test]
+        public void DataProtectorHandlesKeyAndPayloadBoundaries()
+        {
+            byte[] key = Utility.Encryption.CreateKey();
+            IDataProtector protector = new DefaultDataProtector(
+                new TestKeyProvider("content-v1", key));
+
+            byte[] empty = protector.Protect(
+                Array.Empty<byte>(),
+                ProtectedDataPayloadKind.Custom,
+                "content-v1");
+            CollectionAssert.IsEmpty(protector.Unprotect(
+                empty,
+                ProtectedDataPayloadKind.Custom));
+
+            byte[] large = new byte[1024 * 1024];
+            for (int i = 0; i < large.Length; i++)
+            {
+                large[i] = (byte)(i % 251);
+            }
+
+            byte[] protectedLarge = protector.Protect(
+                large,
+                ProtectedDataPayloadKind.Storage,
+                "content-v1");
+            CollectionAssert.AreEqual(
+                large,
+                protector.Unprotect(protectedLarge, ProtectedDataPayloadKind.Storage));
+
+            IDataProtector missingKeyProtector = new DefaultDataProtector(
+                new TestKeyProvider(null, null));
+            Assert.Throws<RFrameworkException>(() => missingKeyProtector.Unprotect(
+                protectedLarge,
+                ProtectedDataPayloadKind.Storage));
+
+            IDataProtector wrongKeyProtector = new DefaultDataProtector(
+                new TestKeyProvider("content-v1", Utility.Encryption.CreateKey()));
+            Assert.Throws<RFrameworkException>(() => wrongKeyProtector.Unprotect(
+                protectedLarge,
+                ProtectedDataPayloadKind.Storage));
+        }
+
+        /// <summary>验证密钥轮换后仍可按封装中的 KeyId 读取旧数据。</summary>
+        [Test]
+        public void DataProtectorResolvesEmbeddedKeyIdAfterRotation()
+        {
+            byte[] oldKey = Utility.Encryption.CreateKey();
+            byte[] currentKey = Utility.Encryption.CreateKey();
+            IDataProtector protector = new DefaultDataProtector(
+                new TestKeyProvider("save-v1", oldKey, "save-v2", currentKey));
+            byte[] source = Encoding.UTF8.GetBytes("rotating save key");
+
+            byte[] oldData = protector.Protect(
+                source,
+                ProtectedDataPayloadKind.Storage,
+                "save-v1");
+            byte[] currentData = protector.Protect(
+                source,
+                ProtectedDataPayloadKind.Storage,
+                "save-v2");
+
+            CollectionAssert.AreEqual(
+                source,
+                protector.Unprotect(oldData, ProtectedDataPayloadKind.Storage));
+            CollectionAssert.AreEqual(
+                source,
+                protector.Unprotect(currentData, ProtectedDataPayloadKind.Storage));
+        }
+
         /// <summary>验证本地路径可转换为标准文件 URI，嵌套空目录可递归清理。</summary>
         [Test]
         public void PathUtilityUsesStandardFileUriAndRemovesEmptyTree()
@@ -135,6 +261,55 @@ namespace UnityRFramework.Editor.Tests
                 {
                     Directory.Delete(root, true);
                 }
+            }
+        }
+
+        private sealed class TestKeyProvider : IKeyProvider
+        {
+            private readonly string keyId;
+            private readonly byte[] key;
+            private readonly string secondaryKeyId;
+            private readonly byte[] secondaryKey;
+
+            public TestKeyProvider(string keyId, byte[] key)
+                : this(keyId, key, null, null)
+            {
+            }
+
+            public TestKeyProvider(
+                string keyId,
+                byte[] key,
+                string secondaryKeyId,
+                byte[] secondaryKey)
+            {
+                this.keyId = keyId;
+                this.key = key;
+                this.secondaryKeyId = secondaryKeyId;
+                this.secondaryKey = secondaryKey;
+            }
+
+            public bool TryGetKey(string requestedKeyId, out byte[] resolvedKey)
+            {
+                if (key != null && string.Equals(
+                        keyId,
+                        requestedKeyId,
+                        StringComparison.Ordinal))
+                {
+                    resolvedKey = (byte[])key.Clone();
+                    return true;
+                }
+
+                if (secondaryKey != null && string.Equals(
+                        secondaryKeyId,
+                        requestedKeyId,
+                        StringComparison.Ordinal))
+                {
+                    resolvedKey = (byte[])secondaryKey.Clone();
+                    return true;
+                }
+
+                resolvedKey = null;
+                return false;
             }
         }
 
