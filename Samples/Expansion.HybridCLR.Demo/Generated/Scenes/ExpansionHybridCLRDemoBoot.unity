@@ -1369,6 +1369,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5738174961551105532, guid: 653d38c875d2d9649ace831b03f7ea9a, type: 3}
+      propertyPath: protectionMode
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 6090552622275600981, guid: 653d38c875d2d9649ace831b03f7ea9a, type: 3}
       propertyPath: m_Name
       value: UnityRFramework

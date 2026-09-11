@@ -1,12 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using RFramework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 using UnityRFramework.Runtime;
 
 namespace UnityRFramework.Editor.Tests
@@ -254,6 +256,97 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        /// <summary>验证旧 Prefab 未配置根节点时会生成默认 Canvas 和完整层级。</summary>
+        [Test]
+        public void UIComponentCreatesDefaultRootsWhenReferencesAreMissing()
+        {
+            GameObject owner = new GameObject("Legacy Framework UI");
+            try
+            {
+                UIComponent component = owner.AddComponent<UIComponent>();
+                typeof(UIComponent).GetMethod(
+                    "EnsureLayerRoots",
+                    BindingFlags.Instance | BindingFlags.NonPublic).Invoke(component, null);
+                Transform canvasTransform = owner.transform.Find("Canvas");
+                Assert.NotNull(canvasTransform);
+                Canvas canvas = canvasTransform.GetComponent<Canvas>();
+                CanvasScaler scaler = canvasTransform.GetComponent<CanvasScaler>();
+                GraphicRaycaster raycaster = canvasTransform.GetComponent<GraphicRaycaster>();
+                Assert.NotNull(canvas);
+                Assert.NotNull(scaler);
+                Assert.NotNull(raycaster);
+                Assert.AreEqual(RenderMode.ScreenSpaceOverlay, canvas.renderMode);
+                Assert.IsFalse(canvas.pixelPerfect);
+                Assert.AreEqual(0, canvas.sortingOrder);
+                Assert.AreEqual(0, canvas.targetDisplay);
+                Assert.AreEqual(CanvasScaler.ScaleMode.ConstantPixelSize, scaler.uiScaleMode);
+                Assert.AreEqual(1f, scaler.scaleFactor);
+                Assert.AreEqual(100f, scaler.referencePixelsPerUnit);
+                Assert.IsTrue(raycaster.ignoreReversedGraphics);
+                Assert.AreEqual(GraphicRaycaster.BlockingObjects.None, raycaster.blockingObjects);
+                Assert.AreEqual(-1, raycaster.blockingMask.value);
+
+                Transform uiRoot = canvasTransform.Find("UIRoot");
+                Transform canvasRoot = owner.transform.Find("CanvasRoot");
+                AssertDefaultLayerRoots(uiRoot);
+                AssertDefaultLayerRoots(canvasRoot);
+
+                DefaultUIHelper helper = owner.GetComponentInChildren<DefaultUIHelper>(true);
+                component.SetHelper(helper);
+                Assert.AreEqual(1, CountDirectChildren(owner.transform, "Canvas"));
+                Assert.AreEqual(1, CountDirectChildren(owner.transform, "CanvasRoot"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
+        /// <summary>验证已有 Canvas 参数和层级不被覆盖，只补齐缺失的默认层级。</summary>
+        [Test]
+        public void UIComponentPreservesExistingCanvasAndCompletesMissingRoots()
+        {
+            GameObject owner = new GameObject("Configured Framework UI");
+            try
+            {
+                GameObject canvasObject = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas),
+                    typeof(CanvasScaler), typeof(GraphicRaycaster));
+                canvasObject.transform.SetParent(owner.transform, false);
+                Canvas canvas = canvasObject.GetComponent<Canvas>();
+                CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
+                canvas.renderMode = RenderMode.WorldSpace;
+                canvas.sortingOrder = 77;
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                UnityEngine.Object.DestroyImmediate(canvasObject.GetComponent<GraphicRaycaster>());
+
+                GameObject uiRootObject = new GameObject("UIRoot", typeof(RectTransform));
+                uiRootObject.transform.SetParent(canvasObject.transform, false);
+                GameObject bottomObject = new GameObject("Bottom", typeof(RectTransform));
+                bottomObject.transform.SetParent(uiRootObject.transform, false);
+
+                UIComponent component = owner.AddComponent<UIComponent>();
+                typeof(UIComponent).GetMethod(
+                    "EnsureLayerRoots",
+                    BindingFlags.Instance | BindingFlags.NonPublic).Invoke(component, null);
+
+                Assert.AreEqual(RenderMode.WorldSpace, canvas.renderMode);
+                Assert.AreEqual(77, canvas.sortingOrder);
+                Assert.AreEqual(CanvasScaler.ScaleMode.ScaleWithScreenSize, scaler.uiScaleMode);
+                Assert.NotNull(canvasObject.GetComponent<GraphicRaycaster>());
+                Assert.AreEqual(1, CountDirectChildren(owner.transform, "Canvas"));
+                Assert.NotNull(uiRootObject.transform.Find("Bottom"));
+                Assert.NotNull(uiRootObject.transform.Find("HUD"));
+                Assert.NotNull(uiRootObject.transform.Find("Panel"));
+                Assert.NotNull(uiRootObject.transform.Find("Popup"));
+                Assert.NotNull(uiRootObject.transform.Find("System"));
+                Assert.NotNull(uiRootObject.transform.Find("Top"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(owner);
+            }
+        }
+
         /// <summary>验证外部场景 UI 只由模块代管生命周期，不释放其实例或资源。</summary>
         [Test]
         public void ExternalFormKeepsExternalOwnership()
@@ -278,6 +371,39 @@ namespace UnityRFramework.Editor.Tests
                 Assert.Less(DateTime.UtcNow, deadline, "异步 UI 测试超时。");
                 yield return null;
             }
+        }
+
+        private static void AssertDefaultLayerRoots(Transform root)
+        {
+            Assert.NotNull(root);
+            CollectionAssert.AreEqual(
+                new[] { "Bottom", "HUD", "Panel", "Popup", "System", "Top" },
+                GetChildNames(root));
+        }
+
+        private static string[] GetChildNames(Transform root)
+        {
+            string[] names = new string[root.childCount];
+            for (int i = 0; i < root.childCount; i++)
+            {
+                names[i] = root.GetChild(i).name;
+            }
+
+            return names;
+        }
+
+        private static int CountDirectChildren(Transform root, string name)
+        {
+            int count = 0;
+            for (int i = 0; i < root.childCount; i++)
+            {
+                if (root.GetChild(i).name == name)
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
 
         private static void AssertTaskSucceeded(Task task)

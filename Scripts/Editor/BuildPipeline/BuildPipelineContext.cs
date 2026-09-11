@@ -222,7 +222,8 @@ namespace UnityRFramework.Editor
                 ProjectRoot,
                 OutputRootAbsolute,
                 OutputDirectory,
-                OutputFileName);
+                OutputFileName,
+                Recipe);
         }
 
         /// <summary>

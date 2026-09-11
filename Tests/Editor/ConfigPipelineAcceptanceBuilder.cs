@@ -164,6 +164,9 @@ namespace UnityRFramework.Editor
                     + "Resources/ConfigPipelineAcceptance/Localization",
                 ExportConfigBundle = true,
                 ConfigBundleName = "AcceptanceBundle",
+                ConfigReleaseFormat = ConfigReleaseDataFormat.FrameworkBinary,
+                ConfigBinaryProtection = RFramework.ConfigProtectionMode.None,
+                ConfigProtectionSourceRoot = "ConfigPipelineAcceptance/Config/Binary",
                 ExportLocalizationBundle = true,
                 LocalizationBundleName = "AcceptanceLanguages",
                 GeneratedNamespace = "UnityRFramework.Tests.Config"

@@ -31,6 +31,11 @@
       "path": "Samples~/Sample.Download"
     },
     {
+      "displayName": "Sample.Storage",
+      "description": "内置 Storage 模块的独立轻量验收场景，覆盖普通与加密存档、多槽位、压缩、备份恢复、密钥丢失和软重启。",
+      "path": "Samples~/Sample.Storage"
+    },
+    {
       "displayName": "Sample.UI",
       "description": "内置 UI 模块的独立 UGUI 验收场景，覆盖实际层级、同层顺序、栈顶返回、全屏遮挡、场景 UI 和强类型参数。",
       "path": "Samples~/Sample.UI"
@@ -59,6 +64,26 @@
       "displayName": "Expansion.Obfuz",
       "description": "Obfuz 可选代码混淆构建扩展，提供构建工具中的 Obfuz 步骤，并支持与 HybridCLR 的 Obfuz4HybridCLR 扩展衔接。需手动安装并配置 Obfuz 与 Obfuz4HybridCLR；未导入时不影响核心框架。",
       "path": "Samples~/Expansion.Obfuz"
+    },
+    {
+      "displayName": "Expansion.Security.Android",
+      "description": "Android 本地存档密钥保护扩展，使用 Android Keystore 的不可导出 AES 密钥保护 Storage 安装级 SaveKey；仅适用于 Android Player。",
+      "path": "Samples~/Expansion.Security.Android"
+    },
+    {
+      "displayName": "Expansion.Security.iOS",
+      "description": "iOS 本地存档密钥保护扩展，使用系统 Keychain 保存 Storage 安装级 SaveKey；仅适用于 iOS Player。",
+      "path": "Samples~/Expansion.Security.iOS"
+    },
+    {
+      "displayName": "Expansion.Security.macOS",
+      "description": "macOS 本地存档密钥保护扩展，使用数据保护 Keychain 保存 Storage 安装级 SaveKey；适用于 macOS IL2CPP Player。",
+      "path": "Samples~/Expansion.Security.macOS"
+    },
+    {
+      "displayName": "Expansion.Security.Windows",
+      "description": "Windows 本地存档密钥保护扩展，使用当前用户 DPAPI 保护 Storage 安装级 SaveKey；仅适用于 Windows Editor 与 Player。",
+      "path": "Samples~/Expansion.Security.Windows"
     },
     {
       "displayName": "Expansion.YooAsset.Demo",

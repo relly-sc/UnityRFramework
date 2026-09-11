@@ -42,8 +42,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6389cbfc804270544ac5ed6da7bd005c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!1 &828014825355657188
 GameObject:
   m_ObjectHideFlags: 0
@@ -146,6 +146,7 @@ Transform:
   - {fileID: 8797553878759392729}
   - {fileID: 21790163296332577}
   - {fileID: 818843575856683787}
+  - {fileID: 1770240587722855478}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &3006306689066536698
@@ -741,6 +742,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   uiHelperTypeName: UnityRFramework.Runtime.DefaultUIHelper
+  uiRoot: {fileID: 0}
+  canvasRoot: {fileID: 0}
+  layerRoots: []
+  canvasLayerRoots: []
 --- !u!1 &4139981638910185432
 GameObject:
   m_ObjectHideFlags: 0
@@ -1212,6 +1217,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   configHelperTypeName: UnityRFramework.Runtime.JsonConfigHelper
+  protectionMode: 0
+  protectedSingleTableFormat: 0
+  protectedTableBundleFormat: 0
 --- !u!1 &6352145623489672633
 GameObject:
   m_ObjectHideFlags: 0
@@ -1482,6 +1490,60 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 88888888888888888888888888888888, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!1 &7497381422082451265
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1770240587722855478}
+  - component: {fileID: 9138383234566296534}
+  m_Layer: 0
+  m_Name: Storage
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1770240587722855478
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7497381422082451265}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1825794738314003970}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &9138383234566296534
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7497381422082451265}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aac3e47afcfd994a90fb7013f70651c, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  storageHelperTypeName: UnityRFramework.Runtime.DefaultStorageHelper
+  storageSerializerTypeName: UnityRFramework.Runtime.JsonStorageSerializer
+  storageDirectoryName: Saves
+  defaultVersion: 1
+  defaultCompressionMode: 0
+  defaultProtectionMode: 0
+  defaultProtectionKeyId: SaveKey
+  automaticallyManageSaveKey: 1
+  createBackupByDefault: 1
+  recoverFromBackupByDefault: 1
 --- !u!1 &7513868666965301906
 GameObject:
   m_ObjectHideFlags: 0

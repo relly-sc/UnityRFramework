@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using NUnit.Framework;
 using RFramework;
+using UnityEditor;
 using UnityEngine;
 using UnityRFramework.Editor;
 using UnityRFramework.Runtime;
@@ -385,6 +387,239 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        /// <summary>验证 Config 可选保护层可解密数据，且认证失败不会覆盖当前缓存。</summary>
+        [Test]
+        public void ConfigModuleProtectedLoadAuthenticatesBeforeReplacingTable()
+        {
+            ConfigTableSchema old = CreatePartitionSchema(
+                "TestConfigRow@Old", new CsvRow(4, new[] { "9", "Old", "1" }));
+            ConfigTableSchema current = CreatePartitionSchema(
+                "TestConfigRow@Current", new CsvRow(4, new[] { "1", "Sword", "12.5" }));
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), old.TableId, old.SchemaHash);
+            GameObject owner = new GameObject("Protected Config Tests");
+            IConfigModule module = RFrameworkModuleHost.Get<IConfigModule>();
+            byte[] key = Utility.Encryption.CreateKey();
+            IDataProtector protector = new DefaultDataProtector(
+                new ConfigTestKeyProvider("config-v1", key));
+            ConfigProtectionContext context = new ConfigProtectionContext(
+                ConfigProtectionMode.EncryptedAndAuthenticated,
+                "Config/TestConfig.json",
+                ConfigPayloadType.Single,
+                ConfigPayloadFormat.Json);
+
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                module.UnloadAllConfigs();
+                module.SetHelper(helper);
+                module.SetDataProtector(protector);
+                module.LoadConfig<TestConfigRow>(
+                    Encoding.UTF8.GetBytes(ConfigJsonExporter.Build(old)));
+
+                byte[] encrypted = context.Protect(
+                    protector,
+                    Encoding.UTF8.GetBytes(ConfigJsonExporter.Build(current)),
+                    "config-v1");
+                encrypted[encrypted.Length - 1] ^= 0x01;
+
+                Assert.Throws<RFrameworkException>(() =>
+                    module.LoadConfig<TestConfigRow>(encrypted, context));
+                Assert.AreEqual("Old", module.GetConfig<TestConfigRow>(9).Name);
+
+                encrypted = context.Protect(
+                    protector,
+                    Encoding.UTF8.GetBytes(ConfigJsonExporter.Build(current)),
+                    "config-v1");
+                module.LoadConfig<TestConfigRow>(encrypted, context);
+                Assert.IsNull(module.GetConfig<TestConfigRow>(9));
+                Assert.AreEqual("Sword", module.GetConfig<TestConfigRow>(1).Name);
+            }
+            finally
+            {
+                module.UnloadAllConfigs();
+                module.SetDataProtector(null);
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
+                Object.DestroyImmediate(owner);
+                Array.Clear(key, 0, key.Length);
+            }
+        }
+
+        /// <summary>验证 Runtime 统一内容密钥注册后，ConfigComponent 可无感安装保护器。</summary>
+        [Test]
+        public void ConfigComponentUsesRegisteredContentKeyProvider()
+        {
+            ConfigTableSchema schema = CreatePartitionSchema(
+                "TestConfigRow@Registered", new CsvRow(4, new[] { "1", "Sword", "12.5" }));
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), schema.TableId, schema.SchemaHash);
+            byte[] key = Utility.Encryption.CreateKey();
+            var provider = new ConfigTestKeyProvider("config-v1", key);
+            IDataProtector protector = new DefaultDataProtector(provider);
+            ConfigProtectionContext context = new ConfigProtectionContext(
+                ConfigProtectionMode.EncryptedAndAuthenticated,
+                "Config/TestConfig.json",
+                ConfigPayloadType.Single,
+                ConfigPayloadFormat.Json);
+            byte[] encrypted = context.Protect(
+                protector,
+                Encoding.UTF8.GetBytes(ConfigJsonExporter.Build(schema)),
+                "config-v1");
+            GameObject owner = null;
+
+            try
+            {
+                RFrameworkModuleHost.StopAll();
+                RuntimeKeyProviderRegistry.ConfigureContentKeys(provider);
+                owner = new GameObject("Registered Content Key Config Tests");
+                ConfigComponent component = owner.AddComponent<ConfigComponent>();
+                typeof(ConfigComponent).GetMethod(
+                        "Awake",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(component, null);
+
+                component.LoadConfig<TestConfigRow>(encrypted, context);
+
+                Assert.AreEqual("Sword", component.GetConfig<TestConfigRow>(1).Name);
+            }
+            finally
+            {
+                RuntimeKeyProviderRegistry.ResetContentKeys();
+                RFrameworkModuleHost.StopAll();
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
+                if (owner != null) Object.DestroyImmediate(owner);
+                Array.Clear(key, 0, key.Length);
+            }
+        }
+
+        /// <summary>验证关闭保护时不需要保护器，也不复制输入数据。</summary>
+        [Test]
+        public void ConfigProtectionNoneReturnsOriginalBytes()
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes("plain config");
+            ConfigProtectionContext context = new ConfigProtectionContext(
+                ConfigProtectionMode.None,
+                null,
+                ConfigPayloadType.Single,
+                ConfigPayloadFormat.Custom);
+
+            Assert.AreSame(bytes, context.Protect(null, bytes, null));
+            Assert.AreSame(bytes, context.Unprotect(null, bytes));
+        }
+
+        /// <summary>验证加密多表容器可合并分片，且资源位置属于认证上下文。</summary>
+        [Test]
+        public void ConfigModuleProtectedBundleBindsSourceAndMergesPartitions()
+        {
+            ConfigTableSchema low = CreatePartitionSchema(
+                "TestConfigRow@Low", new CsvRow(4, new[] { "1", "Sword", "12.5" }));
+            ConfigTableSchema high = CreatePartitionSchema(
+                "TestConfigRow@High", new CsvRow(4, new[] { "2", "Shield", "20" }));
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), low.TableId, low.SchemaHash);
+            GameObject owner = new GameObject("Protected Config Bundle Tests");
+            IConfigModule module = RFrameworkModuleHost.Get<IConfigModule>();
+            byte[] key = Utility.Encryption.CreateKey();
+            IDataProtector protector = new DefaultDataProtector(
+                new ConfigTestKeyProvider("config-v1", key));
+            ConfigProtectionContext context = new ConfigProtectionContext(
+                ConfigProtectionMode.EncryptedAndAuthenticated,
+                "Config/All.bytes",
+                ConfigPayloadType.Bundle,
+                ConfigPayloadFormat.Json);
+
+            try
+            {
+                JsonConfigHelper helper = owner.AddComponent<JsonConfigHelper>();
+                module.UnloadAllConfigs();
+                module.SetHelper(helper);
+                module.SetDataProtector(protector);
+                byte[] encrypted = context.Protect(
+                    protector,
+                    Encoding.UTF8.GetBytes(ConfigJsonExporter.BuildBundle(new[] { low, high })),
+                    "config-v1");
+                ConfigProtectionContext wrongSource = new ConfigProtectionContext(
+                    ConfigProtectionMode.EncryptedAndAuthenticated,
+                    "Config/Wrong.bytes",
+                    ConfigPayloadType.Bundle,
+                    ConfigPayloadFormat.Json);
+
+                Assert.Throws<RFrameworkException>(() =>
+                    module.LoadConfigBundle(encrypted, wrongSource));
+                Assert.AreEqual(0, module.ConfigCount);
+
+                module.LoadConfigBundle(encrypted, context);
+                Assert.AreEqual("Sword", module.GetConfig<TestConfigRow>(1).Name);
+                Assert.AreEqual("Shield", module.GetConfig<TestConfigRow>(2).Name);
+            }
+            finally
+            {
+                module.UnloadAllConfigs();
+                module.SetDataProtector(null);
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
+                Object.DestroyImmediate(owner);
+                Array.Clear(key, 0, key.Length);
+            }
+        }
+
+        /// <summary>验证 URFC 单表和 URFM 容器共用同一可选保护层。</summary>
+        [Test]
+        public void ConfigModuleProtectedBinaryFormatsLoad()
+        {
+            ConfigTableSchema low = CreatePartitionSchema(
+                "TestConfigRow@Low", new CsvRow(4, new[] { "1", "Sword", "12.5" }));
+            ConfigTableSchema high = CreatePartitionSchema(
+                "TestConfigRow@High", new CsvRow(4, new[] { "2", "Shield", "20" }));
+            ConfigSchemaRegistry.Register(
+                typeof(TestConfigRow), low.TableId, low.SchemaHash);
+            BinaryConfigCodecRegistry.Register(
+                new TestConfigRowCodec(low.TableId, low.SchemaHash));
+            GameObject owner = new GameObject("Protected Binary Config Tests");
+            IConfigModule module = RFrameworkModuleHost.Get<IConfigModule>();
+            byte[] key = Utility.Encryption.CreateKey();
+            IDataProtector protector = new DefaultDataProtector(
+                new ConfigTestKeyProvider("config-v1", key));
+            ConfigProtectionContext singleContext = new ConfigProtectionContext(
+                ConfigProtectionMode.EncryptedAndAuthenticated,
+                "Config/Item.bytes",
+                ConfigPayloadType.Single,
+                ConfigPayloadFormat.BinarySingleTable);
+            ConfigProtectionContext bundleContext = new ConfigProtectionContext(
+                ConfigProtectionMode.EncryptedAndAuthenticated,
+                "Config/All.bytes",
+                ConfigPayloadType.Bundle,
+                ConfigPayloadFormat.BinaryTableBundle);
+
+            try
+            {
+                BinaryConfigHelper helper = owner.AddComponent<BinaryConfigHelper>();
+                module.UnloadAllConfigs();
+                module.SetHelper(helper);
+                module.SetDataProtector(protector);
+                byte[] single = singleContext.Protect(
+                    protector, ConfigBinaryExporter.BuildV2(low), "config-v1");
+                module.LoadConfig<TestConfigRow>(single, singleContext);
+                Assert.AreEqual("Sword", module.GetConfig<TestConfigRow>(1).Name);
+
+                byte[] bundle = bundleContext.Protect(
+                    protector,
+                    ConfigBinaryExporter.BuildBundle(new[] { low, high }),
+                    "config-v1");
+                module.LoadConfigBundle(bundle, bundleContext);
+                Assert.AreEqual("Sword", module.GetConfig<TestConfigRow>(1).Name);
+                Assert.AreEqual("Shield", module.GetConfig<TestConfigRow>(2).Name);
+            }
+            finally
+            {
+                module.UnloadAllConfigs();
+                module.SetDataProtector(null);
+                BinaryConfigCodecRegistry.Unregister(typeof(TestConfigRow));
+                ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
+                Object.DestroyImmediate(owner);
+                Array.Clear(key, 0, key.Length);
+            }
+        }
+
         /// <summary>验证 Localization JSON 导出、转义和 JsonLocalizationHelper 回读。</summary>
         [Test]
         public void LocalizationJsonRoundTripsThroughJsonHelper()
@@ -538,6 +773,81 @@ namespace UnityRFramework.Editor.Tests
             StringAssert.Contains("URLM", text);
             StringAssert.Contains("Recommendation", text);
             Assert.AreEqual(0, report.WrittenFileCount);
+        }
+
+        /// <summary>验证正式二进制可选加密，且相同明文不会因随机 IV 重写产物。</summary>
+        [Test]
+        public void ConfigPipelineEncryptedExportIsProtectedAndStable()
+        {
+            const string tempRoot =
+                "Assets/UnityRFramework/Tests/Temp/EncryptedConfigExport";
+            byte[] key = Utility.Encryption.CreateKey();
+            IKeyProvider provider = new ConfigTestKeyProvider("config-v1", key);
+            ConfigPipelineOptions options = CreateEncryptedExportOptions(tempRoot);
+
+            try
+            {
+                ConfigPipelineReport first = ConfigPipelineService.ExportConfig(options, provider);
+                string outputPath = Path.Combine(
+                    tempRoot,
+                    "Config/Binary/Acceptance_Action.bytes");
+                byte[] encrypted = File.ReadAllBytes(outputPath);
+                ConfigProtectionContext context = new ConfigProtectionContext(
+                    ConfigProtectionMode.EncryptedAndAuthenticated,
+                    "ProtectedConfig/Binary/Acceptance_Action.bytes",
+                    ConfigPayloadType.Single,
+                    ConfigPayloadFormat.Json);
+                byte[] plaintext = context.Unprotect(
+                    new DefaultDataProtector(provider), encrypted);
+                string manifest = File.ReadAllText(Path.Combine(
+                    tempRoot,
+                    "Config/Binary/UnityRFramework.ConfigProtection.manifest"));
+
+                StringAssert.Contains(
+                    "acceptance_attack", Encoding.UTF8.GetString(plaintext));
+                StringAssert.DoesNotContain(
+                    "acceptance_attack", Encoding.UTF8.GetString(encrypted));
+                StringAssert.Contains("releaseFormat=JsonContent", manifest);
+                StringAssert.Contains("keyId=config-v1", manifest);
+                StringAssert.DoesNotContain(Convert.ToBase64String(key), manifest);
+                Assert.Greater(first.WrittenFileCount, 0);
+
+                ConfigPipelineReport second = ConfigPipelineService.ExportConfig(options, provider);
+                Assert.AreEqual(0, second.WrittenFileCount);
+                Assert.Greater(second.UnchangedFileCount, 0);
+            }
+            finally
+            {
+                FileUtil.DeleteFileOrDirectory(tempRoot);
+                FileUtil.DeleteFileOrDirectory(tempRoot + ".meta");
+                AssetDatabase.Refresh();
+                Array.Clear(key, 0, key.Length);
+            }
+        }
+
+        /// <summary>验证加密导出在写文件前拒绝无法解析的 KeyId。</summary>
+        [Test]
+        public void ConfigPipelineEncryptedExportRejectsMissingKeyBeforeWriting()
+        {
+            const string tempRoot =
+                "Assets/UnityRFramework/Tests/Temp/EncryptedConfigMissingKey";
+            byte[] key = Utility.Encryption.CreateKey();
+            ConfigPipelineOptions options = CreateEncryptedExportOptions(tempRoot);
+
+            try
+            {
+                IKeyProvider provider = new ConfigTestKeyProvider("another-key", key);
+                Assert.Throws<RFrameworkException>(() =>
+                    ConfigPipelineService.ExportConfig(options, provider));
+                Assert.IsFalse(Directory.Exists(tempRoot));
+            }
+            finally
+            {
+                FileUtil.DeleteFileOrDirectory(tempRoot);
+                FileUtil.DeleteFileOrDirectory(tempRoot + ".meta");
+                AssetDatabase.Refresh();
+                Array.Clear(key, 0, key.Length);
+            }
         }
 
         /// <summary>验证 URFL v2 导出结果可由 Runtime Helper 回读。</summary>
@@ -1094,6 +1404,51 @@ namespace UnityRFramework.Editor.Tests
             public string Generate(ConfigTableSchema schema)
             {
                 return "// custom:" + schema.TableName;
+            }
+        }
+
+        private static ConfigPipelineOptions CreateEncryptedExportOptions(string tempRoot)
+        {
+            return new ConfigPipelineOptions
+            {
+                ConfigSourceDirectory =
+                    "Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline/ConfigSource/Config",
+                LocalizationSourceDirectory =
+                    "Assets/UnityRFramework/Tests/Fixtures/ConfigPipeline/ConfigSource/Localization",
+                GeneratedCodeDirectory = tempRoot + "/Generated",
+                ConfigOutputDirectory = tempRoot + "/Config",
+                LocalizationOutputDirectory = tempRoot + "/Localization",
+                ExportConfigBundle = true,
+                ConfigBundleName = "AcceptanceBundle",
+                GeneratedNamespace = "UnityRFramework.Tests.Config",
+                ConfigReleaseFormat = ConfigReleaseDataFormat.JsonContent,
+                ConfigBinaryProtection = ConfigProtectionMode.EncryptedAndAuthenticated,
+                ConfigProtectionKeyId = "config-v1",
+                ConfigProtectionSourceRoot = "ProtectedConfig/Binary"
+            };
+        }
+
+        private sealed class ConfigTestKeyProvider : IKeyProvider
+        {
+            private readonly string keyId;
+            private readonly byte[] key;
+
+            public ConfigTestKeyProvider(string keyId, byte[] key)
+            {
+                this.keyId = keyId;
+                this.key = key;
+            }
+
+            public bool TryGetKey(string requestedKeyId, out byte[] resolvedKey)
+            {
+                if (string.Equals(keyId, requestedKeyId, StringComparison.Ordinal))
+                {
+                    resolvedKey = (byte[])key.Clone();
+                    return true;
+                }
+
+                resolvedKey = null;
+                return false;
             }
         }
 

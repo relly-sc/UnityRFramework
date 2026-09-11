@@ -55,10 +55,11 @@ namespace UnityRFramework.Editor.Tests
             Assert.NotNull(RFrameworkModuleHost.Get<IProcedureModule>());
             Assert.NotNull(RFrameworkModuleHost.Get<IResourceModule>());
             Assert.NotNull(RFrameworkModuleHost.Get<ISceneModule>());
+            Assert.NotNull(RFrameworkModuleHost.Get<IStorageModule>());
             Assert.NotNull(RFrameworkModuleHost.Get<ITimerModule>());
             Assert.NotNull(RFrameworkModuleHost.Get<IUIModule>());
             Assert.NotNull(RFrameworkModuleHost.Get<IWebRequestModule>());
-            Assert.AreEqual(15, RFrameworkModuleHost.Count);
+            Assert.AreEqual(16, RFrameworkModuleHost.Count);
         }
 
         /// <summary>验证强制日志与关闭后安全日志具有不同失败语义。</summary>
