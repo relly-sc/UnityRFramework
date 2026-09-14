@@ -16,6 +16,11 @@ namespace UnityRFramework.Sample.Storage.Editor
         private const string Root = "Assets/UnityRFramework/Samples/Sample.Storage";
         private const string ScenePath = Root + "/GameAssets/Scenes/StorageAcceptance.unity";
         private const string FrameworkPrefabPath = "Assets/UnityRFramework/Prefabs/UnityRFramework.prefab";
+        private const string StandardSpritePath = "UI/Skin/UISprite.psd";
+        private const string BackgroundSpritePath = "UI/Skin/Background.psd";
+        private const string InputFieldBackgroundPath = "UI/Skin/InputFieldBackground.psd";
+        private const string CheckmarkPath = "UI/Skin/Checkmark.psd";
+        private const string DropdownArrowPath = "UI/Skin/DropdownArrow.psd";
 
         [MenuItem("UnityRFramework/Samples/生成存档验收场景")]
         public static void Generate()
@@ -51,34 +56,35 @@ namespace UnityRFramework.Sample.Storage.Editor
 
         private static StorageAcceptanceController CreateInterface(Transform parent)
         {
+            DefaultControls.Resources resources = CreateStandardResources();
             GameObject root = new GameObject("存档验收", typeof(RectTransform), typeof(Image));
             root.transform.SetParent(parent, false);
             Stretch(root.GetComponent<RectTransform>());
             root.GetComponent<Image>().color = new Color(0.07f, 0.09f, 0.12f, 1f);
             StorageAcceptanceController controller = root.AddComponent<StorageAcceptanceController>();
 
-            CreateText(root.transform, "标题", "存档功能验收", new Vector2(0, -34), new Vector2(900, 52), 30, TextAnchor.MiddleCenter);
-            Text environment = CreateText(root.transform, "运行环境", "", new Vector2(0, -88), new Vector2(1040, 58), 16, TextAnchor.MiddleLeft);
+            CreateText(root.transform, "标题", "存档功能验收", new Vector2(0, -42), new Vector2(980, 64), 36, TextAnchor.MiddleCenter);
+            Text environment = CreateText(root.transform, "运行环境", "", new Vector2(0, -112), new Vector2(1040, 64), 22, TextAnchor.MiddleLeft);
 
-            Dropdown slot = CreateDropdown(root.transform, "存档槽位", new Vector2(-390, -174), new[] { "存档槽 1", "存档槽 2", "存档槽 3" });
-            InputField playerName = CreateInput(root.transform, "玩家名称", "测试玩家", new Vector2(-390, -228));
-            InputField level = CreateInput(root.transform, "等级", "1", new Vector2(-390, -282));
-            InputField coins = CreateInput(root.transform, "金币", "100", new Vector2(-390, -336));
-            Toggle encryption = CreateToggle(root.transform, "加密并认证", new Vector2(-390, -400));
-            Toggle compression = CreateToggle(root.transform, "GZip 压缩", new Vector2(-140, -400));
+            Dropdown slot = CreateDropdown(root.transform, "存档槽位", new Vector2(-400, -202), new[] { "存档槽 1", "存档槽 2", "存档槽 3" });
+            InputField playerName = CreateInput(root.transform, "玩家名称", "测试玩家", new Vector2(-400, -282));
+            InputField level = CreateInput(root.transform, "等级", "1", new Vector2(-400, -362));
+            InputField coins = CreateInput(root.transform, "金币", "100", new Vector2(-400, -442));
+            Toggle encryption = CreateToggle(root.transform, "加密并认证", new Vector2(-400, -530), resources);
+            Toggle compression = CreateToggle(root.transform, "GZip 压缩", new Vector2(-90, -530), resources);
 
-            Button save = CreateButton(root.transform, "保存", new Vector2(150, -174));
-            Button load = CreateButton(root.transform, "读取", new Vector2(390, -174));
-            Button delete = CreateButton(root.transform, "删除当前槽位", new Vector2(150, -228));
-            Button list = CreateButton(root.transform, "列出全部槽位", new Vector2(390, -228));
-            Button corrupt = CreateButton(root.transform, "验证损坏后恢复", new Vector2(150, -282));
-            Button deleteKey = CreateButton(root.transform, "删除测试密钥", new Vector2(390, -282));
-            Button recreateKey = CreateButton(root.transform, "重建测试密钥", new Vector2(150, -336));
-            Button restart = CreateButton(root.transform, "软重启框架", new Vector2(390, -336));
-            Button quit = CreateButton(root.transform, "退出程序", new Vector2(270, -400));
+            Button save = CreateButton(root.transform, "保存", new Vector2(150, -202));
+            Button load = CreateButton(root.transform, "读取", new Vector2(450, -202));
+            Button delete = CreateButton(root.transform, "删除当前槽位", new Vector2(150, -282));
+            Button list = CreateButton(root.transform, "列出全部槽位", new Vector2(450, -282));
+            Button corrupt = CreateButton(root.transform, "验证损坏后恢复", new Vector2(150, -362));
+            Button deleteKey = CreateButton(root.transform, "删除测试密钥", new Vector2(450, -362));
+            Button recreateKey = CreateButton(root.transform, "重建测试密钥", new Vector2(150, -442));
+            Button restart = CreateButton(root.transform, "软重启框架", new Vector2(450, -442));
+            Button quit = CreateButton(root.transform, "退出程序", new Vector2(300, -530));
 
-            Text status = CreateText(root.transform, "状态", "准备中", new Vector2(0, -476), new Vector2(1040, 44), 22, TextAnchor.MiddleCenter);
-            Text log = CreateText(root.transform, "日志", "", new Vector2(0, -548), new Vector2(1040, 130), 16, TextAnchor.UpperLeft);
+            Text status = CreateText(root.transform, "状态", "准备中", new Vector2(0, -632), new Vector2(1040, 58), 28, TextAnchor.MiddleCenter);
+            Text log = CreateText(root.transform, "日志", "", new Vector2(0, -758), new Vector2(1040, 220), 22, TextAnchor.UpperLeft);
 
             SerializedObject serialized = new SerializedObject(controller);
             Assign(serialized, "slotDropdown", slot);
@@ -105,13 +111,13 @@ namespace UnityRFramework.Sample.Storage.Editor
 
         private static InputField CreateInput(Transform parent, string label, string value, Vector2 position)
         {
-            CreateText(parent, label + "标签", label, position, new Vector2(130, 42), 17, TextAnchor.MiddleRight);
+            CreateText(parent, label + "标签", label, position, new Vector2(180, 56), 22, TextAnchor.MiddleRight);
             GameObject inputObject = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(InputField));
             inputObject.transform.SetParent(parent, false);
-            SetRect(inputObject.GetComponent<RectTransform>(), position + new Vector2(165, 0), new Vector2(190, 40));
+            SetRect(inputObject.GetComponent<RectTransform>(), position + new Vector2(215, 0), new Vector2(260, 56));
             inputObject.GetComponent<Image>().color = new Color(0.18f, 0.21f, 0.25f, 1f);
-            Text text = CreateText(inputObject.transform, "文本", value, Vector2.zero, new Vector2(170, 38), 17, TextAnchor.MiddleLeft);
-            Text placeholder = CreateText(inputObject.transform, "提示", "请输入" + label, Vector2.zero, new Vector2(170, 38), 17, TextAnchor.MiddleLeft);
+            Text text = CreateText(inputObject.transform, "文本", value, Vector2.zero, new Vector2(236, 54), 22, TextAnchor.MiddleLeft);
+            Text placeholder = CreateText(inputObject.transform, "提示", "请输入" + label, Vector2.zero, new Vector2(236, 54), 22, TextAnchor.MiddleLeft);
             placeholder.color = new Color(0.65f, 0.67f, 0.70f, 1f);
             InputField input = inputObject.GetComponent<InputField>();
             input.textComponent = text;
@@ -122,11 +128,11 @@ namespace UnityRFramework.Sample.Storage.Editor
 
         private static Dropdown CreateDropdown(Transform parent, string label, Vector2 position, string[] values)
         {
-            CreateText(parent, label + "标签", label, position, new Vector2(130, 42), 17, TextAnchor.MiddleRight);
-            GameObject dropdownObject = DefaultControls.CreateDropdown(new DefaultControls.Resources());
+            CreateText(parent, label + "标签", label, position, new Vector2(180, 56), 22, TextAnchor.MiddleRight);
+            GameObject dropdownObject = DefaultControls.CreateDropdown(CreateStandardResources());
             dropdownObject.name = label;
             dropdownObject.transform.SetParent(parent, false);
-            SetRect(dropdownObject.GetComponent<RectTransform>(), position + new Vector2(165, 0), new Vector2(190, 40));
+            SetRect(dropdownObject.GetComponent<RectTransform>(), position + new Vector2(215, 0), new Vector2(260, 56));
             Dropdown dropdown = dropdownObject.GetComponent<Dropdown>();
             dropdown.ClearOptions();
             dropdown.AddOptions(new System.Collections.Generic.List<string>(values));
@@ -134,27 +140,53 @@ namespace UnityRFramework.Sample.Storage.Editor
             return dropdown;
         }
 
-        private static Toggle CreateToggle(Transform parent, string label, Vector2 position)
+        private static Toggle CreateToggle(Transform parent, string label, Vector2 position, DefaultControls.Resources resources)
         {
-            GameObject toggleObject = DefaultControls.CreateToggle(new DefaultControls.Resources());
+            GameObject toggleObject = DefaultControls.CreateToggle(resources);
             toggleObject.name = label;
             toggleObject.transform.SetParent(parent, false);
-            SetRect(toggleObject.GetComponent<RectTransform>(), position, new Vector2(210, 40));
+            SetRect(toggleObject.GetComponent<RectTransform>(), position, new Vector2(280, 58));
             Text text = toggleObject.GetComponentInChildren<Text>();
             text.text = label;
             text.font = BuiltinFont;
-            text.fontSize = 17;
+            text.fontSize = 22;
             text.color = Color.white;
+            RectTransform background = toggleObject.transform.Find("Background") as RectTransform;
+            if (background != null)
+            {
+                background.sizeDelta = new Vector2(32f, 32f);
+            }
+
+            RectTransform checkmark = toggleObject.transform.Find("Background/Checkmark") as RectTransform;
+            if (checkmark != null)
+            {
+                checkmark.sizeDelta = new Vector2(28f, 28f);
+            }
+
+            RectTransform labelRect = text.rectTransform;
+            labelRect.offsetMin = new Vector2(42f, 1f);
             return toggleObject.GetComponent<Toggle>();
+        }
+
+        private static DefaultControls.Resources CreateStandardResources()
+        {
+            return new DefaultControls.Resources
+            {
+                standard = AssetDatabase.GetBuiltinExtraResource<Sprite>(StandardSpritePath),
+                background = AssetDatabase.GetBuiltinExtraResource<Sprite>(BackgroundSpritePath),
+                inputField = AssetDatabase.GetBuiltinExtraResource<Sprite>(InputFieldBackgroundPath),
+                checkmark = AssetDatabase.GetBuiltinExtraResource<Sprite>(CheckmarkPath),
+                dropdown = AssetDatabase.GetBuiltinExtraResource<Sprite>(DropdownArrowPath)
+            };
         }
 
         private static Button CreateButton(Transform parent, string label, Vector2 position)
         {
             GameObject buttonObject = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(Button));
             buttonObject.transform.SetParent(parent, false);
-            SetRect(buttonObject.GetComponent<RectTransform>(), position, new Vector2(210, 42));
+            SetRect(buttonObject.GetComponent<RectTransform>(), position, new Vector2(260, 64));
             buttonObject.GetComponent<Image>().color = new Color(0.18f, 0.34f, 0.48f, 1f);
-            Text text = CreateText(buttonObject.transform, "文字", label, Vector2.zero, new Vector2(200, 40), 17, TextAnchor.MiddleCenter);
+            Text text = CreateText(buttonObject.transform, "文字", label, Vector2.zero, new Vector2(248, 60), 22, TextAnchor.MiddleCenter);
             Stretch(text.rectTransform);
             return buttonObject.GetComponent<Button>();
         }
@@ -183,7 +215,7 @@ namespace UnityRFramework.Sample.Storage.Editor
             for (int i = 0; i < texts.Length; i++)
             {
                 texts[i].font = BuiltinFont;
-                texts[i].fontSize = 16;
+                texts[i].fontSize = 22;
             }
         }
 
