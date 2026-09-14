@@ -65,9 +65,11 @@ namespace UnityRFramework.Sample.Storage
                 return;
             }
 
-            string keyStore = string.IsNullOrEmpty(storage.ManagedSaveKeyStoreTypeName)
-                ? "未启用自动密钥管理"
-                : GetShortTypeName(storage.ManagedSaveKeyStoreTypeName);
+            string keyStore = !string.IsNullOrEmpty(storage.ManagedSaveKeyStoreTypeName)
+                ? GetShortTypeName(storage.ManagedSaveKeyStoreTypeName)
+                : !string.IsNullOrEmpty(storage.ManagedSaveKeyStoreError)
+                    ? "初始化失败：" + storage.ManagedSaveKeyStoreError
+                    : "未启用自动密钥管理";
             environmentText.text = "存档目录：" + storage.StorageRootPath
                 + "\n密钥仓：" + keyStore;
             SetStatus("准备完成", false);
@@ -298,7 +300,7 @@ namespace UnityRFramework.Sample.Storage
         {
             if (string.IsNullOrWhiteSpace(message)) return;
             logLines.Enqueue((error ? "[失败] " : "") + message);
-            while (logLines.Count > 8) logLines.Dequeue();
+            while (logLines.Count > 5) logLines.Dequeue();
             logText.text = string.Join("\n", logLines.ToArray());
         }
 

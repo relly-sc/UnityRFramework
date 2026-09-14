@@ -70,6 +70,9 @@ namespace UnityRFramework.Runtime
         /// <summary>当前自动管理的安装级密钥仓类型；未启用时为空。</summary>
         public string ManagedSaveKeyStoreTypeName { get; private set; }
 
+        /// <summary>自动密钥仓初始化失败原因；成功或未启用时为空。</summary>
+        public string ManagedSaveKeyStoreError { get; private set; }
+
         protected override void Awake()
         {
             base.Awake();
@@ -96,6 +99,7 @@ namespace UnityRFramework.Runtime
         {
             ManagedSaveKeyProvider = null;
             ManagedSaveKeyStoreTypeName = string.Empty;
+            ManagedSaveKeyStoreError = string.Empty;
             GetStorageModule().SetDataProtector(protector);
         }
 
@@ -106,8 +110,19 @@ namespace UnityRFramework.Runtime
         {
             if (keyStore == null) throw new ArgumentNullException(nameof(keyStore));
 
+            ManagedSaveKeyProvider = null;
+            ManagedSaveKeyStoreTypeName = string.Empty;
+            ManagedSaveKeyStoreError = string.Empty;
             var provider = new InstallSaveKeyProvider(keyStore);
-            provider.EnsureKey(keyId);
+            try
+            {
+                provider.EnsureKey(keyId);
+            }
+            catch (Exception exception)
+            {
+                ManagedSaveKeyStoreError = exception.Message;
+                throw;
+            }
             ManagedSaveKeyProvider = provider;
             ManagedSaveKeyStoreTypeName = keyStore.GetType().FullName;
             defaultProtectionKeyId = keyId;
@@ -179,7 +194,14 @@ namespace UnityRFramework.Runtime
             string keyId = string.IsNullOrWhiteSpace(defaultProtectionKeyId)
                 ? InstallSaveKeyProvider.DefaultKeyId
                 : defaultProtectionKeyId.Trim();
-            SetManagedSaveKeyStore(CreateAutomaticKeyStore(), keyId);
+            try
+            {
+                SetManagedSaveKeyStore(CreateAutomaticKeyStore(), keyId);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("自动密钥管理初始化失败：" + exception.Message, this);
+            }
         }
 
         private static IKeyStore CreateAutomaticKeyStore()

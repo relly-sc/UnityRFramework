@@ -64,7 +64,7 @@ namespace UnityRFramework.Sample.Storage.Editor
             StorageAcceptanceController controller = root.AddComponent<StorageAcceptanceController>();
 
             CreateText(root.transform, "标题", "存档功能验收", new Vector2(0, -42), new Vector2(1100, 70), 44, TextAnchor.MiddleCenter);
-            Text environment = CreateText(root.transform, "运行环境", "", new Vector2(0, -122), new Vector2(1100, 70), 28, TextAnchor.MiddleLeft);
+            Text environment = CreateText(root.transform, "运行环境", "", new Vector2(0, -122), new Vector2(1600, 104), 24, TextAnchor.MiddleLeft);
 
             Dropdown slot = CreateDropdown(root.transform, "存档槽位", new Vector2(-450, -220), new[] { "存档槽 1", "存档槽 2", "存档槽 3" });
             InputField playerName = CreateInput(root.transform, "玩家名称", "测试玩家", new Vector2(-450, -310));
@@ -84,7 +84,7 @@ namespace UnityRFramework.Sample.Storage.Editor
             Button quit = CreateButton(root.transform, "退出程序", new Vector2(380, -590));
 
             Text status = CreateText(root.transform, "状态", "准备中", new Vector2(0, -700), new Vector2(1100, 70), 34, TextAnchor.MiddleCenter);
-            Text log = CreateText(root.transform, "日志", "", new Vector2(0, -850), new Vector2(1100, 240), 28, TextAnchor.UpperLeft);
+            Text log = CreateText(root.transform, "日志", "", new Vector2(0, -820), new Vector2(1600, 180), 24, TextAnchor.UpperLeft);
 
             SerializedObject serialized = new SerializedObject(controller);
             Assign(serialized, "slotDropdown", slot);
