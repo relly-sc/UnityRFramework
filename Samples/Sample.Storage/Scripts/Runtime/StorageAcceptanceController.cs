@@ -91,7 +91,6 @@ namespace UnityRFramework.Sample.Storage
         {
             if (busy || storage == null) return;
             busy = true;
-            SetOperationsInteractable(false);
             try
             {
                 await action();
@@ -103,7 +102,6 @@ namespace UnityRFramework.Sample.Storage
             finally
             {
                 busy = false;
-                SetOperationsInteractable(true);
             }
         }
 

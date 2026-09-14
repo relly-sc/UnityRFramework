@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
 using RFramework;
 using UnityEngine;
 using UnityEngine.Scripting;
@@ -20,11 +21,15 @@ namespace UnityRFramework.Expansion
 
         private static readonly object SyncRoot = new object();
         private readonly FileKeyStore fileStore;
+        private readonly SynchronizationContext unityContext;
+        private readonly int unityThreadId;
 
         [Preserve]
         public AndroidKeystoreKeyStore(string rootDirectory)
         {
             fileStore = new FileKeyStore(rootDirectory);
+            unityContext = SynchronizationContext.Current;
+            unityThreadId = Thread.CurrentThread.ManagedThreadId;
         }
 
         public bool TryRead(string keyId, out byte[] key)
@@ -77,96 +82,143 @@ namespace UnityRFramework.Expansion
             return fileStore.Delete(keyId);
         }
 
-        private static byte[] Protect(string keyId, byte[] plaintext)
+        private byte[] Protect(string keyId, byte[] plaintext)
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            EnsureSupportedDevice();
-            using (AndroidJavaObject wrappingKey = GetOrCreateWrappingKey())
-            using (AndroidJavaClass cipherClass = new AndroidJavaClass("javax.crypto.Cipher"))
-            using (AndroidJavaObject cipher = cipherClass.CallStatic<AndroidJavaObject>(
-                       "getInstance", CipherTransformation))
+            return RunOnUnityThread(() =>
             {
-                cipher.Call("init", 1, wrappingKey);
-                ApplyAssociatedData(cipher, keyId);
-                byte[] ciphertext = cipher.Call<byte[]>("doFinal", plaintext);
-                byte[] iv = cipher.Call<byte[]>("getIV");
-                try
-                {
-                    if (iv == null || iv.Length == 0 || iv.Length > byte.MaxValue)
-                    {
-                        throw new RFrameworkException("Android Keystore returned an invalid IV.");
-                    }
-
-                    byte[] result = new byte[2 + iv.Length + ciphertext.Length];
-                    result[0] = BlobVersion;
-                    result[1] = (byte)iv.Length;
-                    Buffer.BlockCopy(iv, 0, result, 2, iv.Length);
-                    Buffer.BlockCopy(ciphertext, 0, result, 2 + iv.Length, ciphertext.Length);
-                    return result;
-                }
-                finally
-                {
-                    if (iv != null) Array.Clear(iv, 0, iv.Length);
-                    if (ciphertext != null) Array.Clear(ciphertext, 0, ciphertext.Length);
-                }
-            }
-#else
-            throw new PlatformNotSupportedException(
-                "Android Keystore key storage is only available in an Android Player.");
-#endif
-        }
-
-        private static byte[] Unprotect(string keyId, byte[] protectedData)
-        {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            EnsureSupportedDevice();
-            if (protectedData == null || protectedData.Length < 3
-                || protectedData[0] != BlobVersion)
-            {
-                throw new RFrameworkException("Android Keystore key blob is invalid.");
-            }
-
-            int ivLength = protectedData[1];
-            int ciphertextLength = protectedData.Length - 2 - ivLength;
-            if (ivLength <= 0 || ciphertextLength <= 0)
-            {
-                throw new RFrameworkException("Android Keystore key blob is truncated.");
-            }
-
-            byte[] iv = new byte[ivLength];
-            byte[] ciphertext = new byte[ciphertextLength];
-            Buffer.BlockCopy(protectedData, 2, iv, 0, iv.Length);
-            Buffer.BlockCopy(protectedData, 2 + iv.Length, ciphertext, 0, ciphertext.Length);
-            try
-            {
-                using (AndroidJavaObject wrappingKey = GetExistingWrappingKey())
+                EnsureSupportedDevice();
+                using (AndroidJavaObject wrappingKey = GetOrCreateWrappingKey())
                 using (AndroidJavaClass cipherClass = new AndroidJavaClass("javax.crypto.Cipher"))
                 using (AndroidJavaObject cipher = cipherClass.CallStatic<AndroidJavaObject>(
                            "getInstance", CipherTransformation))
-                using (AndroidJavaObject parameters = new AndroidJavaObject(
-                           "javax.crypto.spec.GCMParameterSpec", 128, iv))
                 {
-                    if (wrappingKey == null)
-                    {
-                        throw new RFrameworkException(
-                            "Android Keystore wrapping key is unavailable.");
-                    }
-
-                    cipher.Call("init", 2, wrappingKey, parameters);
+                    cipher.Call("init", 1, wrappingKey);
                     ApplyAssociatedData(cipher, keyId);
-                    return cipher.Call<byte[]>("doFinal", ciphertext);
+                    byte[] ciphertext = cipher.Call<byte[]>("doFinal", plaintext);
+                    byte[] iv = cipher.Call<byte[]>("getIV");
+                    try
+                    {
+                        if (iv == null || iv.Length == 0 || iv.Length > byte.MaxValue)
+                        {
+                            throw new RFrameworkException("Android Keystore returned an invalid IV.");
+                        }
+
+                        byte[] result = new byte[2 + iv.Length + ciphertext.Length];
+                        result[0] = BlobVersion;
+                        result[1] = (byte)iv.Length;
+                        Buffer.BlockCopy(iv, 0, result, 2, iv.Length);
+                        Buffer.BlockCopy(ciphertext, 0, result, 2 + iv.Length, ciphertext.Length);
+                        return result;
+                    }
+                    finally
+                    {
+                        if (iv != null) Array.Clear(iv, 0, iv.Length);
+                        if (ciphertext != null) Array.Clear(ciphertext, 0, ciphertext.Length);
+                    }
                 }
-            }
-            finally
-            {
-                Array.Clear(iv, 0, iv.Length);
-                Array.Clear(ciphertext, 0, ciphertext.Length);
-            }
+            });
 #else
             throw new PlatformNotSupportedException(
                 "Android Keystore key storage is only available in an Android Player.");
 #endif
         }
+
+        private byte[] Unprotect(string keyId, byte[] protectedData)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            return RunOnUnityThread(() =>
+            {
+                EnsureSupportedDevice();
+                if (protectedData == null || protectedData.Length < 3
+                    || protectedData[0] != BlobVersion)
+                {
+                    throw new RFrameworkException("Android Keystore key blob is invalid.");
+                }
+
+                int ivLength = protectedData[1];
+                int ciphertextLength = protectedData.Length - 2 - ivLength;
+                if (ivLength <= 0 || ciphertextLength <= 0)
+                {
+                    throw new RFrameworkException("Android Keystore key blob is truncated.");
+                }
+
+                byte[] iv = new byte[ivLength];
+                byte[] ciphertext = new byte[ciphertextLength];
+                Buffer.BlockCopy(protectedData, 2, iv, 0, iv.Length);
+                Buffer.BlockCopy(protectedData, 2 + iv.Length, ciphertext, 0, ciphertext.Length);
+                try
+                {
+                    using (AndroidJavaObject wrappingKey = GetExistingWrappingKey())
+                    using (AndroidJavaClass cipherClass = new AndroidJavaClass("javax.crypto.Cipher"))
+                    using (AndroidJavaObject cipher = cipherClass.CallStatic<AndroidJavaObject>(
+                               "getInstance", CipherTransformation))
+                    using (AndroidJavaObject parameters = new AndroidJavaObject(
+                               "javax.crypto.spec.GCMParameterSpec", 128, iv))
+                    {
+                        if (wrappingKey == null)
+                        {
+                            throw new RFrameworkException(
+                                "Android Keystore wrapping key is unavailable.");
+                        }
+
+                        cipher.Call("init", 2, wrappingKey, parameters);
+                        ApplyAssociatedData(cipher, keyId);
+                        return cipher.Call<byte[]>("doFinal", ciphertext);
+                    }
+                }
+                finally
+                {
+                    Array.Clear(iv, 0, iv.Length);
+                    Array.Clear(ciphertext, 0, ciphertext.Length);
+                }
+            });
+#else
+            throw new PlatformNotSupportedException(
+                "Android Keystore key storage is only available in an Android Player.");
+#endif
+        }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        private T RunOnUnityThread<T>(Func<T> action)
+        {
+            if (Thread.CurrentThread.ManagedThreadId == unityThreadId)
+            {
+                return action();
+            }
+
+            if (unityContext == null)
+            {
+                throw new RFrameworkException(
+                    "Android Keystore requires a Unity synchronization context.");
+            }
+
+            T result = default(T);
+            Exception failure = null;
+            using (ManualResetEventSlim completed = new ManualResetEventSlim(false))
+            {
+                unityContext.Post(_ =>
+                {
+                    try
+                    {
+                        result = action();
+                    }
+                    catch (Exception exception)
+                    {
+                        failure = exception;
+                    }
+                    finally
+                    {
+                        completed.Set();
+                    }
+                }, null);
+                completed.Wait();
+            }
+
+            if (failure != null) throw failure;
+            return result;
+        }
+#endif
 
 #if UNITY_ANDROID && !UNITY_EDITOR
         private static AndroidJavaObject GetOrCreateWrappingKey()

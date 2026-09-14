@@ -137,7 +137,35 @@ namespace UnityRFramework.Sample.Storage.Editor
             dropdown.ClearOptions();
             dropdown.AddOptions(new System.Collections.Generic.List<string>(values));
             SetFont(dropdownObject);
+            ConfigureDropdownLayout(dropdown);
             return dropdown;
+        }
+
+        private static void ConfigureDropdownLayout(Dropdown dropdown)
+        {
+            RectTransform template = dropdown.template;
+            template.sizeDelta = new Vector2(0f, 180f);
+
+            RectTransform item = template.Find("Viewport/Content/Item") as RectTransform;
+            item.sizeDelta = new Vector2(0f, 54f);
+
+            RectTransform content = item.parent as RectTransform;
+            content.sizeDelta = new Vector2(0f, 62f);
+
+            RectTransform itemCheckmark = item.Find("Item Checkmark") as RectTransform;
+            itemCheckmark.sizeDelta = new Vector2(32f, 32f);
+            itemCheckmark.anchoredPosition = new Vector2(18f, 0f);
+
+            RectTransform itemLabel = item.Find("Item Label") as RectTransform;
+            itemLabel.offsetMin = new Vector2(42f, 2f);
+            itemLabel.offsetMax = new Vector2(-12f, -2f);
+
+            RectTransform arrow = dropdown.transform.Find("Arrow") as RectTransform;
+            arrow.sizeDelta = new Vector2(28f, 28f);
+            arrow.anchoredPosition = new Vector2(-20f, 0f);
+
+            dropdown.captionText.rectTransform.offsetMin = new Vector2(14f, 4f);
+            dropdown.captionText.rectTransform.offsetMax = new Vector2(-44f, -4f);
         }
 
         private static Toggle CreateToggle(Transform parent, string label, Vector2 position, DefaultControls.Resources resources)
