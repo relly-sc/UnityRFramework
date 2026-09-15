@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEngine;
 
 namespace UnityRFramework.Editor.Tests
@@ -70,6 +71,8 @@ namespace UnityRFramework.Editor.Tests
             profile.Platform.PublicVersion = "1.0.0";
             profile.Platform.BuildNumber = 12;
             profile.Platform.ScriptingBackend = ScriptingImplementation.IL2CPP;
+            // 测试环境可能残留人工验收宏，默认 Profile 先明确移除它，避免测试顺序耦合。
+            profile.Platform.RemoveDefineSymbols.Add("URF_TEST");
 
             string[] sceneGuids = AssetDatabase.FindAssets("t:SceneAsset");
             if (sceneGuids.Length > 0)
@@ -120,6 +123,99 @@ namespace UnityRFramework.Editor.Tests
 
             Assert.That(result.CanBuild, Is.True);
             Assert.That(result.Errors, Is.Empty);
+        }
+
+        [Test]
+        public void ReleasePlayer_WithTestSymbol_BlocksBuild()
+        {
+            UnityRFrameworkBuildProfile profile = CreateValidProfile();
+            profile.Flavor = BuildProfileFlavor.Release;
+            profile.Platform.RemoveDefineSymbols.Clear();
+            profile.Platform.DefineSymbols.Add("URF_TEST");
+
+            BuildValidationResult result = BuildProfileValidator.Validate(
+                profile,
+                BuildRecipe.Player,
+                CleanState);
+
+            Assert.That(result.CanBuild, Is.False);
+            Assert.That(
+                result.Errors,
+                Has.Some.Property("Code").EqualTo(
+                    BuildProfileValidator.ReleaseSecurityCode));
+        }
+
+        [Test]
+        public void ReleasePlayer_WithExistingTargetTestSymbol_BlocksBuild()
+        {
+            UnityRFrameworkBuildProfile profile = CreateValidProfile();
+            profile.Flavor = BuildProfileFlavor.Release;
+            profile.Platform.RemoveDefineSymbols.Clear();
+
+            BuildTargetGroup group =
+                UnityEditor.BuildPipeline.GetBuildTargetGroup(profile.Platform.Target);
+            NamedBuildTarget namedTarget = NamedBuildTarget.FromBuildTargetGroup(group);
+            string oldSymbols = PlayerSettings.GetScriptingDefineSymbols(namedTarget);
+            try
+            {
+                PlayerSettings.SetScriptingDefineSymbols(namedTarget, oldSymbols + ";URF_TEST");
+
+                BuildValidationResult result = BuildProfileValidator.Validate(
+                    profile,
+                    BuildRecipe.Player,
+                    CleanState);
+
+                Assert.That(result.CanBuild, Is.False);
+                Assert.That(
+                    result.Errors,
+                    Has.Some.Property("Code").EqualTo(
+                        BuildProfileValidator.ReleaseSecurityCode));
+            }
+            finally
+            {
+                PlayerSettings.SetScriptingDefineSymbols(namedTarget, oldSymbols);
+            }
+        }
+
+        [Test]
+        public void DevelopmentPlayer_WithDebugOptions_AllowsBuild()
+        {
+            UnityRFrameworkBuildProfile profile = CreateValidProfile();
+            profile.Flavor = BuildProfileFlavor.Development;
+            profile.Platform.DevelopmentBuild = true;
+            profile.Platform.ScriptDebugging = true;
+            profile.Platform.AutoconnectProfiler = true;
+
+            BuildValidationResult result = BuildProfileValidator.Validate(
+                profile,
+                BuildRecipe.Player,
+                CleanState);
+
+            Assert.That(result.CanBuild, Is.True);
+            Assert.That(
+                result.Errors,
+                Has.None.Property("Code").EqualTo(
+                    BuildProfileValidator.ReleaseSecurityCode));
+        }
+
+        [Test]
+        public void ReleasePlayer_WithMonoAndLowStripping_ReportsWarnings()
+        {
+            UnityRFrameworkBuildProfile profile = CreateValidProfile();
+            profile.Flavor = BuildProfileFlavor.Release;
+            profile.Platform.ScriptingBackend = ScriptingImplementation.Mono2x;
+            profile.Platform.ManagedStrippingLevel = ManagedStrippingLevel.Low;
+
+            BuildValidationResult result = BuildProfileValidator.Validate(
+                profile,
+                BuildRecipe.Player,
+                CleanState);
+
+            Assert.That(result.CanBuild, Is.True);
+            Assert.That(
+                result.Warnings,
+                Has.Exactly(2).Property("Code").EqualTo(
+                    BuildProfileValidator.ReleaseSecurityCode));
         }
 
         /// <summary>

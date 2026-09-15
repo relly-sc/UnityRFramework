@@ -296,11 +296,15 @@ namespace UnityRFramework.Editor
                 int deployed = DeployObfuscatedAssemblies(
                     obfuscatedDir,
                     stagedDir);
+                string mappingArchive = ObfuzMappingArchive.Archive(context);
 
                 AssetDatabase.Refresh();
                 return BuildStepResult.Succeeded(
                     $"Obfuz 热更混淆完成：{deployed} 个程序集已覆盖到 {stagedDir}，"
-                    + "MethodBridge 与 AOT 泛型引用已基于混淆后程序集重生成。");
+                    + "MethodBridge 与 AOT 泛型引用已基于混淆后程序集重生成。"
+                    + (mappingArchive == null
+                        ? string.Empty
+                        : $" 映射已归档到 {mappingArchive}。"));
             }
             catch (Exception exception)
             {
@@ -428,6 +432,69 @@ namespace UnityRFramework.Editor
             return count;
         }
 
+    }
+
+    /// <summary>
+    /// 将 Obfuz 符号映射归档到 Bundles 外部目录，避免跟随 Player 或 UPM 包发布。
+    /// </summary>
+    internal static class ObfuzMappingArchive
+    {
+        private const string ArchiveRoot = "Bundles/ObfuzMappings";
+
+        /// <summary>
+        /// 归档当前 Obfuz 符号映射；未启用符号混淆或文件尚未生成时返回 null。
+        /// </summary>
+        /// <param name="context">当前构建上下文。</param>
+        /// <returns>归档后的项目相对路径；无映射文件时返回 null。</returns>
+        internal static string Archive(BuildPipelineContext context)
+        {
+            if (context == null || ObfuzSettings.Instance == null
+                || ObfuzSettings.Instance.symbolObfusSettings == null)
+            {
+                return null;
+            }
+
+            string configuredPath = ObfuzSettings.Instance.symbolObfusSettings
+                .GetSymbolMappingFile();
+            if (string.IsNullOrWhiteSpace(configuredPath))
+            {
+                return null;
+            }
+
+            string sourcePath = Path.IsPathRooted(configuredPath)
+                ? configuredPath
+                : Path.Combine(context.ProjectRoot, configuredPath);
+            sourcePath = Path.GetFullPath(sourcePath);
+            if (!File.Exists(sourcePath))
+            {
+                return null;
+            }
+
+            string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff");
+            string folder = Path.Combine(
+                context.ProjectRoot,
+                ArchiveRoot,
+                context.Target.ToString(),
+                context.Profile.Platform.PublicVersion + "-"
+                    + context.Profile.Platform.BuildNumber,
+                stamp);
+            Directory.CreateDirectory(folder);
+            string destination = Path.Combine(folder, "symbol-mapping.xml");
+            File.Copy(sourcePath, destination, false);
+            return NormalizeProjectPath(
+                Path.Combine(
+                    ArchiveRoot,
+                    context.Target.ToString(),
+                    context.Profile.Platform.PublicVersion + "-"
+                        + context.Profile.Platform.BuildNumber,
+                    stamp,
+                    "symbol-mapping.xml"));
+        }
+
+        private static string NormalizeProjectPath(string path)
+        {
+            return path.Replace('\\', '/');
+        }
     }
 
     /// <summary>
@@ -572,7 +639,7 @@ namespace UnityRFramework.Editor
                 BuildPlayerOptions options =
                     BuildPlayerOptionsFactory.Create(context);
                 UnityEditor.Build.Reporting.BuildReport report =
-                    UnityEditor.BuildPipeline.BuildPlayer(options);
+                UnityEditor.BuildPipeline.BuildPlayer(options);
                 if (report == null
                     || report.summary.result != UnityEditor.Build.Reporting.BuildResult.Succeeded)
                 {
@@ -584,9 +651,14 @@ namespace UnityRFramework.Editor
                         null);
                 }
 
+                string mappingArchive = ObfuzMappingArchive.Archive(context);
+
                 return BuildStepResult.Succeeded(
                     "Obfuz 联合准备完成，并已基于最新 AOT 基线重建最终 Player："
-                    + options.locationPathName);
+                    + options.locationPathName
+                    + (mappingArchive == null
+                        ? string.Empty
+                        : $" 映射已归档到 {mappingArchive}。"));
             }
             catch (Exception exception)
             {
