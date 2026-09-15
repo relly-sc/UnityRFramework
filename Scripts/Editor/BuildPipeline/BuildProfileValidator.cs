@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEngine;
 
 namespace UnityRFramework.Editor
@@ -133,6 +134,9 @@ namespace UnityRFramework.Editor
         /// <summary>错误码：构建步骤可用性。</summary>
         public const string StepCode = "STEP";
 
+        /// <summary>错误码：正式构建安全策略。</summary>
+        public const string ReleaseSecurityCode = "RELEASE_SECURITY";
+
         /// <summary>校验分组：基础配置。</summary>
         public const string GroupBasic = "基础配置";
 
@@ -159,6 +163,21 @@ namespace UnityRFramework.Editor
 
         /// <summary>校验分组：构建步骤。</summary>
         public const string GroupSteps = "构建步骤";
+
+        /// <summary>校验分组：正式构建安全。</summary>
+        public const string GroupReleaseSecurity = "正式构建安全";
+
+        private static readonly HashSet<string> ReleaseTestSymbols =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "TEST",
+                "QA",
+                "DEVELOPMENT",
+                "DEBUG",
+                "URF_TEST",
+                "URF_QA",
+                "URF_DEVELOPMENT"
+            };
 
         /// <summary>输出文件名允许的扩展名集合（含点号）。</summary>
         private static readonly HashSet<string> WindowsExtensions =
@@ -260,6 +279,7 @@ namespace UnityRFramework.Editor
             ValidatePlatform(profile, context, issues);
             ValidateDefineSymbols(profile, issues);
             ValidateEnvironment(state, issues);
+            ValidateReleaseSecurity(profile, recipe, issues);
             ValidateRecipeAndSteps(profile, recipe, issues);
 
             if (includeAssetHealth)
@@ -674,6 +694,117 @@ namespace UnityRFramework.Editor
                 profile.Platform.RemoveDefineSymbols,
                 "移除宏",
                 issues);
+        }
+
+        /// <summary>
+        /// 校验正式 Player 构建的额外安全策略。
+        /// 只读取 Profile，不修改 PlayerSettings；第三方保护流程由扩展自行校验。
+        /// </summary>
+        private static void ValidateReleaseSecurity(
+            UnityRFrameworkBuildProfile profile,
+            BuildRecipe recipe,
+            ICollection<BuildValidationIssue> issues)
+        {
+            if (profile.Flavor != BuildProfileFlavor.Release
+                || (recipe != BuildRecipe.Player && recipe != BuildRecipe.Release))
+            {
+                return;
+            }
+
+            HashSet<string> symbols = GetEffectiveDefineSymbols(profile);
+            foreach (string symbol in symbols)
+            {
+                if (ReleaseTestSymbols.Contains(symbol))
+                {
+                    issues.Add(BuildValidationIssue.Error(
+                        ReleaseSecurityCode,
+                        $"正式构建不能包含测试宏 '{symbol}'，请从目标平台宏或 Profile 公共宏中移除。",
+                        GroupReleaseSecurity));
+                }
+            }
+
+            if (profile.Platform.ScriptingBackend ==
+                UnityEditor.ScriptingImplementation.Mono2x)
+            {
+                issues.Add(BuildValidationIssue.Warning(
+                    ReleaseSecurityCode,
+                    "正式构建当前使用 Mono；如项目和插件支持，建议使用 IL2CPP 以提高托管代码分析成本。",
+                    GroupReleaseSecurity));
+            }
+
+            if (profile.Platform.ManagedStrippingLevel ==
+                    UnityEditor.ManagedStrippingLevel.Minimal
+                || profile.Platform.ManagedStrippingLevel ==
+                    UnityEditor.ManagedStrippingLevel.Low)
+            {
+                issues.Add(BuildValidationIssue.Warning(
+                    ReleaseSecurityCode,
+                    "正式构建使用较低托管裁剪等级；请确认 link.xml、Preserve 标记和反射入口，"
+                    + "避免为提高裁剪等级破坏运行。",
+                    GroupReleaseSecurity));
+            }
+        }
+
+        /// <summary>
+        /// 合并目标平台当前宏与 Profile 的增删宏，得到本次应用后实际生效的宏集合。
+        /// </summary>
+        private static HashSet<string> GetEffectiveDefineSymbols(
+            UnityRFrameworkBuildProfile profile)
+        {
+            HashSet<string> symbols = new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase);
+            BuildTargetGroup group =
+                UnityEditor.BuildPipeline.GetBuildTargetGroup(profile.Platform.Target);
+            NamedBuildTarget namedTarget = NamedBuildTarget.FromBuildTargetGroup(group);
+            string current = PlayerSettings.GetScriptingDefineSymbols(namedTarget);
+            AddDefineSymbols(current, symbols);
+
+            if (profile.Platform.RemoveDefineSymbols != null)
+            {
+                for (int i = 0; i < profile.Platform.RemoveDefineSymbols.Count; i++)
+                {
+                    string symbol = profile.Platform.RemoveDefineSymbols[i]?.Trim();
+                    if (!string.IsNullOrEmpty(symbol))
+                    {
+                        symbols.Remove(symbol);
+                    }
+                }
+            }
+
+            if (profile.Platform.DefineSymbols != null)
+            {
+                for (int i = 0; i < profile.Platform.DefineSymbols.Count; i++)
+                {
+                    string symbol = profile.Platform.DefineSymbols[i]?.Trim();
+                    if (!string.IsNullOrEmpty(symbol))
+                    {
+                        symbols.Add(symbol);
+                    }
+                }
+            }
+
+            return symbols;
+        }
+
+        /// <summary>将 Unity 分号分隔的宏字符串加入集合。</summary>
+        private static void AddDefineSymbols(
+            string rawSymbols,
+            ISet<string> symbols)
+        {
+            if (string.IsNullOrWhiteSpace(rawSymbols))
+            {
+                return;
+            }
+
+            string[] values = rawSymbols.Split(';');
+            for (int i = 0; i < values.Length; i++)
+            {
+                string symbol = values[i].Trim();
+                if (!string.IsNullOrEmpty(symbol))
+                {
+                    symbols.Add(symbol);
+                }
+            }
         }
 
         /// <summary>
