@@ -1,0 +1,140 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 185f6993d5150494d98da50e26cb1c25, type: 3}
+  m_Name: BundleCollectorSetting
+  m_EditorClassIdentifier: 
+  ShowPackageView: 1
+  ShowEditorAlias: 1
+  UniqueBundleName: 1
+  Packages:
+  - PackageName: ExpansionAcceptancePackage
+    PackageDesc: "\u81EA\u52A8\u5316\u6D4B\u8BD5"
+    EnableAddressable: 1
+    SupportExtensionless: 1
+    LocationToLower: 0
+    IncludeAssetGUID: 0
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: ExpansionAcceptance
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/UnityRFramework/Samples/Expansion.YooAsset.Demo/Acceptance/GameAssets/YooAsset/Raw
+        CollectorGUID: 545f75be4dd3488419027d148f3948e0
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackSeparately
+        FilterRuleName: CollectAll
+        AssetTags: builtin
+        UserData: 
+      - CollectPath: Assets/UnityRFramework/Samples/Expansion.YooAsset.Demo/Acceptance/GameAssets/YooAsset/Remote
+        CollectorGUID: 7fb638879d100e44a87c0b72ace2d785
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackSeparately
+        FilterRuleName: CollectAll
+        AssetTags: 
+        UserData: 
+      - CollectPath: Assets/UnityRFramework/Samples/Expansion.YooAsset.Demo/Acceptance/GameAssets/YooAsset/Scenes
+        CollectorGUID: 9efb08d7eb90c2542a7c28eb72429084
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackSeparately
+        FilterRuleName: CollectScene
+        AssetTags: builtin
+        UserData: 
+  - PackageName: ExpansionDemoPackage
+    PackageDesc: "\u8D44\u6E90\u70ED\u66F4"
+    EnableAddressable: 1
+    SupportExtensionless: 1
+    LocationToLower: 0
+    IncludeAssetGUID: 0
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: ExpansionDemo
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/UnityRFramework/Samples/Sample.Demo/GameAssets/Resources
+        CollectorGUID: 9b172c312ed26754184ba79e54dfc814
+        CollectorType: 0
+        AddressRuleName: ExpansionDemoResourcesAddressRule
+        PackRuleName: ExpansionDemoShortPackRule
+        FilterRuleName: CollectAll
+        AssetTags: preload
+        UserData: 
+      - CollectPath: Assets/UnityRFramework/Samples/Sample.Demo/GameAssets/Scenes
+        CollectorGUID: aa5788e12d75a924f9e1186410253058
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: ExpansionDemoShortPackRule
+        FilterRuleName: CollectScene
+        AssetTags: preload
+        UserData: 
+      - CollectPath: Assets/UnityRFramework/Samples/Expansion.YooAsset.Demo/GameAssets/OnDemand/Elastigirl/Elastigirl.fbx
+        CollectorGUID: 6ec0bd14c1380fd47a700dfcee6f04ee
+        CollectorType: 0
+        AddressRuleName: ExpansionDemoOnDemandAddressRule
+        PackRuleName: ExpansionDemoShortPackRule
+        FilterRuleName: CollectAll
+        AssetTags: ondemand
+        UserData: 
+  - PackageName: ExpansionHybridCLRDemoPackage
+    PackageDesc: "\u8D44\u6E90/\u4EE3\u7801\u70ED\u66F4"
+    EnableAddressable: 1
+    SupportExtensionless: 1
+    LocationToLower: 0
+    IncludeAssetGUID: 0
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: ExpansionHybridCLRDemo
+      GroupDesc: 
+      AssetTags: 
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/UnityRFramework/Samples/Sample.Demo/GameAssets/Resources
+        CollectorGUID: 9b172c312ed26754184ba79e54dfc814
+        CollectorType: 0
+        AddressRuleName: ExpansionDemoResourcesAddressRule
+        PackRuleName: ExpansionDemoShortPackRule
+        FilterRuleName: CollectAll
+        AssetTags: preload
+        UserData: 
+      - CollectPath: Assets/UnityRFramework/Samples/Sample.Demo/GameAssets/Scenes
+        CollectorGUID: aa5788e12d75a924f9e1186410253058
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: ExpansionDemoShortPackRule
+        FilterRuleName: CollectScene
+        AssetTags: preload
+        UserData: 
+      - CollectPath: Assets/UnityRFramework/Samples/Expansion.YooAsset.Demo/GameAssets/OnDemand/Elastigirl/Elastigirl.fbx
+        CollectorGUID: 6ec0bd14c1380fd47a700dfcee6f04ee
+        CollectorType: 0
+        AddressRuleName: ExpansionDemoOnDemandAddressRule
+        PackRuleName: ExpansionDemoShortPackRule
+        FilterRuleName: CollectAll
+        AssetTags: ondemand
+        UserData: 
+      - CollectPath: Assets/UnityRFramework/Samples/Expansion.HybridCLR.Demo/GameAssets/HotUpdate
+        CollectorGUID: e8f9ad58957b0f24ca3ab85e4e62bf4c
+        CollectorType: 0
+        AddressRuleName: HybridCLRHotUpdateAddressRule
+        PackRuleName: ExpansionDemoShortPackRule
+        FilterRuleName: CollectAll
+        AssetTags: hotupdate
+        UserData: 

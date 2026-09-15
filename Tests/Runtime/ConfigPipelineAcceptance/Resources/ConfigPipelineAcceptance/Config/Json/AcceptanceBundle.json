@@ -1,0 +1,42 @@
+{
+  "Tables": {
+    "Acceptance_Action": {
+      "TableId": "AA6DA36B",
+      "SchemaHash": "3295B1DE6344398F",
+      "Rows": [
+        {
+          "Id": 1,
+          "NameKey": "acceptance_attack",
+          "Power": 1
+        },
+        {
+          "Id": 2,
+          "NameKey": "acceptance_skill",
+          "Power": 1.5
+        }
+      ]
+    },
+    "Acceptance_Partition@High": {
+      "TableId": "16B1E71D",
+      "SchemaHash": "079D32FA28B51355",
+      "Rows": [
+        {
+          "Id": 2000,
+          "NameKey": "acceptance_partition_high",
+          "Power": 20
+        }
+      ]
+    },
+    "Acceptance_Partition@Low": {
+      "TableId": "16B1E71D",
+      "SchemaHash": "079D32FA28B51355",
+      "Rows": [
+        {
+          "Id": 1000,
+          "NameKey": "acceptance_partition_low",
+          "Power": 10
+        }
+      ]
+    }
+  }
+}
