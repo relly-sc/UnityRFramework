@@ -445,9 +445,9 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
-        /// <summary>验证 Runtime 统一内容密钥注册后，ConfigComponent 可无感安装保护器。</summary>
+        /// <summary>验证 ConfigComponent 仍支持显式注入自定义数据保护器。</summary>
         [Test]
-        public void ConfigComponentUsesRegisteredContentKeyProvider()
+        public void ConfigComponentUsesExplicitDataProtector()
         {
             ConfigTableSchema schema = CreatePartitionSchema(
                 "TestConfigRow@Registered", new CsvRow(4, new[] { "1", "Sword", "12.5" }));
@@ -470,13 +470,13 @@ namespace UnityRFramework.Editor.Tests
             try
             {
                 RFrameworkModuleHost.StopAll();
-                RuntimeKeyProviderRegistry.ConfigureContentKeys(provider);
-                owner = new GameObject("Registered Content Key Config Tests");
+                owner = new GameObject("Explicit Config Protector Tests");
                 ConfigComponent component = owner.AddComponent<ConfigComponent>();
                 typeof(ConfigComponent).GetMethod(
                         "Awake",
                         BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(component, null);
+                component.SetDataProtector(protector);
 
                 component.LoadConfig<TestConfigRow>(encrypted, context);
 
@@ -484,7 +484,6 @@ namespace UnityRFramework.Editor.Tests
             }
             finally
             {
-                RuntimeKeyProviderRegistry.ResetContentKeys();
                 RFrameworkModuleHost.StopAll();
                 ConfigSchemaRegistry.Unregister(typeof(TestConfigRow));
                 if (owner != null) Object.DestroyImmediate(owner);

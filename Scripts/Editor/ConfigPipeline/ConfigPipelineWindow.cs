@@ -84,16 +84,30 @@ namespace UnityRFramework.Editor
                 options.ConfigProtectionKeyId = EditorGUILayout.TextField(
                     new GUIContent("密钥编号", "写入产物用于密钥轮换，不是密钥内容。"),
                     options.ConfigProtectionKeyId);
-                options.ConfigProtectionKeyEnvironmentVariable = EditorGUILayout.TextField(
-                    new GUIContent("密钥环境变量", "变量值必须是 Base64 编码的 32 字节密钥。"),
-                    options.ConfigProtectionKeyEnvironmentVariable);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    options.ConfigProtectionKeyFile = EditorGUILayout.TextField(
+                        new GUIContent("Config 密钥文件", "由工具生成的 configKey.bytes。"),
+                        options.ConfigProtectionKeyFile);
+                    if (GUILayout.Button("选择", GUILayout.Width(52f)))
+                    {
+                        string selected = BuildAssetPathField.PickProjectFile(
+                            options.ConfigProtectionKeyFile,
+                            "bytes");
+                        if (selected != null) options.ConfigProtectionKeyFile = selected;
+                    }
+                    if (GUILayout.Button("生成", GUILayout.Width(52f)))
+                    {
+                        ConfigKeyFileGenerator.Generate(options.ConfigProtectionKeyFile);
+                    }
+                }
                 options.ConfigProtectionSourceRoot = EditorGUILayout.TextField(
                     new GUIContent(
                         "运行时加载路径前缀",
                         "必须与 LoadConfigAsync 使用的路径一致，例如 Config/Binary。"),
                     options.ConfigProtectionSourceRoot);
                 EditorGUILayout.HelpBox(
-                    "密钥只从环境变量读取，不会保存到配置资产、EditorPrefs、报告或导出目录。",
+                    "密钥文件经过简单偏移混淆，不包含明文 Base64；请将同一文件赋给 ConfigComponent。",
                     MessageType.Info);
             }
             options.GeneratedNamespace = EditorGUILayout.TextField(

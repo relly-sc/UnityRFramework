@@ -49,6 +49,8 @@ Config 与 Localization 使用和现有 CSV 工具一致的四行结构：
 - Config 行类型与 URFC Codec 代码生成。
 - 生成代码目录与可留空的命名空间。
 - Localization 多语言 Bundle 导出选项。
+- Config Binary 可选“加密认证”；密钥使用核心工具生成的 `Assets/ConfigSource/configKey.bytes`。
+- 启用加密时，Excel 工具与框架 `ConfigComponent` 必须使用同一个 Config 密钥文件和密钥编号。
 
 生成命名空间留空时，生成的配置代码不声明命名空间。工具设置会被 Project 视图右键
 导出入口复用。
@@ -73,6 +75,7 @@ Assets/UnityRFramework/Excel/Localization/导出为 Binary
 
 - Config JSON：由 `JsonConfigHelper` 读取。
 - Config Binary：URFC v2，由 `BinaryConfigHelper` 和生成的 Codec 读取。
+- Config 加密 Binary：在 URFC 数据外增加框架保护封装，由 `ConfigComponent` 自动解密后读取。
 - Localization JSON：由 `JsonLocalizationHelper` 读取。
 - Localization Binary：单语言 URFL v2；多语言 Bundle 使用 URLM v1。
 

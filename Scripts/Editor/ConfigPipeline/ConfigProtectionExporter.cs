@@ -6,7 +6,7 @@ using RFramework;
 namespace UnityRFramework.Editor
 {
     /// <summary>为 Config 正式二进制产物提供可选的加密认证和稳定写入。</summary>
-    internal sealed class ConfigProtectionExporter
+    public sealed class ConfigProtectionExporter
     {
         internal const string ManifestName = "UnityRFramework.ConfigProtection.manifest";
 
@@ -30,7 +30,7 @@ namespace UnityRFramework.Editor
             this.protector = protector;
         }
 
-        internal static ConfigProtectionExporter Create(
+        public static ConfigProtectionExporter Create(
             ConfigPipelineOptions options,
             IKeyProvider keyProvider)
         {
@@ -67,9 +67,9 @@ namespace UnityRFramework.Editor
             }
 
             string sourceRoot = NormalizeSourceRoot(options.ConfigProtectionSourceRoot);
-            IKeyProvider provider = keyProvider ?? new EnvironmentVariableKeyProvider(
+            IKeyProvider provider = keyProvider ?? new ConfigKeyFileProvider(
                 keyId,
-                options.ConfigProtectionKeyEnvironmentVariable);
+                options.ConfigProtectionKeyFile);
             ValidateKey(provider, keyId);
             return new ConfigProtectionExporter(
                 options.ConfigBinaryProtection,
@@ -79,7 +79,7 @@ namespace UnityRFramework.Editor
                 new DefaultDataProtector(provider));
         }
 
-        internal bool WriteBytesIfChanged(
+        public bool WriteBytesIfChanged(
             string path,
             string fileName,
             ConfigPayloadType payloadType,
@@ -213,19 +213,19 @@ namespace UnityRFramework.Editor
             return true;
         }
 
-        private sealed class EnvironmentVariableKeyProvider : IKeyProvider
+        private sealed class ConfigKeyFileProvider : IKeyProvider
         {
             private readonly string keyId;
-            private readonly string variableName;
+            private readonly string path;
 
-            internal EnvironmentVariableKeyProvider(string keyId, string variableName)
+            internal ConfigKeyFileProvider(string keyId, string path)
             {
                 this.keyId = keyId;
-                this.variableName = variableName?.Trim();
-                if (string.IsNullOrEmpty(this.variableName))
+                this.path = path?.Trim();
+                if (string.IsNullOrEmpty(this.path))
                 {
                     throw new RFrameworkException(
-                        "Config protection key environment variable name is invalid.");
+                        "Config protection key file path is invalid.");
                 }
             }
 
@@ -237,18 +237,17 @@ namespace UnityRFramework.Editor
                     return false;
                 }
 
-                string value = Environment.GetEnvironmentVariable(variableName);
-                if (string.IsNullOrWhiteSpace(value))
+                if (!File.Exists(path))
                 {
                     return false;
                 }
 
                 try
                 {
-                    key = Convert.FromBase64String(value.Trim());
+                    key = Runtime.ConfigKeyFile.Decode(File.ReadAllBytes(path));
                     return true;
                 }
-                catch (FormatException)
+                catch (RFrameworkException)
                 {
                     return false;
                 }

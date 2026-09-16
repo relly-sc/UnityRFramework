@@ -515,6 +515,45 @@ GameEntry.Download.SetArchiveHelper(new SharpZipLibArchiveHelper());
 
 ### Config
 
+#### Config 加密密钥
+
+Config 工具中的加密配置使用以下三个字段：
+
+| 字段 | 填写内容 |
+|---|---|
+| 密钥编号 | `config-v1`，用于标识密钥，不填写密钥正文 |
+| Config 密钥文件 | 默认 `Assets/ConfigSource/configKey.bytes` |
+| 运行时加载路径前缀 | `Config/Binary` |
+
+在 CSV 配置表工具、Excel 配置表工具或构建步骤配置中点击“生成”，也可使用菜单
+`UnityRFramework/配置表工具/生成 Config 密钥文件`。工具会生成 32 字节随机密钥，并以带文件头、
+偏移混淆和 CRC32 校验的 `configKey.bytes` 保存。重新生成会导致旧的加密 Config 无法读取。
+
+#### Player 运行时解密
+
+将同一个 `configKey.bytes` 赋给框架入口预制体的 `ConfigComponent`。Config 导出和 Player 运行时
+使用同一文件，业务代码不需要额外注册。YooAsset Bundle 加密使用其扩展自己的独立密钥与解密服务。
+
+密钥会随 Player 发布，因此该功能只用于防止普通查看和随手修改配置，适合当前的离线仿真、三维
+项目；它不承诺对抗专业逆向或有意破解。
+
+各平台规则如下：
+
+| 平台 | 构建时 | Player 运行时 |
+|---|---|---|
+| Editor | 工具读取 `configKey.bytes` | `ConfigComponent` 读取同一文件 |
+| Windows/macOS | 构建工具读取密钥文件 | `ConfigComponent` 读取随 Player 发布的文件 |
+| Android/iOS | 构建工具读取密钥文件 | `ConfigComponent` 读取随 Player 发布的文件 |
+| WebGL | 构建工具读取密钥文件 | `ConfigComponent` 读取随 Player 发布的文件 |
+
+移动端本地验收步骤：
+
+1. 生成 `configKey.bytes`，选择“加密认证”并导出 Config。
+2. 在框架入口预制体的 `ConfigComponent` 填写 Config 密钥编号 `config-v1`，并赋值同一密钥文件。
+3. 不需要在业务入口手动调用密钥注册方法，`ConfigComponent` 会在框架启动时自动注册。
+4. 构建 Android 或 iOS Player，确认 Config 能加载；修改一个 `.bytes` 文件后重新打包，确认认证失败。
+5. 该密钥随 Player 发布，适合作为简单离线保护；不需要额外配置平台密钥服务。
+
 ```csharp
 // 默认 Helper 从 UTF-8 JSON 原始字节加载；文件位于 Assets/Resources/Config/Json/items.json
 await GameEntry.Config.LoadConfigAsync<ItemConfig>("Config/Json/items.json");

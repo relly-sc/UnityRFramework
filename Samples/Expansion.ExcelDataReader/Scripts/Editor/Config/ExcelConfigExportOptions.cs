@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RFramework;
 
 namespace UnityRFramework.Expansion
 {
@@ -23,6 +24,18 @@ namespace UnityRFramework.Expansion
 
         /// <summary>生成代码使用的命名空间，留空时使用全局命名空间。</summary>
         public string GeneratedNamespace = ExcelConfigExportDefaults.GeneratedNamespace;
+
+        /// <summary>正式二进制保护模式。</summary>
+        public ConfigProtectionMode ConfigBinaryProtection = ConfigProtectionMode.None;
+
+        /// <summary>加密产物中的密钥编号。</summary>
+        public string ConfigProtectionKeyId = "config-v1";
+
+        /// <summary>偏移混淆密钥文件。</summary>
+        public string ConfigProtectionKeyFile = "Assets/ConfigSource/configKey.bytes";
+
+        /// <summary>运行时配置加载路径前缀。</summary>
+        public string ConfigProtectionSourceRoot = "Config/Binary";
 
         /// <summary>已选导出器标识。</summary>
         public List<string> SelectedExporterIds = new List<string>

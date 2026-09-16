@@ -1370,8 +1370,24 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5738174961551105532, guid: 653d38c875d2d9649ace831b03f7ea9a, type: 3}
+      propertyPath: configKeyFile
+      value: 
+      objectReference: {fileID: 4900000, guid: 16f6c50f06296c642b0de4cd7ac9acc5, type: 3}
+    - target: {fileID: 5738174961551105532, guid: 653d38c875d2d9649ace831b03f7ea9a, type: 3}
       propertyPath: protectionMode
-      value: 0
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5738174961551105532, guid: 653d38c875d2d9649ace831b03f7ea9a, type: 3}
+      propertyPath: configHelperTypeName
+      value: UnityRFramework.Runtime.BinaryConfigHelper
+      objectReference: {fileID: 0}
+    - target: {fileID: 5738174961551105532, guid: 653d38c875d2d9649ace831b03f7ea9a, type: 3}
+      propertyPath: protectedSingleTableFormat
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5738174961551105532, guid: 653d38c875d2d9649ace831b03f7ea9a, type: 3}
+      propertyPath: protectedTableBundleFormat
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 6090552622275600981, guid: 653d38c875d2d9649ace831b03f7ea9a, type: 3}
       propertyPath: m_Name

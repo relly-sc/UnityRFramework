@@ -1,9 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using RFramework;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace UnityRFramework.Runtime
 {
@@ -30,11 +30,18 @@ namespace UnityRFramework.Runtime
         private string configHelperTypeName = JsonHelperTypeName;
 
         [SerializeField]
-        [Tooltip("配置资源保护模式。默认不启用；启用后必须在加载前注入 IDataProtector。")]
+        [Tooltip("配置资源保护模式。默认不启用；启用后使用 Config 密钥文件或显式 IDataProtector。")]
         private ConfigProtectionMode protectionMode = ConfigProtectionMode.None;
 
         [SerializeField]
-        [FormerlySerializedAs("protectedPayloadFormat")]
+        [Tooltip("与配置导出端一致的 Config 密钥编号。")]
+        private string configKeyId = "config-v1";
+
+        [SerializeField]
+        [Tooltip("可选。由配置表工具生成的 configKey.bytes；仅用于 Config 简单离线防护。")]
+        private TextAsset configKeyFile;
+
+        [SerializeField]
         [Tooltip("单表解密后交给当前 Config Helper 的数据格式。")]
         private ConfigPayloadFormat protectedSingleTableFormat = ConfigPayloadFormat.Custom;
 
@@ -52,6 +59,7 @@ namespace UnityRFramework.Runtime
         {
             base.Awake();
             configModule = RFrameworkModuleHost.Get<IConfigModule>();
+            ConfigureEmbeddedContentKey();
 
             // IL2CPP 构建时 [SerializeField] private 字段可能因 stripping 被损毁，
             // 防御性检查：值异常时回退到代码默认值
@@ -75,6 +83,57 @@ namespace UnityRFramework.Runtime
                     "ConfigComponent: 配置辅助器类型 '{0}' 为 null。"
                     + "请在 Inspector 中配置 ConfigHelperTypeName 或在启动流程中调用 SetHelper()。",
                     configHelperTypeName);
+            }
+        }
+
+        private void ConfigureEmbeddedContentKey()
+        {
+            if (protectionMode == ConfigProtectionMode.None || configKeyFile == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(configKeyId))
+            {
+                throw new RFrameworkException("ConfigComponent: content key id is invalid.");
+            }
+
+            try
+            {
+                byte[] key = ConfigKeyFile.Decode(configKeyFile.bytes);
+                configModule.SetDataProtector(new DefaultDataProtector(
+                    new EmbeddedContentKeyProvider(configKeyId.Trim(), key)));
+                hasExplicitDataProtector = true;
+            }
+            catch (RFrameworkException exception)
+            {
+                throw new RFrameworkException(
+                    "ConfigComponent: config key file is invalid.",
+                    exception);
+            }
+        }
+
+        private sealed class EmbeddedContentKeyProvider : IKeyProvider
+        {
+            private readonly string keyId;
+            private readonly byte[] key;
+
+            public EmbeddedContentKeyProvider(string keyId, byte[] key)
+            {
+                this.keyId = keyId;
+                this.key = key;
+            }
+
+            public bool TryGetKey(string requestedKeyId, out byte[] result)
+            {
+                if (!string.Equals(keyId, requestedKeyId, StringComparison.Ordinal))
+                {
+                    result = null;
+                    return false;
+                }
+
+                result = (byte[])key.Clone();
+                return true;
             }
         }
 
@@ -235,13 +294,13 @@ namespace UnityRFramework.Runtime
 
         private void EnsureRegisteredDataProtector()
         {
-            if (hasExplicitDataProtector
-                || !RuntimeKeyProviderRegistry.TryGetContentKeys(out IKeyProvider provider))
+            if (hasExplicitDataProtector)
             {
                 return;
             }
 
-            configModule.SetDataProtector(new DefaultDataProtector(provider));
+            throw new RFrameworkException(
+                "ConfigComponent: protected config requires a Config key file or an explicit data protector.");
         }
 
         /// <summary>

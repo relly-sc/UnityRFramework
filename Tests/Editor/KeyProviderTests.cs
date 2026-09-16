@@ -13,6 +13,20 @@ namespace UnityRFramework.Editor.Tests
     public sealed class KeyProviderTests
     {
         [Test]
+        public void ConfigKeyFileRoundTripsAndRejectsTampering()
+        {
+            byte[] expected = CreateKey(23);
+            byte[] file = ConfigKeyFile.Encode(expected, 91);
+            byte[] actual = ConfigKeyFile.Decode(file);
+            CollectionAssert.AreEqual(expected, actual);
+
+            file[12] ^= 1;
+            Assert.Throws<RFrameworkException>(() => ConfigKeyFile.Decode(file));
+            Array.Clear(expected, 0, expected.Length);
+            Array.Clear(actual, 0, actual.Length);
+        }
+
+        [Test]
         public void MissingLookupDoesNotCreateKey()
         {
             var store = new MemoryKeyStore();
