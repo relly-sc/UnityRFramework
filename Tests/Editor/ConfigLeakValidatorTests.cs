@@ -166,6 +166,40 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        /// <summary>UPM 包中的只读场景依赖不属于用户项目发布泄漏检查范围。</summary>
+        [Test]
+        public void PackageSceneDependencyIsIgnored()
+        {
+            string packagePath =
+                "Packages/com.relly-sc.unityrframework/Tests/Runtime/ConfigPipelineAcceptance/"
+                + "Resources/ConfigPipelineAcceptance/Config/Json/UnityRFramework.ConfigJson.manifest";
+            UnityRFrameworkBuildProfile profile =
+                ScriptableObject.CreateInstance<UnityRFrameworkBuildProfile>();
+            try
+            {
+                string[] sceneGuids = AssetDatabase.FindAssets("t:SceneAsset");
+                Assert.That(sceneGuids, Is.Not.Empty);
+                profile.Scenes.Add(new BuildSceneEntry
+                {
+                    Enabled = true,
+                    Scene = AssetDatabase.LoadAssetAtPath<SceneAsset>(
+                        AssetDatabase.GUIDToAssetPath(sceneGuids[0]))
+                });
+                HashSet<string> paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                ConfigLeakScanner.AddSceneDependencies(
+                    profile,
+                    paths,
+                    _ => new[] { packagePath });
+
+                Assert.That(paths, Does.Not.Contain(packagePath));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(profile);
+            }
+        }
+
         /// <summary>安装 YooAsset 时检查当前 Package 的实际收集结果。</summary>
         [Test]
         public void YooAssetCollectedConfigSourceIsCheckedWhenPluginExists()

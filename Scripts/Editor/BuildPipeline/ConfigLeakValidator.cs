@@ -115,6 +115,7 @@ namespace UnityRFramework.Editor
             {
                 string path = NormalizeAssetPath(rawPath);
                 if (string.IsNullOrEmpty(path)
+                    || !IsProjectAsset(path)
                     || AssetDatabase.IsValidFolder(path)
                     || IsAllowed(path, settings.LeakCheckAllowedPaths)
                     || !TryGetLeakReason(
@@ -188,7 +189,11 @@ namespace UnityRFramework.Editor
                     : AssetDatabase.GetDependencies(scenePath, true);
                 for (int j = 0; j < dependencies.Length; j++)
                 {
-                    paths.Add(NormalizeAssetPath(dependencies[j]));
+                    string path = NormalizeAssetPath(dependencies[j]);
+                    if (IsProjectAsset(path))
+                    {
+                        paths.Add(path);
+                    }
                 }
             }
         }
@@ -279,7 +284,11 @@ namespace UnityRFramework.Editor
             string path = field?.GetValue(assetInfo) as string;
             if (!string.IsNullOrWhiteSpace(path))
             {
-                paths.Add(NormalizeAssetPath(path));
+                path = NormalizeAssetPath(path);
+                if (IsProjectAsset(path))
+                {
+                    paths.Add(path);
+                }
             }
         }
 
@@ -452,6 +461,11 @@ namespace UnityRFramework.Editor
         {
             return path.StartsWith("Assets/Resources/", StringComparison.OrdinalIgnoreCase)
                 || path.IndexOf("/Resources/", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsProjectAsset(string path)
+        {
+            return path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsWithin(string path, string root)
