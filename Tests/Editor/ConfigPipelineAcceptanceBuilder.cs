@@ -21,10 +21,13 @@ namespace UnityRFramework.Editor
             "Temp/ConfigPipelineAcceptance/ConfigPipelineAcceptance.exe";
         private const string FrameworkPrefabPath =
             "Assets/UnityRFramework/Prefabs/UnityRFramework.prefab";
+        private const string KeyFilePath =
+            "Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance/Resources/configKey.bytes";
 
         [MenuItem("UnityRFramework/Tests/Export ConfigPipeline Acceptance Data")]
         public static void ExportData()
         {
+            EnsureKeyFile();
             ConfigPipelineReport report = ConfigPipelineService.ExportAll(
                 CreateOptions());
             Debug.Log(string.Join("\n", report.Messages));
@@ -33,6 +36,7 @@ namespace UnityRFramework.Editor
         [MenuItem("UnityRFramework/Tests/Analyze ConfigPipeline Acceptance Data")]
         public static void AnalyzeData()
         {
+            EnsureKeyFile();
             ConfigPipelineReport report = ConfigPipelineService.Analyze(CreateOptions());
             Debug.Log(string.Join("\n", report.Messages));
         }
@@ -69,6 +73,10 @@ namespace UnityRFramework.Editor
 
                 SetString(config, "configHelperTypeName",
                     "UnityRFramework.Runtime.BinaryConfigHelper");
+                SetInt(config, "protectionMode", (int)RFramework.ConfigProtectionMode.EncryptedAndAuthenticated);
+                EnsureKeyFile();
+                SetObject(config, "configKeyFile",
+                    AssetDatabase.LoadAssetAtPath<TextAsset>(KeyFilePath));
                 SetString(localization, "localizationHelperTypeName",
                     "UnityRFramework.Runtime.BinaryLocalizationHelper");
                 SetString(localization, "defaultLanguage", "zh-CN");
@@ -165,7 +173,9 @@ namespace UnityRFramework.Editor
                 ExportConfigBundle = true,
                 ConfigBundleName = "AcceptanceBundle",
                 ConfigReleaseFormat = ConfigReleaseDataFormat.FrameworkBinary,
-                ConfigBinaryProtection = RFramework.ConfigProtectionMode.None,
+                ConfigBinaryProtection = RFramework.ConfigProtectionMode.EncryptedAndAuthenticated,
+                ConfigProtectionKeyId = "config-v1",
+                ConfigProtectionKeyFile = KeyFilePath,
                 ConfigProtectionSourceRoot = "ConfigPipelineAcceptance/Config/Binary",
                 ExportLocalizationBundle = true,
                 LocalizationBundleName = "AcceptanceLanguages",
@@ -200,6 +210,51 @@ namespace UnityRFramework.Editor
             }
 
             property.boolValue = value;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            EditorUtility.SetDirty(target);
+        }
+
+        private static void EnsureKeyFile()
+        {
+            if (File.Exists(KeyFilePath)) return;
+            Directory.CreateDirectory(Path.GetDirectoryName(KeyFilePath));
+            byte[] key = new byte[32];
+            for (int i = 0; i < key.Length; i++) key[i] = (byte)(i + 1);
+            File.WriteAllBytes(KeyFilePath, ConfigKeyFile.Encode(key, 73));
+            AssetDatabase.ImportAsset(KeyFilePath, ImportAssetOptions.ForceUpdate);
+        }
+
+        private static void SetObject(
+            Object target,
+            string propertyName,
+            Object value)
+        {
+            SerializedObject serializedObject = new SerializedObject(target);
+            SerializedProperty property = serializedObject.FindProperty(propertyName);
+            if (property == null)
+            {
+                throw new RFramework.RFrameworkException(
+                    $"Serialized property '{propertyName}' was not found on '{target.GetType().Name}'.");
+            }
+
+            property.objectReferenceValue = value;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+            EditorUtility.SetDirty(target);
+        }
+
+        private static void SetInt(Object target, string propertyName, int value)
+        {
+            SerializedObject serializedObject = new SerializedObject(target);
+            SerializedProperty property = serializedObject.FindProperty(propertyName);
+            if (property == null)
+            {
+                throw new RFramework.RFrameworkException(
+                    $"Serialized property '{propertyName}' was not found on '{target.GetType().Name}'.");
+            }
+
+            property.intValue = value;
             serializedObject.ApplyModifiedPropertiesWithoutUndo();
             PrefabUtility.RecordPrefabInstancePropertyModifications(target);
             EditorUtility.SetDirty(target);

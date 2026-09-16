@@ -71,6 +71,35 @@ namespace UnityRFramework.Expansion
 
             EditorGUILayout.LabelField("导出格式", EditorStyles.miniBoldLabel);
             DrawConfigExporterToggles();
+            options.ConfigBinaryProtection = (RFramework.ConfigProtectionMode)
+                EditorGUILayout.Popup(
+                    "正式二进制保护",
+                    (int)options.ConfigBinaryProtection,
+                    new[] { "不加密", "加密并校验完整性" });
+            if (options.ConfigBinaryProtection
+                == RFramework.ConfigProtectionMode.EncryptedAndAuthenticated)
+            {
+                options.ConfigProtectionKeyId = EditorGUILayout.TextField(
+                    "密钥编号", options.ConfigProtectionKeyId);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    options.ConfigProtectionKeyFile = EditorGUILayout.TextField(
+                        "Config 密钥文件", options.ConfigProtectionKeyFile);
+                    if (GUILayout.Button("选择", GUILayout.Width(52f)))
+                    {
+                        string selected = UnityRFramework.Editor.BuildAssetPathField.PickProjectFile(
+                            options.ConfigProtectionKeyFile, "bytes");
+                        if (selected != null) options.ConfigProtectionKeyFile = selected;
+                    }
+                    if (GUILayout.Button("生成", GUILayout.Width(52f)))
+                    {
+                        UnityRFramework.Editor.ConfigKeyFileGenerator.Generate(
+                            options.ConfigProtectionKeyFile);
+                    }
+                }
+                options.ConfigProtectionSourceRoot = EditorGUILayout.TextField(
+                    "运行时加载路径前缀", options.ConfigProtectionSourceRoot);
+            }
 
             EditorGUILayout.Space(10f);
             EditorGUILayout.LabelField("Localization", EditorStyles.boldLabel);

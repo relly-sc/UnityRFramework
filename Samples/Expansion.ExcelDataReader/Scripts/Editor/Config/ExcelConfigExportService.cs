@@ -61,6 +61,16 @@ namespace UnityRFramework.Expansion
 
             HashSet<string> outputPaths =
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            ConfigProtectionExporter protection = ConfigProtectionExporter.Create(
+                new ConfigPipelineOptions
+                {
+                    ConfigBinaryProtection = options.ConfigBinaryProtection,
+                    ConfigProtectionKeyId = options.ConfigProtectionKeyId,
+                    ConfigProtectionKeyFile = options.ConfigProtectionKeyFile,
+                    ConfigProtectionSourceRoot = options.ConfigProtectionSourceRoot,
+                    ConfigReleaseFormat = ConfigReleaseDataFormat.FrameworkBinary
+                },
+                null);
             for (int exporterIndex = 0;
                  exporterIndex < options.SelectedExporterIds.Count;
                  exporterIndex++)
@@ -94,8 +104,17 @@ namespace UnityRFramework.Expansion
                             + $"'{ExcelExportUtility.ToProjectPath(outputPath)}'.");
                     }
 
-                    if (ExcelExportUtility.WriteBytesIfChanged(
-                        outputPath, output.Data))
+                    bool isBinary = output.RelativePath.StartsWith(
+                        "Binary/", StringComparison.OrdinalIgnoreCase);
+                    bool written = isBinary
+                        ? protection.WriteBytesIfChanged(
+                            outputPath,
+                            Path.GetFileName(outputPath),
+                            ConfigPayloadType.Single,
+                            ConfigPayloadFormat.BinarySingleTable,
+                            output.Data)
+                        : ExcelExportUtility.WriteBytesIfChanged(outputPath, output.Data);
+                    if (written)
                     {
                         changed = true;
                         report.WrittenFileCount++;

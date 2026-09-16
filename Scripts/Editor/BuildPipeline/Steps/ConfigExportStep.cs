@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
@@ -106,6 +107,15 @@ namespace UnityRFramework.Editor
                     StepGroup));
             }
 
+            if (settings.ExportTool == ConfigExportTool.Excel
+                && FindExcelBridge() == null)
+            {
+                issues.Add(BuildValidationIssue.Error(
+                    StepCode,
+                    "已选择 Excel 配置表工具，但未导入 Expansion.ExcelDataReader。",
+                    StepGroup));
+            }
+
             if (!IsAssetsDirectoryExisting(options.LocalizationSourceDirectory))
             {
                 issues.Add(BuildValidationIssue.Error(
@@ -160,18 +170,33 @@ namespace UnityRFramework.Editor
                     ClearJsonOutputs(options);
                 }
 
-                ConfigPipelineReport report = ConfigPipelineService.ExportAll(options);
+                int configWritten;
+                ConfigPipelineReport localizationReport;
+                if (settings.ExportTool == ConfigExportTool.Excel)
+                {
+                    configWritten = ExportExcel(options, exportJson);
+                    localizationReport = ConfigPipelineService.ExportLocalization(options);
+                }
+                else
+                {
+                    ConfigPipelineReport report = ConfigPipelineService.ExportAll(options);
+                    configWritten = report.WrittenFileCount;
+                    localizationReport = null;
+                }
+
+                int writtenCount = configWritten
+                    + (localizationReport?.WrittenFileCount ?? 0);
 
                 if (!exportJson)
                 {
                     int removedCount = ClearJsonOutputs(options);
                     return BuildStepResult.Succeeded(
-                        $"Config/Localization 导出完成：{report.WrittenFileCount} 个文件变更，"
+                        $"Config/Localization 导出完成：{writtenCount} 个文件变更，"
                         + $"清除开发 JSON {removedCount} 个文件，产物仅保留二进制。");
                 }
 
                 return BuildStepResult.Succeeded(
-                    $"Config/Localization 导出完成：{report.WrittenFileCount} 个文件变更。");
+                    $"Config/Localization 导出完成：{writtenCount} 个文件变更。");
             }
             catch (Exception exception)
             {
@@ -179,6 +204,38 @@ namespace UnityRFramework.Editor
                     $"Config/Localization 导出失败：{exception.Message}",
                     exception);
             }
+        }
+
+        private static Type FindExcelBridge()
+        {
+            const string typeName =
+                "UnityRFramework.Expansion.ExcelConfigBuildBridge";
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int i = 0; i < assemblies.Length; i++)
+            {
+                Type type = assemblies[i].GetType(typeName, false);
+                if (type != null) return type;
+            }
+
+            return null;
+        }
+
+        private static int ExportExcel(
+            ConfigPipelineOptions options,
+            bool exportJson)
+        {
+            Type bridge = FindExcelBridge()
+                ?? throw new InvalidOperationException(
+                    "未导入 Expansion.ExcelDataReader。请改用 CSV 配置表工具或导入扩展。");
+            MethodInfo method = bridge.GetMethod(
+                "Export",
+                BindingFlags.Public | BindingFlags.Static);
+            if (method == null)
+            {
+                throw new InvalidOperationException("Excel 配置表构建桥接不可用。");
+            }
+
+            return (int)method.Invoke(null, new object[] { options, exportJson });
         }
 
         /// <summary>

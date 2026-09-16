@@ -24,11 +24,14 @@ namespace UnityRFramework.Editor
             }
 
             EditorGUILayout.LabelField("路径", EditorStyles.boldLabel);
-            DrawDirectory(options, "ConfigSourceDirectory", "Config CSV 源目录");
+            EditorGUILayout.PropertyField(
+                serializedObject.FindProperty("ExportTool"),
+                new GUIContent("Config 导出工具"));
+            DrawDirectory(options, "ConfigSourceDirectory", "Config 源目录");
             DrawDirectory(
                 options,
                 "LocalizationSourceDirectory",
-                "Localization CSV 源目录");
+                "Localization 源目录");
             DrawDirectory(options, "GeneratedCodeDirectory", "生成代码目录");
             DrawDirectory(options, "ConfigOutputDirectory", "Config 输出目录");
             DrawDirectory(
@@ -59,16 +62,26 @@ namespace UnityRFramework.Editor
                 EditorGUILayout.PropertyField(
                     options.FindPropertyRelative("ConfigProtectionKeyId"),
                     new GUIContent("密钥编号"));
-                EditorGUILayout.PropertyField(
-                    options.FindPropertyRelative("ConfigProtectionKeyEnvironmentVariable"),
-                    new GUIContent("密钥环境变量"));
+                BuildAssetPathField.DrawProjectFile(
+                    options.FindPropertyRelative("ConfigProtectionKeyFile"),
+                    new GUIContent("Config 密钥文件"),
+                    "bytes");
+                if (GUILayout.Button("生成新的 Config 密钥文件"))
+                {
+                    ConfigKeyFileGenerator.Generate(
+                        options.FindPropertyRelative("ConfigProtectionKeyFile").stringValue);
+                }
                 EditorGUILayout.PropertyField(
                     options.FindPropertyRelative("ConfigProtectionSourceRoot"),
                     new GUIContent("运行时加载路径前缀"));
                 EditorGUILayout.HelpBox(
-                    "环境变量值必须是 Base64 编码的 32 字节密钥；密钥内容不会写入资产。",
+                    "密钥文件经过简单偏移混淆；请将同一文件赋给框架入口的 ConfigComponent。",
                     MessageType.Info);
             }
+
+            EditorGUILayout.PropertyField(
+                options.FindPropertyRelative("GeneratedNamespace"),
+                new GUIContent("生成命名空间"));
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField("Localization", EditorStyles.boldLabel);
@@ -78,8 +91,6 @@ namespace UnityRFramework.Editor
                 options.FindPropertyRelative("LocalizationBundleName"));
 
             EditorGUILayout.Space(4f);
-            EditorGUILayout.PropertyField(
-                options.FindPropertyRelative("GeneratedNamespace"));
             EditorGUILayout.PropertyField(serializedObject.FindProperty("ExportJson"));
 
             EditorGUILayout.Space(4f);

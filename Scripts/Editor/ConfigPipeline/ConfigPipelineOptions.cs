@@ -1,6 +1,5 @@
 using System;
 using RFramework;
-using UnityEngine.Serialization;
 
 namespace UnityRFramework.Editor
 {
@@ -20,17 +19,16 @@ namespace UnityRFramework.Editor
     [Serializable]
     public sealed class ConfigPipelineOptions
     {
-        /// <summary>Config CSV 源目录。</summary>
+        /// <summary>Config 配置表源目录。</summary>
         public string ConfigSourceDirectory = "Assets/ConfigSource/Config";
 
-        /// <summary>Localization CSV 源目录。</summary>
+        /// <summary>Localization 配置表源目录。</summary>
         public string LocalizationSourceDirectory = "Assets/ConfigSource/Localization";
 
         /// <summary>Config 行类型和 Codec 代码输出目录。</summary>
         public string GeneratedCodeDirectory = "Assets/Generated/UnityRFramework/Config";
 
         /// <summary>Config 统一输出根目录，内部自动分为 Json/Binary。</summary>
-        [FormerlySerializedAs("ConfigBinaryDirectory")]
         public string ConfigOutputDirectory = "Assets/Resources/Config";
 
         /// <summary>是否额外导出包含全部 Config 分片的 JSON 与二进制容器。</summary>
@@ -49,15 +47,13 @@ namespace UnityRFramework.Editor
         /// <summary>加密产物写入的密钥编号，不包含密钥本身。</summary>
         public string ConfigProtectionKeyId = "config-v1";
 
-        /// <summary>保存 Base64 32 字节密钥的环境变量名。</summary>
-        public string ConfigProtectionKeyEnvironmentVariable =
-            "UNITYRFRAMEWORK_CONFIG_KEY";
+        /// <summary>由配置表工具生成的偏移混淆密钥文件。</summary>
+        public string ConfigProtectionKeyFile = "Assets/ConfigSource/configKey.bytes";
 
         /// <summary>运行时传给 LoadConfigAsync 的加载路径前缀。</summary>
         public string ConfigProtectionSourceRoot = "Config/Binary";
 
         /// <summary>Localization 统一输出根目录，内部自动分为 Json/Binary。</summary>
-        [FormerlySerializedAs("LocalizationBinaryDirectory")]
         public string LocalizationOutputDirectory = "Assets/Resources/Localization";
 
         /// <summary>是否额外导出包含全部语言的 JSON 与二进制容器。</summary>
