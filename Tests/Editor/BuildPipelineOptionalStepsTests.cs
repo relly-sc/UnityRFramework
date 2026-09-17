@@ -240,40 +240,6 @@ namespace UnityRFramework.Editor.Tests
         }
 
         [Test]
-        public void ConfigStep_FrameworkBinaryWithJsonOutput_AddsFormatWarning()
-        {
-            UnityRFrameworkBuildProfile profile = CreateProfile(BuildRecipe.Assets);
-            ConfigExportBuildConfiguration configuration =
-                ScriptableObject.CreateInstance<ConfigExportBuildConfiguration>();
-            configuration.Options.ConfigSourceDirectory = "Assets";
-            configuration.Options.LocalizationSourceDirectory = "Assets";
-            configuration.Options.ConfigReleaseFormat =
-                ConfigReleaseDataFormat.FrameworkBinary;
-            configuration.ExportJson = true;
-            profile.Steps.Add(new BuildStepSettings
-            {
-                StepId = "config",
-                Enabled = true,
-                Configuration = configuration
-            });
-            List<BuildValidationIssue> issues = new List<BuildValidationIssue>();
-
-            new ConfigExportStep().Validate(
-                BuildPipelineContext.Create(
-                    profile,
-                    new Dictionary<string, IBuildPipelineStep>(),
-                    default),
-                issues);
-
-            Assert.That(
-                issues,
-                Has.Some.Matches<BuildValidationIssue>(
-                    issue => issue.Code == "CONFIG"
-                        && issue.Level == BuildValidationLevel.Warning
-                        && issue.Message.Contains("Config/Binary")));
-        }
-
-        [Test]
         public void HotUpdateRecipe_OrdersImportedStepsByStageAndDependency()
         {
             UnityRFrameworkBuildProfile profile = CreateProfile(BuildRecipe.HotUpdate);

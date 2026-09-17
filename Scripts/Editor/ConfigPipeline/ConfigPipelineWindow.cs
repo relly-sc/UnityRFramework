@@ -70,9 +70,9 @@ namespace UnityRFramework.Editor
                     options.ConfigBundleName);
             }
             options.ConfigReleaseFormat = (ConfigReleaseDataFormat)EditorGUILayout.Popup(
-                "Binary .bytes 内容格式",
+                "内容格式",
                 (int)options.ConfigReleaseFormat,
-                new[] { "框架二进制", "JSON 内容（仍输出 .bytes）" });
+                new[] { "框架二进制", "JSON" });
             options.ConfigBinaryProtection = (RFramework.ConfigProtectionMode)
                 EditorGUILayout.Popup(
                     "正式二进制保护",
@@ -87,7 +87,7 @@ namespace UnityRFramework.Editor
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     options.ConfigProtectionKeyFile = EditorGUILayout.TextField(
-                        new GUIContent("Config 密钥文件", "由工具生成的 configKey.bytes。"),
+                        new GUIContent("Config 密钥文件", "由工具生成的 ConfigKey.bytes。"),
                         options.ConfigProtectionKeyFile);
                     if (GUILayout.Button("选择", GUILayout.Width(52f)))
                     {

@@ -48,9 +48,9 @@ namespace UnityRFramework.Editor
             SerializedProperty releaseFormat = options.FindPropertyRelative(
                 "ConfigReleaseFormat");
             releaseFormat.enumValueIndex = EditorGUILayout.Popup(
-                "Binary .bytes 内容格式",
+                "内容格式",
                 releaseFormat.enumValueIndex,
-                new[] { "框架二进制", "JSON 内容（仍输出 .bytes）" });
+                new[] { "框架二进制", "JSON" });
             SerializedProperty protection = options.FindPropertyRelative(
                 "ConfigBinaryProtection");
             protection.enumValueIndex = EditorGUILayout.Popup(
@@ -89,19 +89,6 @@ namespace UnityRFramework.Editor
                 options.FindPropertyRelative("ExportLocalizationBundle"));
             EditorGUILayout.PropertyField(
                 options.FindPropertyRelative("LocalizationBundleName"));
-
-            EditorGUILayout.Space(4f);
-            SerializedProperty exportJson = serializedObject.FindProperty("ExportJson");
-            EditorGUILayout.PropertyField(
-                exportJson,
-                new GUIContent("保留开发 JSON", "同时保留 Config/Json 与 Localization/Json 输出。"));
-            if (exportJson.boolValue)
-            {
-                EditorGUILayout.HelpBox(
-                    "开发 JSON 与 Binary .bytes 会同时存在。运行时加载 Config/Json 时使用 "
-                    + "JsonConfigHelper；加载 Config/Binary 时使用 BinaryConfigHelper。",
-                    MessageType.Info);
-            }
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField("正式发布检查", EditorStyles.boldLabel);

@@ -71,6 +71,11 @@ namespace UnityRFramework.Expansion
 
             EditorGUILayout.LabelField("导出格式", EditorStyles.miniBoldLabel);
             DrawConfigExporterToggles();
+            options.ConfigReleaseFormat = (UnityRFramework.Editor.ConfigReleaseDataFormat)
+                EditorGUILayout.Popup(
+                    "内容格式",
+                    (int)options.ConfigReleaseFormat,
+                    new[] { "框架二进制", "JSON" });
             options.ConfigBinaryProtection = (RFramework.ConfigProtectionMode)
                 EditorGUILayout.Popup(
                     "正式二进制保护",

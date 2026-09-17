@@ -8,22 +8,19 @@ namespace UnityRFramework.Expansion
     {
         public static void Validate(ConfigPipelineOptions source)
         {
-            ExcelConfigExportService.Validate(CreateOptions(source, false));
+            ExcelConfigExportService.Validate(CreateOptions(source));
         }
 
-        public static int Export(ConfigPipelineOptions source, bool exportJson)
+        public static int Export(ConfigPipelineOptions source)
         {
             ExcelConfigExportReport report = ExcelConfigExportService.Export(
-                CreateOptions(source, exportJson));
+                CreateOptions(source));
             return report.WrittenFileCount;
         }
 
-        private static ExcelConfigExportOptions CreateOptions(
-            ConfigPipelineOptions source,
-            bool exportJson)
+        private static ExcelConfigExportOptions CreateOptions(ConfigPipelineOptions source)
         {
             var exporters = new List<string> { ExcelConfigExporterIds.Binary };
-            if (exportJson) exporters.Insert(0, ExcelConfigExporterIds.Json);
             return new ExcelConfigExportOptions
             {
                 SourceDirectory = source.ConfigSourceDirectory,
@@ -32,6 +29,7 @@ namespace UnityRFramework.Expansion
                 GeneratedCodeDirectory = source.GeneratedCodeDirectory,
                 GeneratedNamespace = source.GeneratedNamespace,
                 SelectedExporterIds = exporters,
+                ConfigReleaseFormat = source.ConfigReleaseFormat,
                 ConfigBinaryProtection = source.ConfigBinaryProtection,
                 ConfigProtectionKeyId = source.ConfigProtectionKeyId,
                 ConfigProtectionKeyFile = source.ConfigProtectionKeyFile,

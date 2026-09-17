@@ -49,7 +49,7 @@ Config 与 Localization 使用和现有 CSV 工具一致的四行结构：
 - Config 行类型与 URFC Codec 代码生成。
 - 生成代码目录与可留空的命名空间。
 - Localization 多语言 Bundle 导出选项。
-- Config Binary 可选“加密认证”；密钥使用核心工具生成的 `Assets/ConfigSource/configKey.bytes`。
+- Config Binary 可选“加密认证”；密钥使用核心工具生成的 `Assets/ConfigSource/ConfigKey.bytes`。
 - 启用加密时，Excel 工具与框架 `ConfigComponent` 必须使用同一个 Config 密钥文件和密钥编号。
 
 生成命名空间留空时，生成的配置代码不声明命名空间。工具设置会被 Project 视图右键

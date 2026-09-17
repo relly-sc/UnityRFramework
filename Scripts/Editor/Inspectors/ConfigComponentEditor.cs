@@ -15,6 +15,7 @@ namespace UnityRFramework.Editor
         private SerializedProperty protectionMode;
         private SerializedProperty configKeyId;
         private SerializedProperty configKeyFile;
+        private SerializedProperty protectionSourceRoot;
         private SerializedProperty protectedSingleTableFormat;
         private SerializedProperty protectedTableBundleFormat;
 
@@ -24,6 +25,7 @@ namespace UnityRFramework.Editor
             protectionMode = serializedObject.FindProperty("protectionMode");
             configKeyId = serializedObject.FindProperty("configKeyId");
             configKeyFile = serializedObject.FindProperty("configKeyFile");
+            protectionSourceRoot = serializedObject.FindProperty("protectionSourceRoot");
             protectedSingleTableFormat = serializedObject.FindProperty(
                 "protectedSingleTableFormat");
             protectedTableBundleFormat = serializedObject.FindProperty(
@@ -65,6 +67,9 @@ namespace UnityRFramework.Editor
             EditorGUILayout.PropertyField(configKeyFile, new GUIContent("Config 密钥文件"));
             if (protectionMode.enumValueIndex != 0)
             {
+                EditorGUILayout.PropertyField(
+                    protectionSourceRoot,
+                    new GUIContent("认证路径前缀"));
                 if (!jsonHelper && !binaryHelper)
                 {
                     EditorGUILayout.PropertyField(

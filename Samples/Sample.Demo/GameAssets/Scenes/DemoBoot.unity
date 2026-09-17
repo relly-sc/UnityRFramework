@@ -408,6 +408,26 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 9003003003003003003, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
+      propertyPath: configKeyFile
+      value: 
+      objectReference: {fileID: 4900000, guid: 16f6c50f06296c642b0de4cd7ac9acc5, type: 3}
+    - target: {fileID: 9003003003003003003, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
+      propertyPath: protectionMode
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 9003003003003003003, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
+      propertyPath: configHelperTypeName
+      value: UnityRFramework.Runtime.BinaryConfigHelper
+      objectReference: {fileID: 0}
+    - target: {fileID: 9003003003003003003, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
+      propertyPath: protectedSingleTableFormat
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 9003003003003003003, guid: ba31de88eaaac7a4b9f0b424190d48c1, type: 3}
+      propertyPath: protectedTableBundleFormat
+      value: 3
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

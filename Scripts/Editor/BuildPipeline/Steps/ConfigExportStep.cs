@@ -10,8 +10,8 @@ namespace UnityRFramework.Editor
     /// <summary>
     /// Config 配置导出步骤：复用 ConfigPipelineService 全量导出 Config 与 Localization。
     /// 从步骤条目绑定的 <see cref="ConfigExportBuildConfiguration"/> 读取导出路径与格式；
-    /// 关闭 JSON 导出时，导出完成后清除输出目录的 Json 子目录（带边界校验），
-    /// 确保正式档产物仅保留二进制。导出失败立即停止，不使用旧配置产物继续构建。
+    /// 导出完成后清除输出目录的开发 Json 子目录（带边界校验），
+    /// 正式内容格式由 ConfigReleaseFormat 决定。导出失败立即停止，不使用旧配置产物继续构建。
     /// </summary>
     public sealed class ConfigExportStep : BuildPipelineStepBase
     {
@@ -124,16 +124,6 @@ namespace UnityRFramework.Editor
                     StepGroup));
             }
 
-            if (settings.ExportJson
-                && options.ConfigReleaseFormat == ConfigReleaseDataFormat.FrameworkBinary)
-            {
-                issues.Add(BuildValidationIssue.Warning(
-                    StepCode,
-                    "当前同时保留开发 JSON 和框架二进制。运行时加载 Config/Json 时使用 "
-                    + "JsonConfigHelper；加载 Config/Binary/*.bytes 时使用 BinaryConfigHelper。",
-                    StepGroup));
-            }
-
             try
             {
                 ConfigProtectionExporter.Create(options, null);
@@ -171,20 +161,15 @@ namespace UnityRFramework.Editor
                 options = new ConfigPipelineOptions();
             }
 
-            bool exportJson = settings.ExportJson;
-
             try
             {
-                if (!exportJson)
-                {
-                    ClearJsonOutputs(options);
-                }
+                ClearJsonOutputs(options);
 
                 int configWritten;
                 ConfigPipelineReport localizationReport;
                 if (settings.ExportTool == ConfigExportTool.Excel)
                 {
-                    configWritten = ExportExcel(options, exportJson);
+                    configWritten = ExportExcel(options);
                     localizationReport = ConfigPipelineService.ExportLocalization(options);
                 }
                 else
@@ -197,16 +182,10 @@ namespace UnityRFramework.Editor
                 int writtenCount = configWritten
                     + (localizationReport?.WrittenFileCount ?? 0);
 
-                if (!exportJson)
-                {
-                    int removedCount = ClearJsonOutputs(options);
-                    return BuildStepResult.Succeeded(
-                        $"Config/Localization 导出完成：{writtenCount} 个文件变更，"
-                        + $"清除开发 JSON {removedCount} 个文件，产物仅保留二进制。");
-                }
-
+                int removedCount = ClearJsonOutputs(options);
                 return BuildStepResult.Succeeded(
-                    $"Config/Localization 导出完成：{writtenCount} 个文件变更。");
+                    $"Config/Localization 导出完成：{writtenCount} 个文件变更，"
+                    + $"清除开发 JSON {removedCount} 个文件。");
             }
             catch (Exception exception)
             {
@@ -230,9 +209,7 @@ namespace UnityRFramework.Editor
             return null;
         }
 
-        private static int ExportExcel(
-            ConfigPipelineOptions options,
-            bool exportJson)
+        private static int ExportExcel(ConfigPipelineOptions options)
         {
             Type bridge = FindExcelBridge()
                 ?? throw new InvalidOperationException(
@@ -245,7 +222,7 @@ namespace UnityRFramework.Editor
                 throw new InvalidOperationException("Excel 配置表构建桥接不可用。");
             }
 
-            return (int)method.Invoke(null, new object[] { options, exportJson });
+            return (int)method.Invoke(null, new object[] { options });
         }
 
         /// <summary>

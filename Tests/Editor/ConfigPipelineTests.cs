@@ -491,6 +491,36 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        /// <summary>验证 YooAsset 短地址和完整路径使用同一认证来源。</summary>
+        [Test]
+        public void ConfigComponentBuildsCanonicalProtectionSource()
+        {
+            GameObject owner = new GameObject("Config Protection Source Tests");
+            try
+            {
+                ConfigComponent component = owner.AddComponent<ConfigComponent>();
+                MethodInfo method = typeof(ConfigComponent).GetMethod(
+                    "BuildProtectionSource",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+
+                Assert.AreEqual(
+                    "Config/Binary/Demo_Character.bytes",
+                    method.Invoke(component, new object[] { "Demo_Character" }));
+                Assert.AreEqual(
+                    "Config/Binary/Demo_Character.bytes",
+                    method.Invoke(component, new object[] { "Demo_Character.bytes" }));
+                Assert.AreEqual(
+                    "Config/Binary/Demo_Character.bytes",
+                    method.Invoke(
+                        component,
+                        new object[] { "Config/Binary/Demo_Character.bytes" }));
+            }
+            finally
+            {
+                Object.DestroyImmediate(owner);
+            }
+        }
+
         /// <summary>验证关闭保护时不需要保护器，也不复制输入数据。</summary>
         [Test]
         public void ConfigProtectionNoneReturnsOriginalBytes()
@@ -599,6 +629,14 @@ namespace UnityRFramework.Editor.Tests
                     protector, ConfigBinaryExporter.BuildV2(low), "config-v1");
                 module.LoadConfig<TestConfigRow>(single, singleContext);
                 Assert.AreEqual("Sword", module.GetConfig<TestConfigRow>(1).Name);
+
+                ConfigProtectionContext missingExtensionContext = new ConfigProtectionContext(
+                    ConfigProtectionMode.EncryptedAndAuthenticated,
+                    "Config/Item",
+                    ConfigPayloadType.Single,
+                    ConfigPayloadFormat.BinarySingleTable);
+                Assert.Throws<RFrameworkException>(() =>
+                    module.LoadConfig<TestConfigRow>(single, missingExtensionContext));
 
                 byte[] bundle = bundleContext.Protect(
                     protector,

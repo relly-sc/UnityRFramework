@@ -22,10 +22,6 @@ namespace UnityRFramework.Editor
         /// <summary>Config 使用 CSV 核心工具或可选 Excel 扩展工具。</summary>
         public ConfigExportTool ExportTool = ConfigExportTool.Csv;
 
-        /// <summary>是否保留 JSON 产物。</summary>
-        [Tooltip("是否保留 JSON 产物。")]
-        public bool ExportJson = true;
-
         /// <summary>是否执行正式发布配置泄漏检查。</summary>
         [Tooltip("检查被 Player、Resources、StreamingAssets 或 YooAsset 收集的开发配置和密钥文件。")]
         public bool ReleaseLeakCheck = true;
