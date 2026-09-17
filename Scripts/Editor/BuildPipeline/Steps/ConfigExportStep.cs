@@ -124,6 +124,16 @@ namespace UnityRFramework.Editor
                     StepGroup));
             }
 
+            if (settings.ExportJson
+                && options.ConfigReleaseFormat == ConfigReleaseDataFormat.FrameworkBinary)
+            {
+                issues.Add(BuildValidationIssue.Warning(
+                    StepCode,
+                    "当前同时保留开发 JSON 和框架二进制。运行时加载 Config/Json 时使用 "
+                    + "JsonConfigHelper；加载 Config/Binary/*.bytes 时使用 BinaryConfigHelper。",
+                    StepGroup));
+            }
+
             try
             {
                 ConfigProtectionExporter.Create(options, null);

@@ -70,7 +70,7 @@ namespace UnityRFramework.Editor
                     options.ConfigBundleName);
             }
             options.ConfigReleaseFormat = (ConfigReleaseDataFormat)EditorGUILayout.Popup(
-                "正式数据格式",
+                "Binary .bytes 内容格式",
                 (int)options.ConfigReleaseFormat,
                 new[] { "框架二进制", "JSON 内容（仍输出 .bytes）" });
             options.ConfigBinaryProtection = (RFramework.ConfigProtectionMode)
