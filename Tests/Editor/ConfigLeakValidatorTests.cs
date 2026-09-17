@@ -31,7 +31,7 @@ namespace UnityRFramework.Editor.Tests
             DeleteTestAssets();
         }
 
-        /// <summary>正式构建发现开发 JSON、配置源和私钥文件时必须报告错误及路径。</summary>
+        /// <summary>正式构建发现配置源和私钥文件时必须报告错误及路径，但允许 Config JSON。</summary>
         [Test]
         public void ReleaseBuildReportsIncludedConfigLeaksAsErrors()
         {
@@ -47,9 +47,8 @@ namespace UnityRFramework.Editor.Tests
                 fixture.Profile.Recipe = BuildRecipe.Player;
                 List<BuildValidationIssue> issues = RunValidator(fixture);
 
-                Assert.That(issues, Has.Some.Matches<BuildValidationIssue>(
-                    issue => issue.Level == BuildValidationLevel.Error
-                        && issue.Message.Contains("Item.json")));
+                Assert.That(issues, Has.None.Matches<BuildValidationIssue>(
+                    issue => issue.Message.Contains("Item.json")));
                 Assert.That(issues, Has.Some.Matches<BuildValidationIssue>(
                     issue => issue.Message.Contains("Item.csv")));
                 Assert.That(issues, Has.Some.Matches<BuildValidationIssue>(
@@ -59,7 +58,7 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
-        /// <summary>Development Build 仍报告证据，但不得因泄漏检查阻止构建。</summary>
+        /// <summary>Development Build 允许 Config JSON，且不因 JSON 产生泄漏错误。</summary>
         [Test]
         public void DevelopmentBuildReportsIncludedConfigLeaksAsWarnings()
         {
@@ -70,22 +69,21 @@ namespace UnityRFramework.Editor.Tests
                 fixture.Profile.Recipe = BuildRecipe.Player;
                 List<BuildValidationIssue> issues = RunValidator(fixture);
 
-                Assert.That(issues, Has.Some.Matches<BuildValidationIssue>(
-                    issue => issue.Level == BuildValidationLevel.Warning
-                        && issue.Message.Contains("Item.json")));
+                Assert.That(issues, Has.None.Matches<BuildValidationIssue>(
+                    issue => issue.Message.Contains("Item.json")));
                 Assert.That(issues, Has.None.Matches<BuildValidationIssue>(
                     issue => issue.Level == BuildValidationLevel.Error));
             }
         }
 
-        /// <summary>白名单目录只排除目录内文件，不影响其他泄漏证据。</summary>
+        /// <summary>Config JSON 不需要白名单，配置源和密钥仍由泄漏校验负责。</summary>
         [Test]
         public void AllowedPathExcludesOnlyMatchingLeak()
         {
             string allowedPath = ConfigOutput + "/Json/Allowed.json";
-            string blockedPath = ConfigOutput + "/Json/Blocked.json";
+            string blockedPath = ConfigSource + "/Blocked.csv";
             CreateAsset(allowedPath, "{\"allowed\":true}");
-            CreateAsset(blockedPath, "{\"blocked\":true}");
+            CreateAsset(blockedPath, "id,name\n1,blocked");
 
             using (ValidationFixture fixture = CreateFixture(false))
             {
@@ -96,13 +94,13 @@ namespace UnityRFramework.Editor.Tests
                 Assert.That(issues, Has.None.Matches<BuildValidationIssue>(
                     issue => issue.Message.Contains("Allowed.json")));
                 Assert.That(issues, Has.Some.Matches<BuildValidationIssue>(
-                    issue => issue.Message.Contains("Blocked.json")));
+                    issue => issue.Message.Contains("Blocked.csv")));
             }
         }
 
-        /// <summary>当前 Recipe 会先清理开发 JSON 时，不应在清理步骤前阻断构建。</summary>
+        /// <summary>Release Recipe 保留并允许 Config JSON。</summary>
         [Test]
-        public void ReleaseRecipeIgnoresJsonThatConfigStepWillRemove()
+        public void ReleaseRecipeKeepsConfigJsonAllowed()
         {
             CreateAsset(ConfigOutput + "/Json/Generated.json", "{\"generated\":true}");
 
@@ -116,9 +114,9 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
-        /// <summary>只构建 Player 不执行 Config 清理时，必须报告已有开发 JSON 残留。</summary>
+        /// <summary>只构建 Player 时也允许已有 Config JSON。</summary>
         [Test]
-        public void PlayerRecipeReportsJsonBecauseConfigStepWillNotRun()
+        public void PlayerRecipeKeepsConfigJsonAllowed()
         {
             CreateAsset(ConfigOutput + "/Json/Stale.json", "{\"stale\":true}");
 
@@ -127,9 +125,8 @@ namespace UnityRFramework.Editor.Tests
                 fixture.Profile.Recipe = BuildRecipe.Player;
                 List<BuildValidationIssue> issues = RunValidator(fixture);
 
-                Assert.That(issues, Has.Some.Matches<BuildValidationIssue>(
-                    issue => issue.Level == BuildValidationLevel.Error
-                        && issue.Message.Contains("Stale.json")));
+                Assert.That(issues, Has.None.Matches<BuildValidationIssue>(
+                    issue => issue.Message.Contains("Stale.json")));
             }
         }
 

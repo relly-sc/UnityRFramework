@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace UnityRFramework.Editor
 {
-    /// <summary>检查正式产物是否包含开发配置源、开发 JSON 或密钥文件。</summary>
+    /// <summary>检查正式产物是否包含配置源或密钥文件。</summary>
     public sealed class ConfigLeakValidator : IBuildValidator
     {
         private const string Code = "CONFIG_LEAK";
@@ -93,21 +93,12 @@ namespace UnityRFramework.Editor
                 ".key", ".pem", ".p12", ".pfx", ".jks", ".keystore", ".env"
             };
 
-        private static readonly HashSet<string> DevelopmentManifestNames =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "UnityRFramework.ConfigCode.manifest",
-                "UnityRFramework.ConfigJson.manifest",
-                "UnityRFramework.LocalizationJson.manifest"
-            };
-
         internal static ConfigLeakScanResult Scan(
             BuildValidationContext context,
             ConfigExportBuildConfiguration settings)
         {
             ConfigLeakScanResult result = new ConfigLeakScanResult();
             ConfigPipelineOptions options = settings.Options ?? new ConfigPipelineOptions();
-            bool generatedJsonWillBeRemoved = WillRemoveGeneratedJson(context);
             HashSet<string> includedPaths = CollectIncludedAssetPaths(context, result.Warnings);
             HashSet<string> reportedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -118,11 +109,7 @@ namespace UnityRFramework.Editor
                     || !IsProjectAsset(path)
                     || AssetDatabase.IsValidFolder(path)
                     || IsAllowed(path, settings.LeakCheckAllowedPaths)
-                    || !TryGetLeakReason(
-                        path,
-                        options,
-                        generatedJsonWillBeRemoved,
-                        out string reason)
+                    || !TryGetLeakReason(path, options, out string reason)
                     || !reportedPaths.Add(path))
                 {
                     continue;
@@ -317,7 +304,6 @@ namespace UnityRFramework.Editor
         private static bool TryGetLeakReason(
             string path,
             ConfigPipelineOptions options,
-            bool generatedJsonWillBeRemoved,
             out string reason)
         {
             string extension = Path.GetExtension(path);
@@ -333,40 +319,7 @@ namespace UnityRFramework.Editor
                 return true;
             }
 
-            if (!generatedJsonWillBeRemoved && IsDevelopmentOutput(path, options))
-            {
-                reason = "检测到开发 JSON 或开发 manifest 进入构建内容";
-                return true;
-            }
-
-            if (DevelopmentManifestNames.Contains(Path.GetFileName(path)))
-            {
-                reason = "检测到开发 manifest 进入构建内容";
-                return true;
-            }
-
             reason = string.Empty;
-            return false;
-        }
-
-        private static bool WillRemoveGeneratedJson(BuildValidationContext context)
-        {
-            BuildRecipePlan plan = BuildRecipePlanner.Create(
-                context.Profile,
-                recipeOverride: context.Recipe);
-            if (!plan.IsValid)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < plan.StepIds.Count; i++)
-            {
-                if (string.Equals(plan.StepIds[i], "config", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
             return false;
         }
 
@@ -379,21 +332,6 @@ namespace UnityRFramework.Editor
             return sourceExtension
                 && (IsWithin(path, options.ConfigSourceDirectory)
                     || IsWithin(path, options.LocalizationSourceDirectory));
-        }
-
-        private static bool IsDevelopmentOutput(string path, ConfigPipelineOptions options)
-        {
-            string configJsonRoot = CombineAssetPath(options.ConfigOutputDirectory, "Json");
-            string localizationJsonRoot = CombineAssetPath(
-                options.LocalizationOutputDirectory,
-                "Json");
-            if (!IsWithin(path, configJsonRoot) && !IsWithin(path, localizationJsonRoot))
-            {
-                return false;
-            }
-
-            return Path.GetExtension(path).Equals(".json", StringComparison.OrdinalIgnoreCase)
-                || DevelopmentManifestNames.Contains(Path.GetFileName(path));
         }
 
         private static bool ContainsPrivateKeyMarker(string assetPath)
@@ -474,11 +412,6 @@ namespace UnityRFramework.Editor
                 || normalizedPath.StartsWith(
                     normalizedRoot + "/",
                     StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static string CombineAssetPath(string left, string right)
-        {
-            return NormalizeAssetPath(left).TrimEnd('/') + "/" + right.TrimStart('/');
         }
 
         private static string NormalizeAssetPath(string path)
