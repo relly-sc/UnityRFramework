@@ -38,8 +38,12 @@ namespace UnityRFramework.Runtime
         private string configKeyId = "config-v1";
 
         [SerializeField]
-        [Tooltip("可选。由配置表工具生成的 configKey.bytes；仅用于 Config 简单离线防护。")]
+        [Tooltip("可选。由配置表工具生成的 ConfigKey.bytes；仅用于 Config 简单离线防护。")]
         private TextAsset configKeyFile;
+
+        [SerializeField]
+        [Tooltip("加密认证使用的资源路径前缀，必须与导出端一致。YooAsset 使用短地址时会自动补全此前缀。")]
+        private string protectionSourceRoot = "Config/Binary";
 
         [SerializeField]
         [Tooltip("单表解密后交给当前 Config Helper 的数据格式。")]
@@ -202,7 +206,7 @@ namespace UnityRFramework.Runtime
                     EnsureRegisteredDataProtector();
                     ConfigProtectionContext context = new ConfigProtectionContext(
                         protectionMode,
-                        assetPath,
+                        BuildProtectionSource(assetPath),
                         ConfigPayloadType.Single,
                         protectedSingleTableFormat);
                     configModule.LoadConfig<T>(bytes, context);
@@ -267,7 +271,7 @@ namespace UnityRFramework.Runtime
                     EnsureRegisteredDataProtector();
                     ConfigProtectionContext context = new ConfigProtectionContext(
                         protectionMode,
-                        assetPath,
+                        BuildProtectionSource(assetPath),
                         ConfigPayloadType.Bundle,
                         protectedTableBundleFormat);
                     configModule.LoadConfigBundle(bytes, context);
@@ -301,6 +305,29 @@ namespace UnityRFramework.Runtime
 
             throw new RFrameworkException(
                 "ConfigComponent: protected config requires a Config key file or an explicit data protector.");
+        }
+
+        private string BuildProtectionSource(string assetPath)
+        {
+            string source = assetPath.Replace('\\', '/').Trim('/');
+            string root = protectionSourceRoot?.Trim().Replace('\\', '/').Trim('/');
+            if (string.IsNullOrEmpty(System.IO.Path.GetExtension(source)))
+            {
+                source += ".bytes";
+            }
+
+            if (string.IsNullOrEmpty(root))
+            {
+                return source;
+            }
+
+            if (source.StartsWith(root + "/", StringComparison.Ordinal))
+            {
+                return source;
+            }
+
+            string fileName = source.Substring(source.LastIndexOf('/') + 1);
+            return root + "/" + fileName;
         }
 
         /// <summary>

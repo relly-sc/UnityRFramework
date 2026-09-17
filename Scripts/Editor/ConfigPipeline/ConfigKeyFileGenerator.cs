@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// <summary>生成 Config 简单偏移混淆密钥文件。</summary>
     public static class ConfigKeyFileGenerator
     {
-        public const string DefaultPath = "Assets/ConfigSource/configKey.bytes";
+        public const string DefaultPath = "Assets/ConfigSource/ConfigKey.bytes";
 
         [MenuItem("UnityRFramework/配置表工具/生成 Config 密钥文件")]
         public static void GenerateDefault()

@@ -44,6 +44,7 @@ namespace UnityRFramework.Editor.Tests
 
             using (ValidationFixture fixture = CreateFixture(false))
             {
+                fixture.Profile.Recipe = BuildRecipe.Player;
                 List<BuildValidationIssue> issues = RunValidator(fixture);
 
                 Assert.That(issues, Has.Some.Matches<BuildValidationIssue>(
@@ -66,6 +67,7 @@ namespace UnityRFramework.Editor.Tests
 
             using (ValidationFixture fixture = CreateFixture(true))
             {
+                fixture.Profile.Recipe = BuildRecipe.Player;
                 List<BuildValidationIssue> issues = RunValidator(fixture);
 
                 Assert.That(issues, Has.Some.Matches<BuildValidationIssue>(
@@ -87,6 +89,7 @@ namespace UnityRFramework.Editor.Tests
 
             using (ValidationFixture fixture = CreateFixture(false))
             {
+                fixture.Profile.Recipe = BuildRecipe.Player;
                 AddAllowedPath(fixture.Configuration, allowedPath);
                 List<BuildValidationIssue> issues = RunValidator(fixture);
 
@@ -105,7 +108,6 @@ namespace UnityRFramework.Editor.Tests
 
             using (ValidationFixture fixture = CreateFixture(false))
             {
-                fixture.Configuration.ExportJson = false;
                 fixture.Profile.Recipe = BuildRecipe.Release;
                 List<BuildValidationIssue> issues = RunValidator(fixture);
 
@@ -114,7 +116,7 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
-        /// <summary>只构建 Player 不执行 Config 清理时，关闭 JSON 导出也必须报告已有残留。</summary>
+        /// <summary>只构建 Player 不执行 Config 清理时，必须报告已有开发 JSON 残留。</summary>
         [Test]
         public void PlayerRecipeReportsJsonBecauseConfigStepWillNotRun()
         {
@@ -122,7 +124,6 @@ namespace UnityRFramework.Editor.Tests
 
             using (ValidationFixture fixture = CreateFixture(false))
             {
-                fixture.Configuration.ExportJson = false;
                 fixture.Profile.Recipe = BuildRecipe.Player;
                 List<BuildValidationIssue> issues = RunValidator(fixture);
 

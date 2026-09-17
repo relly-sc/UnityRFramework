@@ -48,7 +48,7 @@ namespace UnityRFramework.Editor
         public string ConfigProtectionKeyId = "config-v1";
 
         /// <summary>由配置表工具生成的偏移混淆密钥文件。</summary>
-        public string ConfigProtectionKeyFile = "Assets/ConfigSource/configKey.bytes";
+        public string ConfigProtectionKeyFile = "Assets/ConfigSource/ConfigKey.bytes";
 
         /// <summary>运行时传给 LoadConfigAsync 的加载路径前缀。</summary>
         public string ConfigProtectionSourceRoot = "Config/Binary";

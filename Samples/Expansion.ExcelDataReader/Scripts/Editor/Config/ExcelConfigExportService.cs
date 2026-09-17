@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using RFramework;
 using UnityEditor;
 using UnityEngine;
@@ -68,7 +69,7 @@ namespace UnityRFramework.Expansion
                     ConfigProtectionKeyId = options.ConfigProtectionKeyId,
                     ConfigProtectionKeyFile = options.ConfigProtectionKeyFile,
                     ConfigProtectionSourceRoot = options.ConfigProtectionSourceRoot,
-                    ConfigReleaseFormat = ConfigReleaseDataFormat.FrameworkBinary
+                    ConfigReleaseFormat = options.ConfigReleaseFormat
                 },
                 null);
             for (int exporterIndex = 0;
@@ -106,13 +107,45 @@ namespace UnityRFramework.Expansion
 
                     bool isBinary = output.RelativePath.StartsWith(
                         "Binary/", StringComparison.OrdinalIgnoreCase);
+                    byte[] releaseData = output.Data;
+                    ConfigPayloadFormat releaseFormat =
+                        ConfigPayloadFormat.BinarySingleTable;
+                    if (isBinary
+                        && options.ConfigReleaseFormat
+                            == ConfigReleaseDataFormat.JsonContent)
+                    {
+                        string segmentName = Path.GetFileNameWithoutExtension(
+                            output.RelativePath);
+                        ConfigTableSchema schema = null;
+                        for (int schemaIndex = 0; schemaIndex < schemas.Count; schemaIndex++)
+                        {
+                            if (string.Equals(
+                                schemas[schemaIndex].SegmentName,
+                                segmentName,
+                                StringComparison.OrdinalIgnoreCase))
+                            {
+                                schema = schemas[schemaIndex];
+                                break;
+                            }
+                        }
+
+                        if (schema == null)
+                        {
+                            throw new RFrameworkException(
+                                $"Excel config schema '{segmentName}' was not found.");
+                        }
+
+                        releaseData = Encoding.UTF8.GetBytes(
+                            ConfigJsonExporter.Build(schema));
+                        releaseFormat = ConfigPayloadFormat.Json;
+                    }
                     bool written = isBinary
                         ? protection.WriteBytesIfChanged(
                             outputPath,
                             Path.GetFileName(outputPath),
                             ConfigPayloadType.Single,
-                            ConfigPayloadFormat.BinarySingleTable,
-                            output.Data)
+                            releaseFormat,
+                            releaseData)
                         : ExcelExportUtility.WriteBytesIfChanged(outputPath, output.Data);
                     if (written)
                     {

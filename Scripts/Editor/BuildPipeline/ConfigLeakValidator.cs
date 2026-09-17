@@ -107,7 +107,7 @@ namespace UnityRFramework.Editor
         {
             ConfigLeakScanResult result = new ConfigLeakScanResult();
             ConfigPipelineOptions options = settings.Options ?? new ConfigPipelineOptions();
-            bool generatedJsonWillBeRemoved = WillRemoveGeneratedJson(context, settings);
+            bool generatedJsonWillBeRemoved = WillRemoveGeneratedJson(context);
             HashSet<string> includedPaths = CollectIncludedAssetPaths(context, result.Warnings);
             HashSet<string> reportedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -349,15 +349,8 @@ namespace UnityRFramework.Editor
             return false;
         }
 
-        private static bool WillRemoveGeneratedJson(
-            BuildValidationContext context,
-            ConfigExportBuildConfiguration settings)
+        private static bool WillRemoveGeneratedJson(BuildValidationContext context)
         {
-            if (settings.ExportJson)
-            {
-                return false;
-            }
-
             BuildRecipePlan plan = BuildRecipePlanner.Create(
                 context.Profile,
                 recipeOverride: context.Recipe);

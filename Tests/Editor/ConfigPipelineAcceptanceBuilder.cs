@@ -22,7 +22,7 @@ namespace UnityRFramework.Editor
         private const string FrameworkPrefabPath =
             "Assets/UnityRFramework/Prefabs/UnityRFramework.prefab";
         private const string KeyFilePath =
-            "Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance/Resources/configKey.bytes";
+            "Assets/UnityRFramework/Tests/Runtime/ConfigPipelineAcceptance/Resources/ConfigKey.bytes";
 
         [MenuItem("UnityRFramework/Tests/Export ConfigPipeline Acceptance Data")]
         public static void ExportData()
