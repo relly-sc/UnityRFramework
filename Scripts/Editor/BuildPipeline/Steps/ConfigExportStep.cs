@@ -10,14 +10,11 @@ namespace UnityRFramework.Editor
     /// <summary>
     /// Config 配置导出步骤：复用 ConfigPipelineService 全量导出 Config 与 Localization。
     /// 从步骤条目绑定的 <see cref="ConfigExportBuildConfiguration"/> 读取导出路径与格式；
-    /// 导出完成后清除输出目录的开发 Json 子目录（带边界校验），
+    /// Config 和 Localization 的 JSON、二进制内容都保留，由对应 Helper 决定运行时读取格式。
     /// 正式内容格式由 ConfigReleaseFormat 决定。导出失败立即停止，不使用旧配置产物继续构建。
     /// </summary>
     public sealed class ConfigExportStep : BuildPipelineStepBase
     {
-        /// <summary>Json 子目录名，与 ConfigPipelineService 输出结构保持一致。</summary>
-        private const string JsonFolderName = "Json";
-
         /// <summary>错误码：配置导出步骤。</summary>
         private const string StepCode = "CONFIG";
 
@@ -163,8 +160,6 @@ namespace UnityRFramework.Editor
 
             try
             {
-                ClearJsonOutputs(options);
-
                 int configWritten;
                 ConfigPipelineReport localizationReport;
                 if (settings.ExportTool == ConfigExportTool.Excel)
@@ -182,10 +177,8 @@ namespace UnityRFramework.Editor
                 int writtenCount = configWritten
                     + (localizationReport?.WrittenFileCount ?? 0);
 
-                int removedCount = ClearJsonOutputs(options);
                 return BuildStepResult.Succeeded(
-                    $"Config/Localization 导出完成：{writtenCount} 个文件变更，"
-                    + $"清除开发 JSON {removedCount} 个文件。");
+                    $"Config/Localization 导出完成：{writtenCount} 个文件变更，JSON 与二进制内容均已保留。");
             }
             catch (Exception exception)
             {
@@ -223,93 +216,6 @@ namespace UnityRFramework.Editor
             }
 
             return (int)method.Invoke(null, new object[] { options });
-        }
-
-        /// <summary>
-        /// 清除 Config 与 Localization 输出目录的 Json 子目录内容（带边界校验）。
-        /// </summary>
-        /// <param name="options">导出选项。</param>
-        /// <returns>删除的文件数量。</returns>
-        private static int ClearJsonOutputs(ConfigPipelineOptions options)
-        {
-            int removedCount = 0;
-            removedCount += ClearJsonDirectory(options.ConfigOutputDirectory);
-            removedCount += ClearJsonDirectory(options.LocalizationOutputDirectory);
-            return removedCount;
-        }
-
-        /// <summary>
-        /// 清除单个输出目录的 Json 子目录内容。
-        /// 先解析绝对路径并确认位于 Assets 目录内，防止路径穿越删除工程文件。
-        /// </summary>
-        /// <param name="outputDirectory">Assets 相对输出目录。</param>
-        /// <returns>删除的文件数量；目录不存在或越界时返回 0。</returns>
-        private static int ClearJsonDirectory(string outputDirectory)
-        {
-            string jsonDirectory = ResolveJsonDirectory(outputDirectory);
-            if (string.IsNullOrEmpty(jsonDirectory) || !Directory.Exists(jsonDirectory))
-            {
-                return 0;
-            }
-
-            string assetsRoot = Path.GetFullPath(Application.dataPath);
-            if (!IsWithin(jsonDirectory, assetsRoot))
-            {
-                Debug.Log(
-                    $"ConfigExportStep: Json 目录越界，跳过清理：{jsonDirectory}");
-                return 0;
-            }
-
-            int removedCount = 0;
-            string[] files = Directory.GetFiles(
-                jsonDirectory,
-                "*",
-                SearchOption.AllDirectories);
-            for (int i = 0; i < files.Length; i++)
-            {
-                string file = files[i];
-                if (!IsWithin(file, jsonDirectory))
-                {
-                    continue;
-                }
-
-                File.Delete(file);
-                removedCount++;
-            }
-
-            return removedCount;
-        }
-
-        /// <summary>
-        /// 将 Assets 相对输出目录解析为 Json 子目录的绝对路径。
-        /// </summary>
-        /// <param name="outputDirectory">Assets 相对输出目录。</param>
-        /// <returns>Json 子目录绝对路径；路径非法时返回空字符串。</returns>
-        private static string ResolveJsonDirectory(string outputDirectory)
-        {
-            if (string.IsNullOrWhiteSpace(outputDirectory))
-            {
-                return string.Empty;
-            }
-
-            if (!outputDirectory.Equals("Assets", StringComparison.Ordinal)
-                && !outputDirectory.StartsWith(
-                    "Assets/",
-                    StringComparison.Ordinal))
-            {
-                return string.Empty;
-            }
-
-            string projectRoot = Directory.GetParent(Application.dataPath)?.FullName;
-            if (string.IsNullOrEmpty(projectRoot))
-            {
-                return string.Empty;
-            }
-
-            string fullPath = Path.GetFullPath(Path.Combine(
-                projectRoot,
-                outputDirectory.Replace('/', Path.DirectorySeparatorChar)));
-            return Path.Combine(fullPath, JsonFolderName);
         }
 
         /// <summary>
