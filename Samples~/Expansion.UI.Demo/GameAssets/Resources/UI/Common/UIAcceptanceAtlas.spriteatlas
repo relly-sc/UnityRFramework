@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: UIAcceptanceAtlas
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 2
+      anisoLevel: 1
+      compressionQuality: 50
+      maxTextureSize: 2048
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      sRGB: 1
+    platformSettings: []
+    packingSettings:
+      serializedVersion: 2
+      padding: 4
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 2800000, guid: 22042447e46aca74d9b51360a9c72e08, type: 3}
+    - {fileID: 2800000, guid: 458fc6c65228ca942bf3e1ac9e001836, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys:
+    - 458fc6c65228ca942bf3e1ac9e001836: 21300000
+    - 22042447e46aca74d9b51360a9c72e08: 21300000
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites:
+  - {fileID: 21300000, guid: 458fc6c65228ca942bf3e1ac9e001836, type: 3}
+  - {fileID: 21300000, guid: 22042447e46aca74d9b51360a9c72e08, type: 3}
+  m_PackedSpriteNamesToIndex:
+  - 01_warrior_portrait
+  - 02_mage_portrait
+  m_RenderDataMap: {}
+  m_Tag: UIAcceptanceAtlas
+  m_IsVariant: 0

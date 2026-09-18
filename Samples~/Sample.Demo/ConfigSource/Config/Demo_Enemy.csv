@@ -1,0 +1,5 @@
+Id,NameKey,BaseAtk,BaseDef,BaseHp
+int,string,int,int,int
+主键ID（唯一标识）,名称本地化键,基础攻击力,基础防御力,基础生命值
+1,enemy_slime,13,4,72
+2,enemy_abyss_guardian,23,8,124

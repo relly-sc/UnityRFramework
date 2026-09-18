@@ -1,0 +1,6 @@
+formatVersion=1
+protectionMode=EncryptedAndAuthenticated
+envelopeVersion=1
+keyId=config-v1
+releaseFormat=FrameworkBinary
+sourceRoot=Config/Binary

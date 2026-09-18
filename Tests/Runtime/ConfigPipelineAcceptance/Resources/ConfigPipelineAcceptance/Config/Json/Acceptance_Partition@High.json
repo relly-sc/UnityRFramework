@@ -1,0 +1,15 @@
+{
+  "Tables": {
+    "Acceptance_Partition@High": {
+      "TableId": "16B1E71D",
+      "SchemaHash": "079D32FA28B51355",
+      "Rows": [
+        {
+          "Id": 2000,
+          "NameKey": "acceptance_partition_high",
+          "Power": 20
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,34 @@
+using System.Collections.Generic;
+
+namespace UnityRFramework.Editor
+{
+    /// <summary>
+    /// Config 表中的单个字段定义。
+    /// </summary>
+    public sealed class ConfigFieldSchema
+    {
+        /// <summary>获取或设置字段名称。</summary>
+        public string Name { get; set; }
+
+        /// <summary>获取或设置 CSV 中的规范化类型关键字。</summary>
+        public string TypeKeyword { get; set; }
+
+        /// <summary>获取或设置生成代码使用的 C# 类型名称。</summary>
+        public string CSharpTypeName { get; set; }
+
+        /// <summary>获取或设置字段注释。</summary>
+        public string Comment { get; set; }
+
+        /// <summary>获取或设置字段类型。</summary>
+        public ConfigFieldKind Kind { get; set; }
+
+        /// <summary>获取或设置数组/List 的元素类型。</summary>
+        public ConfigFieldKind ElementKind { get; set; }
+
+        /// <summary>获取或设置枚举字段的成员定义。</summary>
+        public IReadOnlyList<ConfigEnumValueSchema> EnumValues { get; set; }
+
+        /// <summary>获取或设置自定义字段 Codec 的 Schema 版本。</summary>
+        public uint CustomCodecSchemaVersion { get; set; }
+    }
+}

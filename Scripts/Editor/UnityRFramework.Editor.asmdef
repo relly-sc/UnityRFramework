@@ -1,0 +1,19 @@
+{
+    "name": "UnityRFramework.Editor",
+    "rootNamespace": "UnityRFramework.Editor",
+    "references": [
+        "UnityRFramework.Runtime",
+        "RFramework.Library"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
