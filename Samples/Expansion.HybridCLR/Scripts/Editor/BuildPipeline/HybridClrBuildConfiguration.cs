@@ -1,3 +1,6 @@
+using System;
+using System.Linq;
+using UnityEditor;
 using UnityEngine;
 
 namespace UnityRFramework.Editor
@@ -7,6 +10,11 @@ namespace UnityRFramework.Editor
     /// </summary>
     public sealed class HybridClrBuildConfiguration : ScriptableObject
     {
+        private const string DemoOutputSuffix =
+            "/Expansion.HybridCLR.Demo/GameAssets/HotUpdate";
+        private const string DemoBuilderSuffix =
+            "/Expansion.HybridCLR.Demo/Scripts/Editor/ExpansionHybridCLRDemoBuilder.cs";
+
         [Tooltip("热更产物输出根目录。")]
         public string OutputAssetRoot = "Assets/GameAssets/HotUpdate";
 
@@ -19,5 +27,49 @@ namespace UnityRFramework.Editor
         [Tooltip("是否包含 Portable PDB。")]
         public bool IncludePdb;
 
+        private void OnEnable()
+        {
+            TryMigrateOfficialDemoPath();
+        }
+
+        internal bool TryMigrateOfficialDemoPath()
+        {
+            string current = NormalizePath(OutputAssetRoot);
+            if (AssetDatabase.IsValidFolder(current)
+                || !current.EndsWith(
+                    DemoOutputSuffix,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string[] candidates = AssetDatabase
+                .FindAssets("ExpansionHybridCLRDemoBuilder t:MonoScript")
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Where(path => path.EndsWith(
+                    DemoBuilderSuffix,
+                    StringComparison.OrdinalIgnoreCase))
+                .Select(path => path.Substring(
+                    0,
+                    path.Length - DemoBuilderSuffix.Length) + DemoOutputSuffix)
+                .Where(AssetDatabase.IsValidFolder)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (candidates.Length != 1)
+            {
+                return false;
+            }
+
+            OutputAssetRoot = candidates[0];
+            EditorUtility.SetDirty(this);
+            return true;
+        }
+
+        private static string NormalizePath(string path)
+        {
+            return string.IsNullOrWhiteSpace(path)
+                ? string.Empty
+                : path.Trim().Replace('\\', '/').TrimEnd('/');
+        }
     }
 }
