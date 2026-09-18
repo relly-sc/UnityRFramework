@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 
 namespace UnityRFramework.Editor.Tests
@@ -190,6 +191,41 @@ namespace UnityRFramework.Editor.Tests
                     "IncludePdb"
                 },
                 Array.ConvertAll(fields, field => field.Name));
+        }
+
+        [Test]
+        public void HybridClrConfiguration_MigratesMissingOfficialDemoVersionPath()
+        {
+            IBuildPipelineStep step = FindStep("hybridclr");
+            ScriptableObject configuration =
+                ScriptableObject.CreateInstance(step.ConfigurationType);
+            try
+            {
+                FieldInfo outputRoot = step.ConfigurationType.GetField(
+                    "OutputAssetRoot",
+                    BindingFlags.Instance | BindingFlags.Public);
+                outputRoot.SetValue(
+                    configuration,
+                    "Assets/Samples/UnityRFramework/1.2.0/"
+                    + "Expansion.HybridCLR.Demo/GameAssets/HotUpdate");
+                MethodInfo migrate = step.ConfigurationType.GetMethod(
+                    "TryMigrateOfficialDemoPath",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+
+                Assert.That(migrate.Invoke(configuration, null), Is.True);
+                string migratedPath = (string)outputRoot.GetValue(configuration);
+                Assert.That(
+                    AssetDatabase.IsValidFolder(migratedPath),
+                    Is.True);
+                Assert.That(
+                    migratedPath,
+                    Does.EndWith(
+                        "/Expansion.HybridCLR.Demo/GameAssets/HotUpdate"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(configuration);
+            }
         }
 
         [Test]

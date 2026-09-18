@@ -205,6 +205,8 @@ namespace UnityRFramework.Editor
                 return;
             }
 
+            settings.TryMigrateOfficialDemoPath();
+
             if (string.IsNullOrWhiteSpace(settings.EntryTypeName))
             {
                 issues.Add(BuildValidationIssue.Error(
@@ -250,6 +252,8 @@ namespace UnityRFramework.Editor
                     "HybridCLR 步骤未绑定 HybridClrBuildConfiguration 配置资产。",
                     null);
             }
+
+            settings.TryMigrateOfficialDemoPath();
 
             if (string.IsNullOrWhiteSpace(settings.EntryTypeName))
             {
