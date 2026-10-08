@@ -72,7 +72,10 @@ def write_manifest(path: Path, manifest: dict) -> None:
 
 def build_core_package(output: Path, files: list[Path], source_manifest: dict) -> None:
     for relative_path in files:
-        if relative_path.name in {"Package.json", "Package.json.meta"}:
+        if relative_path == Path("Package.json"):
+            continue
+        if relative_path == Path("Package.json.meta"):
+            copy_file(relative_path, output, Path("package.json.meta"))
             continue
         if relative_path.parts[0] in EXCLUDED_CORE_ROOTS:
             continue
@@ -104,18 +107,20 @@ def build_samples_package(output: Path, files: list[Path], samples_manifest: dic
         target_path = Path("Samples~", *relative_path.parts[1:])
         copy_file(relative_path, output, target_path)
 
-    for shared_file in ("LICENSE", "LICENSE.meta", "THIRD-PARTY-NOTICES.md", "THIRD-PARTY-NOTICES.md.meta"):
+    for shared_file in ("LICENSE", "THIRD-PARTY-NOTICES.md"):
         source = ROOT / shared_file
         if source.is_file():
             copy_file(Path(shared_file), output)
 
     write_manifest(output / "package.json", samples_manifest)
-    (output / "README.md").write_text(
-        "# UnityRFramework Samples\n\n"
-        "UnityRFramework 官方示例、验收场景与可选扩展。请先安装相同版本的核心包，"
-        "再通过 Unity Package Manager 按需导入 Sample。\n",
-        encoding="utf-8",
-    )
+    shutil.copy2(ROOT / "Tools~" / "SamplesREADME.md", output / "README.md")
+    for template_name, output_name in (
+        ("SamplesPackage.json.meta", "package.json.meta"),
+        ("SamplesREADME.md.meta", "README.md.meta"),
+        ("SamplesLicense.meta", "LICENSE.meta"),
+        ("SamplesThirdPartyNotices.meta", "THIRD-PARTY-NOTICES.md.meta"),
+    ):
+        shutil.copy2(ROOT / "Tools~" / template_name, output / output_name)
 
 
 def main() -> None:
