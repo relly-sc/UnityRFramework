@@ -521,6 +521,35 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        [Test]
+        public void ConfigComponentTracksActiveHelperType()
+        {
+            RFrameworkModuleHost.StopAll();
+            GameObject owner = new GameObject("Config Helper Type Tests");
+            try
+            {
+                ConfigComponent component = owner.AddComponent<ConfigComponent>();
+                typeof(ConfigComponent).GetField(
+                        "configModule",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(component, RFrameworkModuleHost.Get<IConfigModule>());
+
+                JsonConfigHelper jsonHelper = owner.AddComponent<JsonConfigHelper>();
+                component.SetHelper(jsonHelper);
+                Assert.AreEqual(typeof(JsonConfigHelper), component.HelperType);
+
+                BinaryConfigHelper helper = owner.AddComponent<BinaryConfigHelper>();
+                component.SetHelper(helper);
+
+                Assert.AreEqual(typeof(BinaryConfigHelper), component.HelperType);
+            }
+            finally
+            {
+                RFrameworkModuleHost.StopAll();
+                Object.DestroyImmediate(owner);
+            }
+        }
+
         /// <summary>验证关闭保护时不需要保护器，也不复制输入数据。</summary>
         [Test]
         public void ConfigProtectionNoneReturnsOriginalBytes()

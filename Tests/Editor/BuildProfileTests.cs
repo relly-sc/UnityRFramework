@@ -69,6 +69,29 @@ namespace UnityRFramework.Editor.Tests
                 Has.Some.Contains("应用标识"));
         }
 
+        [Test]
+        public void CreateProfile_UsesCurrentProjectIdentity()
+        {
+            string name = "ProfileDefaults_" + Guid.NewGuid().ToString("N");
+            string path = $"{UnityRFrameworkBuildProfile.DefaultAssetDirectory}/{name}.asset";
+            try
+            {
+                UnityRFrameworkBuildProfile profile =
+                    BuildProfileEditorUtility.CreateProfile(name);
+
+                Assert.That(profile.Platform.CompanyName, Is.EqualTo(PlayerSettings.companyName));
+                Assert.That(profile.Platform.ProductName, Is.EqualTo(PlayerSettings.productName));
+                Assert.That(
+                    profile.Platform.ApplicationIdentifier,
+                    Is.EqualTo(PlayerSettings.GetApplicationIdentifier(
+                        BuildPipeline.GetBuildTargetGroup(profile.Platform.Target))));
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(path);
+            }
+        }
+
         /// <summary>
         /// 填齐合法配置后校验应无错误。
         /// </summary>
