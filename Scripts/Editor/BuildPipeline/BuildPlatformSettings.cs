@@ -184,13 +184,6 @@ namespace UnityRFramework.Editor
             {
                 errors.Add("公司名称不能为空。");
             }
-            else if (string.Equals(
-                         CompanyName,
-                         "DefaultCompany",
-                         StringComparison.Ordinal))
-            {
-                errors.Add("公司名称不能为 DefaultCompany，请填写实际公司名。");
-            }
 
             if (string.IsNullOrWhiteSpace(ProductName))
             {
