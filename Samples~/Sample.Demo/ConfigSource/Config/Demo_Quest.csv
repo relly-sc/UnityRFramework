@@ -1,0 +1,5 @@
+Id,NameKey,DescKey,EnemyId,Rounds,Difficulty,RewardExp,RewardGold
+int,string,string,int,int,int,int,int
+主键ID（唯一标识）,名称本地化键,描述本地化键,敌人配置ID,回合数量,难度等级,奖励经验,奖励金币
+1,quest_1_name,quest_1_desc,1,3,1,30,100
+2,quest_2_name,quest_2_desc,2,5,3,80,250

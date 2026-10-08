@@ -1,0 +1,9 @@
+<linker>
+  <!-- YooAsset creates its default file systems through reflection. -->
+  <assembly fullname="YooAsset">
+    <type fullname="YooAsset.BuiltinFileSystem" preserve="all" />
+    <type fullname="YooAsset.SandboxFileSystem" preserve="all" />
+    <type fullname="YooAsset.WebServerFileSystem" preserve="all" />
+    <type fullname="YooAsset.WebNetworkFileSystem" preserve="all" />
+  </assembly>
+</linker>
