@@ -222,6 +222,27 @@ namespace UnityRFramework.Editor.Tests
             Assert.That(groups, Does.Contain(BuildDiffGroup.Output));
         }
 
+        [Test]
+        public void AppendSceneEntry_ClearsCopiedSceneAndEnablesEntry()
+        {
+            UnityRFrameworkBuildProfile profile =
+                ScriptableObject.CreateInstance<UnityRFrameworkBuildProfile>();
+            profile.Scenes.Add(new BuildSceneEntry
+            {
+                Enabled = false
+            });
+            SerializedObject serializedObject = new SerializedObject(profile);
+            SerializedProperty scenes = serializedObject.FindProperty("Scenes");
+
+            BuildProfileParametersGUI.AppendSceneEntry(scenes);
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+
+            Assert.That(profile.Scenes, Has.Count.EqualTo(2));
+            Assert.That(profile.Scenes[0].Enabled, Is.False);
+            Assert.That(profile.Scenes[1].Scene, Is.Null);
+            Assert.That(profile.Scenes[1].Enabled, Is.True);
+        }
+
         /// <summary>
         /// 空 Profile 的差异计算返回空列表，不抛异常。
         /// </summary>

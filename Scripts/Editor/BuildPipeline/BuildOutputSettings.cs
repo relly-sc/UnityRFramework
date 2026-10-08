@@ -81,8 +81,7 @@ namespace UnityRFramework.Editor
 
         /// <summary>输出文件名模板，Windows 可执行文件与 Android 安装包使用。</summary>
         [Tooltip("输出文件名模板。")]
-        public string FileNameTemplate =
-            "{ProductName}-{Platform}-{Version}-{BuildNumber}";
+        public string FileNameTemplate = "{ProductName}";
 
         /// <summary>是否在构建前清理目标目录；清理只允许在输出根目录边界内执行。</summary>
         [Tooltip("是否在构建前清理目标目录。")]
