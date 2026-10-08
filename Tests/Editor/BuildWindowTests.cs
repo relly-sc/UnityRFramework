@@ -11,8 +11,8 @@ namespace UnityRFramework.Editor.Tests
     /// </summary>
     public sealed class BuildWindowTests
     {
-        /// <summary>测试使用的 EditorPrefs 键前缀，与 BuildWindowState 保持一致。</summary>
-        private const string KeyPrefix = "UnityRFramework.BuildWindow.";
+        /// <summary>测试使用当前项目专用的 EditorPrefs 键前缀。</summary>
+        private static string KeyPrefix => BuildWindowState.KeyPrefix;
 
         /// <summary>
         /// 每个用例前清理窗口状态键，避免用例间相互污染。
@@ -63,6 +63,16 @@ namespace UnityRFramework.Editor.Tests
             Assert.That(loaded.TabScrollPositions[2], Is.EqualTo(new Vector2(9f, 120f)));
             Assert.That(loaded.IsSectionFolded("Summary"), Is.True);
             Assert.That(loaded.IsSectionFolded("Diffs"), Is.False);
+        }
+
+        [Test]
+        public void WindowState_KeyPrefix_IsProjectScoped()
+        {
+            string first = BuildWindowState.CreateKeyPrefix("C:/Projects/First/Assets");
+            string second = BuildWindowState.CreateKeyPrefix("C:/Projects/Second/Assets");
+
+            Assert.That(first, Is.Not.EqualTo(second));
+            Assert.That(first, Does.StartWith("UnityRFramework.BuildWindow."));
         }
 
         private static void DeleteTabStateKeys()

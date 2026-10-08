@@ -1,5 +1,7 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
+using RFramework;
 using UnityRFramework.Runtime;
 
 namespace UnityRFramework.Sample
@@ -12,15 +14,39 @@ namespace UnityRFramework.Sample
     {
         /// <summary>
         /// 异步加载全部配置表。
-        /// 配置文件位于 StreamingAssets/Config/Binary/，经 LocalFileResourceHelper 加载为原始字节。
+        /// 根据 ConfigComponent 当前 Helper 自动读取对应的 JSON 或二进制产物。
         /// </summary>
         public static async Task LoadAllAsync(CancellationToken ct)
         {
-            await GameEntry.Config.LoadConfigAsync<Demo_CharacterConfig>("Config/Binary/Demo_Character.bytes", ct);
-            await GameEntry.Config.LoadConfigAsync<Demo_EnemyConfig>("Config/Binary/Demo_Enemy.bytes", ct);
-            await GameEntry.Config.LoadConfigAsync<Demo_QuestConfig>("Config/Binary/Demo_Quest.bytes", ct);
-            await GameEntry.Config.LoadConfigAsync<Demo_ActionConfig>("Config/Binary/Demo_Action.bytes", ct);
-            await GameEntry.Config.LoadConfigAsync<Demo_RewardConfig>("Config/Binary/Demo_Reward.bytes", ct);
+            string root;
+            string extension;
+            Type helperType = GameEntry.Config.HelperType;
+            if (helperType == typeof(JsonConfigHelper))
+            {
+                root = "Config/Json/";
+                extension = ".json";
+            }
+            else if (helperType == typeof(BinaryConfigHelper))
+            {
+                root = "Config/Binary/";
+                extension = ".bytes";
+            }
+            else
+            {
+                throw new RFrameworkException(
+                    $"DemoDataLoader: unsupported Config Helper '{helperType?.FullName ?? "null"}'.");
+            }
+
+            await GameEntry.Config.LoadConfigAsync<Demo_CharacterConfig>(
+                root + "Demo_Character" + extension, ct);
+            await GameEntry.Config.LoadConfigAsync<Demo_EnemyConfig>(
+                root + "Demo_Enemy" + extension, ct);
+            await GameEntry.Config.LoadConfigAsync<Demo_QuestConfig>(
+                root + "Demo_Quest" + extension, ct);
+            await GameEntry.Config.LoadConfigAsync<Demo_ActionConfig>(
+                root + "Demo_Action" + extension, ct);
+            await GameEntry.Config.LoadConfigAsync<Demo_RewardConfig>(
+                root + "Demo_Reward" + extension, ct);
             Log.Info("[Demo] Config: loaded {0} tables.", GameEntry.Config.ConfigCount);
         }
     }

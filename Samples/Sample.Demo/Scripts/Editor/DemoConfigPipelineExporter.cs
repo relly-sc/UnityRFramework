@@ -53,7 +53,7 @@ namespace UnityRFramework.Sample
                     SampleRoot + "/GameAssets/Resources/Config",
                 LocalizationOutputDirectory =
                     SampleRoot + "/GameAssets/Resources/Localization",
-                GeneratedNamespace = "Game.Config"
+                GeneratedNamespace = string.Empty
             };
 
             ConfigPipelineReport report = ConfigPipelineService.ExportAll(options);

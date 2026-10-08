@@ -57,7 +57,11 @@ namespace UnityRFramework.Runtime
         /// 配置模块引用，由 Awake 从 RFrameworkModuleHost 获取并缓存。
         /// </summary>
         private IConfigModule configModule;
+        private IConfigHelper configHelper;
         private bool hasExplicitDataProtector;
+
+        /// <summary>当前生效的配置辅助器类型；尚未完成初始化时为 null。</summary>
+        public Type HelperType => configHelper?.GetType();
 
         protected override void Awake()
         {
@@ -79,7 +83,7 @@ namespace UnityRFramework.Runtime
             {
                 helper.name = $"{helper.GetType().Name} (Config Helper)";
                 helper.transform.SetParent(transform);
-                configModule.SetHelper(helper);
+                SetHelper(helper);
             }
             else
             {
@@ -153,6 +157,7 @@ namespace UnityRFramework.Runtime
                 throw new RFrameworkException("ConfigComponent: helper is invalid.");
             }
 
+            configHelper = helper;
             configModule.SetHelper(helper);
         }
 

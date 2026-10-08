@@ -12,23 +12,33 @@ namespace UnityRFramework.Editor
     /// </summary>
     public sealed class BuildWindowState
     {
-        /// <summary>EditorPrefs 键前缀，避免与其他工具冲突。</summary>
-        private const string KeyPrefix = "UnityRFramework.BuildWindow.";
+        /// <summary>当前项目专用的 EditorPrefs 键前缀，避免不同项目串用窗口状态。</summary>
+        internal static string KeyPrefix => CreateKeyPrefix(Application.dataPath);
 
         /// <summary>上次选中 Profile GUID 的 EditorPrefs 键。</summary>
-        private const string ProfileGuidKey = KeyPrefix + "ProfileGuid";
+        private static string ProfileGuidKey => KeyPrefix + "ProfileGuid";
 
         /// <summary>当前页签的 EditorPrefs 键。</summary>
-        private const string SelectedTabKey = KeyPrefix + "SelectedTab";
+        private static string SelectedTabKey => KeyPrefix + "SelectedTab";
 
         /// <summary>各页签滚动位置的 EditorPrefs 键前缀。</summary>
-        private const string TabScrollKey = KeyPrefix + "TabScroll";
+        private static string TabScrollKey => KeyPrefix + "TabScroll";
 
         /// <summary>折叠分区列表的 EditorPrefs 键。</summary>
-        private const string FoldsKey = KeyPrefix + "Folds";
+        private static string FoldsKey => KeyPrefix + "Folds";
 
         /// <summary>最近一次构建摘要的 EditorPrefs 键。</summary>
-        private const string LastBuildKey = KeyPrefix + "LastBuild";
+        private static string LastBuildKey => KeyPrefix + "LastBuild";
+
+        internal static string CreateKeyPrefix(string assetsPath)
+        {
+            string normalizedPath = Path.GetFullPath(assetsPath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .Replace('\\', '/');
+            return "UnityRFramework.BuildWindow."
+                + Hash128.Compute(normalizedPath)
+                + ".";
+        }
 
         /// <summary>上次选中的 Profile GUID；为空表示尚未选择。</summary>
         public string SelectedProfileGuid = string.Empty;

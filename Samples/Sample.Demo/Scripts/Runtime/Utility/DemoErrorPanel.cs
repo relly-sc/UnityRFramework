@@ -113,7 +113,7 @@ namespace UnityRFramework.Sample
             text.fontSize = fontSize;
             text.color = color;
             text.alignment = alignment;
-            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             RectTransform rect = go.GetComponent<RectTransform>();
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;

@@ -99,6 +99,17 @@ namespace UnityRFramework.Editor
 
             UnityRFrameworkBuildProfile profile =
                 ScriptableObject.CreateInstance<UnityRFrameworkBuildProfile>();
+            BuildTarget activeTarget = EditorUserBuildSettings.activeBuildTarget;
+            if (BuildPlatformSettings.IsSupportedTarget(activeTarget))
+            {
+                profile.Platform.Target = activeTarget;
+            }
+
+            profile.Platform.CompanyName = PlayerSettings.companyName;
+            profile.Platform.ProductName = PlayerSettings.productName;
+            profile.Platform.ApplicationIdentifier =
+                PlayerSettings.GetApplicationIdentifier(
+                    BuildPipeline.GetBuildTargetGroup(profile.Platform.Target));
             string path =
                 $"{UnityRFrameworkBuildProfile.DefaultAssetDirectory}/{safeName}.asset";
 
