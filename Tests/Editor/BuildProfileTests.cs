@@ -109,6 +109,17 @@ namespace UnityRFramework.Editor.Tests
             Assert.That(errors, Is.Empty);
         }
 
+        [Test]
+        public void Platform_DefaultCompany_IsAllowed()
+        {
+            BuildPlatformSettings settings = CreateValidProfile().Platform;
+            settings.CompanyName = "DefaultCompany";
+
+            List<string> errors = settings.Validate();
+
+            Assert.That(errors, Has.None.Contains("公司名称"));
+        }
+
         /// <summary>
         /// Profile 序列化往返后平台关键字段保持稳定。
         /// </summary>
