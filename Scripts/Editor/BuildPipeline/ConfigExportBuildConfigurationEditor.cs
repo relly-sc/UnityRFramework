@@ -66,7 +66,7 @@ namespace UnityRFramework.Editor
                     options.FindPropertyRelative("ConfigProtectionKeyFile"),
                     new GUIContent("Config 密钥文件"),
                     "bytes");
-                if (GUILayout.Button("生成新的 Config 密钥文件"))
+                if (GUILayout.Button("生成新的 ConfigKey 密钥文件"))
                 {
                     ConfigKeyFileGenerator.Generate(
                         options.FindPropertyRelative("ConfigProtectionKeyFile").stringValue);

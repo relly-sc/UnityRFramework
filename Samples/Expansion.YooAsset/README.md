@@ -71,8 +71,9 @@ RuntimeKeyProviderRegistry.ConfigureContentKeys(projectKeyProvider);
 `projectKeyProvider` 必须实现 `RFramework.IKeyProvider`，并能按加密数据中保存的 `KeyId`
 返回密钥副本。不要把正式密钥直接序列化到 Prefab、ScriptableObject 或源码中。框架构建步骤
 会读取 YooAsset Builder 的当前加密器选择，并在正式打包前校验环境变量，不维护第二份加密开关。
-同一注册入口也供受保护 Config 使用；未启用 Config 或 Bundle 加密时，注册提供器不会改变
-明文加载流程。`YooAssetBundleProtection.Configure` 仍保留为 YooAsset 专用显式覆盖入口。
+此注册入口只供资源扩展使用；`ConfigComponent` 使用独立的 `ConfigKey.bytes` 自动配置 Config
+解密，不读取 YooAsset 密钥。未启用 Bundle 加密时，注册提供器不会改变明文加载流程。
+`YooAssetBundleProtection.Configure` 仍保留为 YooAsset 专用显式覆盖入口。
 
 当前实现属于整包内存解密，适合提高常规资源提取成本，但加载时会同时占用加密数据和解密后
 数据的内存。应控制单个 Bundle 大小；超大资源需要项目自行提供流式解密器。该能力不替代
