@@ -190,6 +190,7 @@ Player 后才会按 Profile 设置递增 Build Number。
 | **WebRequest** | HTTP GET/POST/PUT/DELETE，并发控制，超时+重试，multipart 上传+进度 | `GameEntry.WebRequest` |
 | **Download** | 大文件可靠下载，`.part` 断点续传、重试、速度/ETA、大小与 SHA-256 校验 | `GameEntry.Download` |
 | **Config** | 配置表管理与查询，默认 JSON + 内置 URFC 二进制，可扩展自定义格式 | `GameEntry.Config` |
+| **Storage** | 多槽位存档、原子写入、备份恢复、版本迁移、可选压缩和加密认证 | `GameEntry.Storage` |
 | **Fsm** | 同步通用有限状态机，泛型 Owner，生命周期异常后停止运行 | `GameEntry.Fsm` |
 | **Procedure** | 同步游戏流程 FSM，Blackboard 跨状态共享数据 | `GameEntry.Procedure` |
 | **Entity** | 游戏实体生命周期，实体组自管实例缓存，父子附加 | `GameEntry.Entity` |
@@ -639,6 +640,37 @@ Editor 代码生成可以实现 `IConfigCodeGenerator` 并通过
 `ConfigCodeGeneratorRegistry.Set()` 替换，`Reset()` 恢复框架默认生成器。自定义生成器仍须
 遵守当前 URFC v2、`IBinaryConfigCodec` 和自动注册契约；需要改变整个文件格式时应实现
 自定义 `ConfigHelperBase`。
+
+### Storage 与基础安全
+
+`StorageComponent` 默认使用 JSON 存档，提供多槽位、原子写入、上一版本备份、损坏后备份读取、
+GZip 压缩和可选的加密认证。未传入 `StorageOptions` 时使用 Inspector 中的默认设置：
+
+```csharp
+StorageResult saved = await GameEntry.Storage.SaveAsync("slot-1", playerData);
+StorageLoadResult<PlayerData> loaded =
+    await GameEntry.Storage.LoadAsync<PlayerData>("slot-1");
+
+if (loaded.Succeeded)
+{
+    playerData = loaded.Data;
+}
+```
+
+需要存档加密时，在框架入口 Prefab 的 `StorageComponent` 中将“默认数据保护”设为
+“加密并认证”，并保持“自动管理安装级密钥”启用。框架会为每次安装生成独立 `SaveKey`；
+Windows、Android、iOS、macOS 可按需导入对应 `Expansion.Security.*`，分别使用 DPAPI、
+Android Keystore 或 Keychain。卸载重装、清除应用数据或密钥丢失后，旧存档可能无法读取；
+跨设备同步应由项目自行设计账号和密钥迁移方案。
+
+`ProtectedInt`、`ProtectedLong`、`ProtectedFloat` 和 `ProtectedBool` 可用于提高 Cheat Engine
+常规明文扫描和简单内存修改的成本。读取时发现内部校验不一致会返回默认值，并通过 Event 模块
+发布 `MemoryTamperEvent`。它们只适合金币、积分、解锁状态等少量高价值字段，不替代服务端校验，
+也不承诺对抗调试、注入或专业逆向。
+
+Config、Storage、YooAsset Bundle 加密和 Obfuz 均为可选能力，默认不启用且使用不同密钥。
+Windows、Android、macOS、iOS 已完成纯核心 Config、`YooAsset + Config` 以及
+`YooAsset + Config + Obfuz` 的 Player 构建和运行验收。
 
 ### Fsm
 
