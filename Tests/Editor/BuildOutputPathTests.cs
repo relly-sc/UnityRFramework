@@ -14,6 +14,14 @@ namespace UnityRFramework.Editor.Tests
     /// </summary>
     public sealed class BuildOutputPathTests
     {
+        [Test]
+        public void DefaultSettings_FileNameUsesProductNameOnly()
+        {
+            Assert.That(
+                new BuildOutputSettings().FileNameTemplate,
+                Is.EqualTo("{ProductName}"));
+        }
+
         /// <summary>测试用工程根目录绝对路径。</summary>
         private static string ProjectRoot =>
             Path.GetDirectoryName(Application.dataPath) ?? string.Empty;

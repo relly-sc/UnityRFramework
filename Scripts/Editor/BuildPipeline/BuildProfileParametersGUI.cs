@@ -409,9 +409,25 @@ namespace UnityRFramework.Editor
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("＋ 添加场景", GUILayout.Width(110f)))
             {
-                scenesProp.InsertArrayElementAtIndex(scenesProp.arraySize);
+                AppendSceneEntry(scenesProp);
             }
             EditorGUILayout.EndHorizontal();
+        }
+
+        /// <summary>追加一个默认启用的空场景条目。</summary>
+        internal static void AppendSceneEntry(SerializedProperty scenesProp)
+        {
+            if (scenesProp == null || !scenesProp.isArray)
+            {
+                return;
+            }
+
+            int index = scenesProp.arraySize;
+            scenesProp.InsertArrayElementAtIndex(index);
+
+            SerializedProperty entry = scenesProp.GetArrayElementAtIndex(index);
+            entry.FindPropertyRelative("Scene").objectReferenceValue = null;
+            entry.FindPropertyRelative("Enabled").boolValue = true;
         }
 
         /// <summary>

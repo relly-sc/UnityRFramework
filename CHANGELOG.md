@@ -11,6 +11,18 @@
 
 ## 未发布
 
+## 1.4.3 - 2026-10-08
+
+### 变更
+
+- 新建 Build Profile 的 Player 文件名模板简化为 `{ProductName}`，避免默认文件名重复包含平台、版本和构建号而过长。
+
+## 1.4.2 - 2026-10-08
+
+### 修复
+
+- 修复构建工具新增场景条目时默认未启用，导致已选择场景仍无法通过构建校验的问题。
+
 ## 1.4.1 - 2026-10-08
 
 ### 新增
@@ -69,6 +81,8 @@
 | 1.1.0 | 2026-08-05 | 早期功能发布；完整差异请查看 Git Tag。 |
 | 1.0.0 | 2026-07-29 | 首个公开版本。 |
 
-[未发布]: https://github.com/relly-sc/UnityRFramework/compare/1.4.1...HEAD
+[未发布]: https://github.com/relly-sc/UnityRFramework/compare/1.4.3...HEAD
+[1.4.3]: https://github.com/relly-sc/UnityRFramework/compare/1.4.2...1.4.3
+[1.4.2]: https://github.com/relly-sc/UnityRFramework/compare/1.4.1...1.4.2
 [1.4.1]: https://github.com/relly-sc/UnityRFramework/compare/1.4.0...1.4.1
 [1.4.0]: https://github.com/relly-sc/UnityRFramework/releases/tag/1.4.0
