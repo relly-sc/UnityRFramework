@@ -18,6 +18,97 @@ namespace UnityRFramework.Editor.Tests
     /// </summary>
     public sealed class ConfigPipelineTests
     {
+        [Test]
+        public void ExcelLocalizationKeyAuditReadsWorkbooksWithoutWritingOutputs()
+        {
+            Type service = Type.GetType(
+                "UnityRFramework.Expansion.ExcelLocalizationExportService, Assembly-CSharp-Editor");
+            const string sourceRoot = "Assets/UnityRFramework/Samples/Sample.Demo/ConfigSource";
+            if (service == null || !AssetDatabase.IsValidFolder(sourceRoot))
+            {
+                Assert.Ignore("Excel extension or its demo workbooks are not installed.");
+            }
+
+            Type configType = Type.GetType(
+                "UnityRFramework.Expansion.ExcelConfigExportOptions, Assembly-CSharp-Editor");
+            Type localizationType = Type.GetType(
+                "UnityRFramework.Expansion.ExcelLocalizationExportOptions, Assembly-CSharp-Editor");
+            object config = Activator.CreateInstance(configType);
+            object localization = Activator.CreateInstance(localizationType);
+            configType.GetField("SourceDirectory")?.SetValue(config, sourceRoot + "/Config");
+            localizationType.GetField("SourceDirectory")?.SetValue(
+                localization, sourceRoot + "/Localization");
+            localizationType.GetField("CodeDirectory")?.SetValue(
+                localization, "Assets/UnityRFramework/Tests/Editor");
+
+            object report = service.GetMethod("AuditLocalizationKeys")?.Invoke(
+                null, new[] { config, localization });
+            Assert.IsNotNull(report);
+            Type reportType = report.GetType();
+            Assert.GreaterOrEqual((int)reportType.GetProperty("WorkbookCount")?.GetValue(report), 2);
+            Assert.AreEqual(0, reportType.GetProperty("WrittenFileCount")?.GetValue(report));
+            StringAssert.Contains("缺失键", string.Join("\n",
+                (IReadOnlyList<string>)reportType.GetProperty("Messages")?.GetValue(report)));
+        }
+
+        [Test]
+        public void LocalizationKeyAuditReportsMissingEmptyUnusedAndDynamicKeys()
+        {
+            ConfigTableSchema config = ConfigSchemaParser.ParseConfig(
+                CsvDocumentReader.Parse("Items.csv",
+                    "Id,NameKey,Note\nint,string,string\n编号,名称 @LocalizationKey,普通文字\n"
+                    + "1,cfg_key,not_a_key"), string.Empty);
+            LocalizationTable zh = LocalizationCsvParser.Parse(CsvDocumentReader.Parse(
+                "zh-CN.csv", "Key,Value\nstring,string\n键,值\n"
+                + "literal,文字\ncfg_key,配置\nreserved,保留\norphan,未用\nempty,有值"));
+            LocalizationTable en = LocalizationCsvParser.Parse(CsvDocumentReader.Parse(
+                "en.csv", "Key,Value\nstring,string\n键,值\n"
+                + "literal,Text\nreserved,Reserved\norphan,Unused\nempty,"));
+            string code = "// GameEntry.Localization.GetString(\"comment_only\")\n"
+                + "var text = \"GameEntry.Localization.GetString(\\\"string_only\\\")\";\n"
+                + "GameEntry.Localization.GetString(\"literal\");\n"
+                + "GameEntry.Localization.GetString(\"absent\");\n"
+                + "GameEntry.Localization.GetString(variable);";
+            ConfigPipelineReport report = new ConfigPipelineReport();
+
+            LocalizationKeyAudit.Analyze(
+                new[] { config }, new[] { zh, en },
+                new[] { new KeyValuePair<string, string>("Demo.cs", code) },
+                new[] { new KeyValuePair<string, string>("prefab_key", "Demo.prefab") },
+                new[] { "# dynamic keys", "reserved" }, report);
+
+            string result = string.Join("\n", report.Messages);
+            StringAssert.Contains("en: cfg_key", result);
+            StringAssert.Contains("zh-CN: prefab_key", result);
+            StringAssert.Contains("zh-CN: absent", result);
+            StringAssert.Contains("en: empty", result);
+            StringAssert.Contains("  orphan", result);
+            StringAssert.Contains("动态调用", result);
+            StringAssert.DoesNotContain("comment_only", result);
+            StringAssert.DoesNotContain("string_only", result);
+            StringAssert.DoesNotContain("not_a_key", result);
+            StringAssert.DoesNotContain("  reserved\n", result);
+        }
+
+        [Test]
+        public void LocalizationKeyAuditWorksWithoutConfigTables()
+        {
+            LocalizationTable language = LocalizationCsvParser.Parse(CsvDocumentReader.Parse(
+                "en.csv", "Key,Value\nstring,string\n键,值\nhello,Hello"));
+            ConfigPipelineReport report = new ConfigPipelineReport();
+
+            LocalizationKeyAudit.Analyze(Array.Empty<ConfigTableSchema>(),
+                new[] { language },
+                new[] { new KeyValuePair<string, string>(
+                    "View.cs", "GameEntry.Localization.GetString(\"hello\");") },
+                Array.Empty<KeyValuePair<string, string>>(),
+                Array.Empty<string>(), report);
+
+            StringAssert.Contains("缺失键：0", string.Join("\n", report.Messages));
+            StringAssert.Contains("可能未使用（先人工确认，不自动删除）：0",
+                string.Join("\n", report.Messages));
+        }
+
         /// <summary>验证 CSV 引号、逗号、转义引号和跨行字段。</summary>
         [Test]
         public void CsvReaderHandlesQuotesCommaAndNewline()

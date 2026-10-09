@@ -41,6 +41,64 @@ namespace UnityRFramework.Editor
             return report;
         }
 
+        /// <summary>只读检查语言 CSV 与确定性的 Config、代码键引用。</summary>
+        public static ConfigPipelineReport AuditLocalizationKeys(ConfigPipelineOptions options)
+        {
+            ValidateOptions(options, false, true);
+            ConfigPipelineReport report = new ConfigPipelineReport();
+            string configRoot = ResolveDirectory(options.ConfigSourceDirectory, false);
+            List<ConfigTableSchema> configs = Directory.Exists(configRoot)
+                && Directory.EnumerateFiles(configRoot, "*.csv", SearchOption.AllDirectories).Any()
+                    ? ParseConfigSchemas(options, report)
+                    : new List<ConfigTableSchema>();
+            List<LocalizationTable> languages = ParseLocalizations(options, report);
+            string localizationRoot = ResolveDirectory(options.LocalizationSourceDirectory, true);
+            AuditLocalizationKeys(configs, languages, options.LocalizationCodeDirectory,
+                Path.Combine(localizationRoot, "ReservedKeys.txt"), report);
+            return report;
+        }
+
+        /// <summary>检查已解析的 CSV 或 Excel 表；不修改源文件。</summary>
+        public static void AuditLocalizationKeys(
+            IReadOnlyList<ConfigTableSchema> configs,
+            IReadOnlyList<LocalizationTable> languages,
+            string codeDirectory,
+            string reservedKeysPath,
+            ConfigPipelineReport report)
+        {
+            string codeRoot = ResolveDirectory(codeDirectory, true);
+            string[] paths = Directory.GetFiles(codeRoot, "*.cs", SearchOption.AllDirectories);
+            Array.Sort(paths, StringComparer.Ordinal);
+            List<KeyValuePair<string, string>> sources = new List<KeyValuePair<string, string>>();
+            foreach (string path in paths)
+            {
+                sources.Add(new KeyValuePair<string, string>(
+                    ToProjectPath(path), File.ReadAllText(path)));
+            }
+
+            string[] reserved = File.Exists(reservedKeysPath)
+                ? File.ReadAllLines(reservedKeysPath)
+                : Array.Empty<string>();
+            List<KeyValuePair<string, string>> prefabReferences =
+                new List<KeyValuePair<string, string>>();
+            foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets" }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (prefab == null) continue;
+                foreach (Runtime.LocalizedText text in prefab.GetComponentsInChildren<Runtime.LocalizedText>(true))
+                {
+                    if (!string.IsNullOrWhiteSpace(text.Key))
+                    {
+                        prefabReferences.Add(new KeyValuePair<string, string>(text.Key, path));
+                    }
+                }
+            }
+
+            LocalizationKeyAudit.Analyze(
+                configs, languages, sources, prefabReferences, reserved, report);
+        }
+
         /// <summary>
         /// 在内存中生成全部格式并报告体积、压缩估算和导出耗时，不写入文件。
         /// </summary>

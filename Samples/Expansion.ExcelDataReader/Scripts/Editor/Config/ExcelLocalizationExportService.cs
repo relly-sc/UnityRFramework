@@ -25,6 +25,38 @@ namespace UnityRFramework.Expansion
                 new[] { options.SourceDirectory }, out _);
         }
 
+        /// <summary>只读检查 Excel 语言表中的键引用。</summary>
+        public static ExcelConfigExportReport AuditLocalizationKeys(
+            ExcelConfigExportOptions configOptions,
+            ExcelLocalizationExportOptions localizationOptions)
+        {
+            if (configOptions == null)
+            {
+                throw new RFrameworkException("Excel config options are invalid.");
+            }
+            ValidateOptions(localizationOptions, false);
+            ExcelConfigExportReport report = BuildTables(
+                new[] { localizationOptions.SourceDirectory },
+                out IReadOnlyList<LocalizationTable> languages);
+            string configRoot = ExcelExportUtility.ResolvePath(configOptions.SourceDirectory);
+            IReadOnlyList<ConfigTableSchema> configs = Array.Empty<ConfigTableSchema>();
+            if (Directory.Exists(configRoot)
+                && ExcelExportUtility.CollectExcelFiles(new[] { configRoot }).Count > 0)
+            {
+                ExcelConfigExportReport configReport = ExcelConfigExportService.BuildSchemas(
+                    new[] { configRoot }, configOptions, out configs);
+                report.WorkbookCount += configReport.WorkbookCount;
+                report.TableCount += configReport.TableCount;
+            }
+            ConfigPipelineReport audit = new ConfigPipelineReport();
+            ConfigPipelineService.AuditLocalizationKeys(
+                configs, languages, localizationOptions.CodeDirectory,
+                Path.Combine(ExcelExportUtility.ResolvePath(
+                    localizationOptions.SourceDirectory), "ReservedKeys.txt"), audit);
+            foreach (string message in audit.Messages) report.AddMessage(message);
+            return report;
+        }
+
         /// <summary>
         /// 导出设置目录中的全部 Localization 工作簿。
         /// </summary>
@@ -123,7 +155,7 @@ namespace UnityRFramework.Expansion
             return report;
         }
 
-        private static ExcelConfigExportReport BuildTables(
+        internal static ExcelConfigExportReport BuildTables(
             IReadOnlyList<string> sourcePaths,
             out IReadOnlyList<LocalizationTable> localizations)
         {

@@ -111,6 +111,7 @@ namespace UnityRFramework.Editor
             EditorGUILayout.LabelField("Localization", EditorStyles.boldLabel);
             DrawFolderField("CSV 目录", ref options.LocalizationSourceDirectory);
             DrawFolderField("输出目录", ref options.LocalizationOutputDirectory);
+            DrawFolderField("代码扫描目录", ref options.LocalizationCodeDirectory);
             options.ExportLocalizationBundle = EditorGUILayout.Toggle(
                 new GUIContent("导出多语言容器", "同时导出 JSON 与二进制多语言容器。"),
                 options.ExportLocalizationBundle);
@@ -148,6 +149,11 @@ namespace UnityRFramework.Editor
             if (GUILayout.Button("分析体积/导出耗时", GUILayout.Height(26f)))
             {
                 Execute(() => ConfigPipelineService.Analyze(options));
+            }
+
+            if (GUILayout.Button("检查本地化键", GUILayout.Height(26f)))
+            {
+                Execute(() => ConfigPipelineService.AuditLocalizationKeys(options));
             }
 
             EditorGUILayout.Space(10f);

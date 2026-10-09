@@ -104,6 +104,8 @@ namespace UnityRFramework.Expansion
             DrawFolderField(
                 "Excel 目录", ref localizationOptions.SourceDirectory, true);
             DrawFolderField(
+                "代码扫描目录", ref localizationOptions.CodeDirectory, false);
+            DrawFolderField(
                 "输出目录", ref localizationOptions.OutputDirectory, false);
             localizationOptions.ExportBundle = EditorGUILayout.Toggle(
                 new GUIContent(
@@ -151,6 +153,12 @@ namespace UnityRFramework.Expansion
                         ExcelLocalizationExportService.Export(
                             localizationOptions));
                 }
+            }
+
+            if (GUILayout.Button("检查本地化键", GUILayout.Height(28f)))
+            {
+                Execute(() => ExcelLocalizationExportService.AuditLocalizationKeys(
+                    options, localizationOptions));
             }
 
             EditorGUILayout.Space(10f);
