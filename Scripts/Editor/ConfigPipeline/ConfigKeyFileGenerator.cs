@@ -9,7 +9,7 @@ namespace UnityRFramework.Editor
     /// <summary>生成 Config 简单偏移混淆密钥文件。</summary>
     public static class ConfigKeyFileGenerator
     {
-        public const string DefaultPath = "Assets/ConfigSource/ConfigKey.bytes";
+        public const string DefaultPath = "Assets/Resources/UnityRFramework/ConfigKey.bytes";
 
         [MenuItem("UnityRFramework/配置表工具/首次生成 Config 密钥文件")]
         public static void GenerateDefault()
@@ -38,11 +38,9 @@ namespace UnityRFramework.Editor
         private static bool WriteKey(string assetPath, bool replace)
         {
             assetPath = assetPath?.Replace('\\', '/');
-            if (string.IsNullOrWhiteSpace(assetPath)
-                || !assetPath.StartsWith("Assets/", StringComparison.Ordinal)
-                || !assetPath.EndsWith(".bytes", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(assetPath, DefaultPath, StringComparison.Ordinal))
             {
-                throw new ArgumentException("Config 密钥文件必须是 Assets 下的 .bytes 文件。", nameof(assetPath));
+                throw new ArgumentException($"Config 密钥文件必须位于 {DefaultPath}。", nameof(assetPath));
             }
 
             bool exists = File.Exists(assetPath);

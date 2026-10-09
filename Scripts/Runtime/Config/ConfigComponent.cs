@@ -30,16 +30,8 @@ namespace UnityRFramework.Runtime
         private string configHelperTypeName = JsonHelperTypeName;
 
         [SerializeField]
-        [Tooltip("配置资源保护模式。默认不启用；启用后使用 Config 密钥文件或显式 IDataProtector。")]
+        [Tooltip("配置资源保护模式。启用后自动读取 Resources/UnityRFramework/ConfigKey.bytes。")]
         private ConfigProtectionMode protectionMode = ConfigProtectionMode.None;
-
-        [SerializeField]
-        [Tooltip("与配置导出端一致的 Config 密钥编号。")]
-        private string configKeyId = "config-v1";
-
-        [SerializeField]
-        [Tooltip("可选。由配置表工具生成的 ConfigKey.bytes；仅用于 Config 简单离线防护。")]
-        private TextAsset configKeyFile;
 
         [SerializeField]
         [Tooltip("加密认证使用的资源路径前缀，必须与导出端一致。YooAsset 使用短地址时会自动补全此前缀。")]
@@ -96,21 +88,23 @@ namespace UnityRFramework.Runtime
 
         private void ConfigureEmbeddedContentKey()
         {
-            if (protectionMode == ConfigProtectionMode.None || configKeyFile == null)
+            if (protectionMode == ConfigProtectionMode.None)
             {
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(configKeyId))
+            TextAsset keyFile = Resources.Load<TextAsset>(ConfigKeyFile.DefaultKeyResourcePath);
+            if (keyFile == null)
             {
-                throw new RFrameworkException("ConfigComponent: content key id is invalid.");
+                throw new RFrameworkException(
+                    "ConfigComponent: ConfigKey.bytes is missing from Resources/UnityRFramework.");
             }
 
             try
             {
-                byte[] key = ConfigKeyFile.Decode(configKeyFile.bytes);
+                byte[] key = ConfigKeyFile.Decode(keyFile.bytes);
                 configModule.SetDataProtector(new DefaultDataProtector(
-                    new EmbeddedContentKeyProvider(configKeyId.Trim(), key)));
+                    new EmbeddedContentKeyProvider(ConfigKeyFile.DefaultKeyId, key)));
                 hasExplicitDataProtector = true;
             }
             catch (RFrameworkException exception)

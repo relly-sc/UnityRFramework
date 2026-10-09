@@ -563,7 +563,7 @@ namespace UnityRFramework.Editor
                     ? "Release Config bytes protection: disabled."
                     : $"Release Config bytes protection: encrypted and authenticated; "
                         + $"format={options.ConfigReleaseFormat}; "
-                        + $"KeyId={options.ConfigProtectionKeyId}; "
+                        + $"KeyId={Runtime.ConfigKeyFile.DefaultKeyId}; "
                         + $"runtime path prefix={options.ConfigProtectionSourceRoot}.");
 
             changed |= SynchronizeManifest(

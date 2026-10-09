@@ -520,24 +520,24 @@ GameEntry.Download.SetArchiveHelper(new SharpZipLibArchiveHelper());
 
 #### Config 加密密钥
 
-Config 工具中的加密配置使用以下三个字段：
+Config 工具中的加密配置只需选择保护模式，并确认运行时加载路径前缀：
 
 | 字段 | 填写内容 |
 |---|---|
-| 密钥编号 | `config-v1`，用于标识密钥，不填写密钥正文 |
-| Config 密钥文件 | 默认 `Assets/ConfigSource/ConfigKey.bytes` |
 | 运行时加载路径前缀 | `Config/Binary` |
 
 在 CSV 配置表工具、Excel 配置表工具或构建步骤配置中点击“生成”，也可使用菜单
 `UnityRFramework/配置表工具/首次生成 Config 密钥文件`。工具会生成 32 字节随机密钥，并以带文件头、
-偏移混淆和 CRC32 校验的 `ConfigKey.bytes` 保存。已有文件会保留原密钥，版本升级和构建应继续
+偏移混淆和 CRC32 校验的 `Assets/Resources/UnityRFramework/ConfigKey.bytes` 保存。已有文件会保留原密钥，版本升级和构建应继续
 复用，并随项目提交或备份。仅主动执行“更换 Config 密钥”时替换密钥；更换后必须重新导出配置
 并发布使用新密钥的 Player，旧的加密 Config 无法读取。
 
+从旧版升级时，将原 `Assets/ConfigSource/ConfigKey.bytes` 连同 `.meta` 原样移动到上述固定路径；不要重新生成。
+
 #### Player 运行时解密
 
-将同一个 `ConfigKey.bytes` 赋给框架入口预制体的 `ConfigComponent`。Config 导出和 Player 运行时
-使用同一文件，业务代码不需要额外注册。YooAsset Bundle 加密使用其扩展自己的独立密钥与解密服务。
+开启 ConfigComponent 的“数据保护”后，它会从固定 Resources 路径自动读取同一密钥；业务代码不需要额外注册。
+YooAsset Bundle 加密使用其扩展自己的独立密钥与解密服务。
 
 密钥会随 Player 发布，因此该功能只用于防止普通查看和随手修改配置，适合当前的离线仿真、三维
 项目；它不承诺对抗专业逆向或有意破解。
@@ -546,15 +546,15 @@ Config 工具中的加密配置使用以下三个字段：
 
 | 平台 | 构建时 | Player 运行时 |
 |---|---|---|
-| Editor | 工具读取 `ConfigKey.bytes` | `ConfigComponent` 读取同一文件 |
-| Windows/macOS | 构建工具读取密钥文件 | `ConfigComponent` 读取随 Player 发布的文件 |
-| Android/iOS | 构建工具读取密钥文件 | `ConfigComponent` 读取随 Player 发布的文件 |
-| WebGL | 构建工具读取密钥文件 | `ConfigComponent` 读取随 Player 发布的文件 |
+| Editor | 工具读取固定路径的 `ConfigKey.bytes` | `ConfigComponent` 从 Resources 自动读取 |
+| Windows/macOS | 构建工具读取固定路径密钥 | `ConfigComponent` 从 Resources 自动读取 |
+| Android/iOS | 构建工具读取固定路径密钥 | `ConfigComponent` 从 Resources 自动读取 |
+| WebGL | 构建工具读取固定路径密钥 | `ConfigComponent` 从 Resources 自动读取 |
 
 移动端本地验收步骤：
 
 1. 生成 `ConfigKey.bytes`，选择“加密认证”并导出 Config。
-2. 在框架入口预制体的 `ConfigComponent` 填写 Config 密钥编号 `config-v1`，并赋值同一密钥文件。
+2. 在框架入口预制体的 `ConfigComponent` 将“数据保护”设为“加密并认证”，无需填写密钥路径或编号。
 3. 不需要在业务入口手动调用密钥注册方法，`ConfigComponent` 会在框架启动时自动注册。
 4. 构建 Android 或 iOS Player，确认 Config 能加载；修改一个 `.bytes` 文件后重新打包，确认认证失败。
 5. 该密钥随 Player 发布，适合作为简单离线保护；不需要额外配置平台密钥服务。

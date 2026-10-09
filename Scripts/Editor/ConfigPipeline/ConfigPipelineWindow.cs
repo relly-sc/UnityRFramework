@@ -81,28 +81,15 @@ namespace UnityRFramework.Editor
             if (options.ConfigBinaryProtection
                 == RFramework.ConfigProtectionMode.EncryptedAndAuthenticated)
             {
-                options.ConfigProtectionKeyId = EditorGUILayout.TextField(
-                    new GUIContent("密钥编号", "写入产物用于密钥轮换，不是密钥内容。"),
-                    options.ConfigProtectionKeyId);
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    options.ConfigProtectionKeyFile = EditorGUILayout.TextField(
-                        new GUIContent("Config 密钥文件", "由工具生成的 ConfigKey.bytes。"),
-                        options.ConfigProtectionKeyFile);
-                    if (GUILayout.Button("选择", GUILayout.Width(52f)))
-                    {
-                        string selected = BuildAssetPathField.PickProjectFile(
-                            options.ConfigProtectionKeyFile,
-                            "bytes");
-                        if (selected != null) options.ConfigProtectionKeyFile = selected;
-                    }
                     if (GUILayout.Button("首次生成", GUILayout.Width(72f)))
                     {
-                        ConfigKeyFileGenerator.Generate(options.ConfigProtectionKeyFile);
+                        ConfigKeyFileGenerator.GenerateDefault();
                     }
                     if (GUILayout.Button("更换密钥", GUILayout.Width(72f)))
                     {
-                        ConfigKeyFileGenerator.Replace(options.ConfigProtectionKeyFile);
+                        ConfigKeyFileGenerator.ReplaceDefault();
                     }
                 }
                 options.ConfigProtectionSourceRoot = EditorGUILayout.TextField(
@@ -111,7 +98,7 @@ namespace UnityRFramework.Editor
                         "必须与 LoadConfigAsync 使用的路径一致，例如 Config/Binary。"),
                     options.ConfigProtectionSourceRoot);
                 EditorGUILayout.HelpBox(
-                    "密钥文件经过简单偏移混淆，不包含明文 Base64；请将同一文件赋给 ConfigComponent。",
+                    "密钥固定保存在 Assets/Resources/UnityRFramework/ConfigKey.bytes，ConfigComponent 自动读取。",
                     MessageType.Info);
             }
             options.GeneratedNamespace = EditorGUILayout.TextField(

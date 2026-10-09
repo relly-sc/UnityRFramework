@@ -44,12 +44,6 @@ namespace UnityRFramework.Editor
         /// <summary>正式 Config 二进制的保护模式，默认不加密。</summary>
         public ConfigProtectionMode ConfigBinaryProtection = ConfigProtectionMode.None;
 
-        /// <summary>加密产物写入的密钥编号，不包含密钥本身。</summary>
-        public string ConfigProtectionKeyId = "config-v1";
-
-        /// <summary>由配置表工具生成的偏移混淆密钥文件。</summary>
-        public string ConfigProtectionKeyFile = "Assets/ConfigSource/ConfigKey.bytes";
-
         /// <summary>运行时传给 LoadConfigAsync 的加载路径前缀。</summary>
         public string ConfigProtectionSourceRoot = "Config/Binary";
 

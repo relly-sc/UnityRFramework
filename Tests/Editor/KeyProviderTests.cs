@@ -15,19 +15,39 @@ namespace UnityRFramework.Editor.Tests
         [Test]
         public void FirstGenerationPreservesExistingConfigKeyFile()
         {
-            string folder = "Assets/ConfigKeyTest_" + Guid.NewGuid().ToString("N");
-            string path = folder + "/ConfigKey.bytes";
-            Directory.CreateDirectory(folder);
-            byte[] original = ConfigKeyFile.Encode(CreateKey(42), 71);
-            File.WriteAllBytes(path, original);
+            string path = ConfigKeyFileGenerator.DefaultPath;
+            if (!File.Exists(path)) Assert.Ignore("项目尚未生成 ConfigKey.bytes。");
+            byte[] original = File.ReadAllBytes(path);
+            Assert.IsFalse(ConfigKeyFileGenerator.Generate(path));
+            CollectionAssert.AreEqual(original, File.ReadAllBytes(path));
+            Assert.Throws<ArgumentException>(() =>
+                ConfigKeyFileGenerator.Generate("Assets/ConfigSource/ConfigKey.bytes"));
+        }
+
+        [Test]
+        public void FixedConfigKeyResourceMatchesExporterFile()
+        {
+            string path = ConfigKeyFileGenerator.DefaultPath;
+            if (!File.Exists(path)) Assert.Ignore("项目尚未生成 ConfigKey.bytes。");
+
+            TextAsset resource = Resources.Load<TextAsset>(ConfigKeyFile.DefaultKeyResourcePath);
+            Assert.NotNull(resource);
+            byte[] exportKey = ConfigKeyFile.Decode(File.ReadAllBytes(path));
+            byte[] runtimeKey = ConfigKeyFile.Decode(resource.bytes);
             try
             {
-                Assert.IsFalse(ConfigKeyFileGenerator.Generate(path));
-                CollectionAssert.AreEqual(original, File.ReadAllBytes(path));
+                CollectionAssert.AreEqual(exportKey, runtimeKey);
+                Assert.DoesNotThrow(() => ConfigProtectionExporter.Create(
+                    new ConfigPipelineOptions
+                    {
+                        ConfigBinaryProtection = ConfigProtectionMode.EncryptedAndAuthenticated
+                    },
+                    null));
             }
             finally
             {
-                if (!AssetDatabase.DeleteAsset(folder)) Directory.Delete(folder, true);
+                Array.Clear(exportKey, 0, exportKey.Length);
+                Array.Clear(runtimeKey, 0, runtimeKey.Length);
             }
         }
 

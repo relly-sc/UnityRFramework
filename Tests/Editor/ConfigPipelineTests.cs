@@ -1489,7 +1489,6 @@ namespace UnityRFramework.Editor.Tests
                 GeneratedNamespace = "UnityRFramework.Tests.Config",
                 ConfigReleaseFormat = ConfigReleaseDataFormat.JsonContent,
                 ConfigBinaryProtection = ConfigProtectionMode.EncryptedAndAuthenticated,
-                ConfigProtectionKeyId = "config-v1",
                 ConfigProtectionSourceRoot = "ProtectedConfig/Binary"
             };
         }

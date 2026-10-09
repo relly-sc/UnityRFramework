@@ -6,6 +6,8 @@ namespace UnityRFramework.Runtime
     /// <summary>读取和生成经过简单偏移混淆的 Config 密钥文件。</summary>
     public static class ConfigKeyFile
     {
+        public const string DefaultKeyId = "config-v1";
+        public const string DefaultKeyResourcePath = "UnityRFramework/ConfigKey";
         private static readonly byte[] Magic = { (byte)'U', (byte)'R', (byte)'F', (byte)'K' };
         private const byte Version = 1;
         private const int KeySize = 32;
