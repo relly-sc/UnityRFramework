@@ -189,7 +189,7 @@ namespace UnityRFramework.Expansion
                 || extension.Equals(".xls", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string ResolvePath(string path)
+        internal static string ResolvePath(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
             {

@@ -13,6 +13,9 @@ namespace UnityRFramework.Expansion
         public string SourceDirectory =
             "Assets/ConfigSource/Localization";
 
+        /// <summary>检查本地化键时扫描固定键调用的 C# 源目录。</summary>
+        public string CodeDirectory = "Assets";
+
         /// <summary>本地化数据输出根目录。</summary>
         public string OutputDirectory =
             ExcelLocalizationExportDefaults.OutputDirectory;

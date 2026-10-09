@@ -51,6 +51,7 @@ Config 与 Localization 使用和现有 CSV 工具一致的四行结构：
 - Localization 多语言 Bundle 导出选项。
 - Config Binary 可选“加密认证”；密钥固定为核心工具生成的 `Assets/Resources/UnityRFramework/ConfigKey.bytes`，运行时自动读取。
 - 启用加密时，Excel 工具与框架 `ConfigComponent` 必须使用同一个 Config 密钥文件和密钥编号。
+- “检查本地化键”读取 Config/Localization Excel、代码扫描目录及 Prefab 中的 `LocalizedText`，报告缺失键、空译文和可能未使用键，不修改源文件。Config 的 `string` 字段可在第三行注释标记 `@LocalizationKey`；动态使用的键可写在 Localization Excel 目录的 `ReservedKeys.txt`，每行一个。
 
 生成命名空间留空时，生成的配置代码不声明命名空间。工具设置会被 Project 视图右键
 导出入口复用。

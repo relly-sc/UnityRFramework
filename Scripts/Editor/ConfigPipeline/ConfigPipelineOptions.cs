@@ -25,6 +25,9 @@ namespace UnityRFramework.Editor
         /// <summary>Localization 配置表源目录。</summary>
         public string LocalizationSourceDirectory = "Assets/ConfigSource/Localization";
 
+        /// <summary>本地化键检查时扫描固定键调用的 C# 源目录。</summary>
+        public string LocalizationCodeDirectory = "Assets";
+
         /// <summary>Config 行类型和 Codec 代码输出目录。</summary>
         public string GeneratedCodeDirectory = "Assets/Generated/UnityRFramework/Config";
 

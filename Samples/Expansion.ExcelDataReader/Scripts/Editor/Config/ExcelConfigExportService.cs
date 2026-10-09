@@ -184,7 +184,7 @@ namespace UnityRFramework.Expansion
             }
         }
 
-        private static ExcelConfigExportReport BuildSchemas(
+        internal static ExcelConfigExportReport BuildSchemas(
             IReadOnlyList<string> sourcePaths,
             ExcelConfigExportOptions options,
             out IReadOnlyList<ConfigTableSchema> schemas)
