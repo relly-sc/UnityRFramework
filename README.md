@@ -71,10 +71,13 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 2. 填入 UPM 发布分支地址：`https://github.com/relly-sc/UnityRFramework.git#upm`
 3. 等待编译完成。
 
-> 请使用 `#upm` 分支安装。该分支会由 GitHub Actions 根据 `main` 自动生成，
-> 并将示例目录发布为 UPM 标准的 `Samples~`；请勿直接使用 `main` 分支安装。
+> 核心包请使用 `#upm` 分支安装。该分支由 GitHub Actions 根据开发仓库的 `main` 生成，
+> 不包含示例和可选扩展；请勿从开发仓库的 `main` 分支直接安装。
 
-**Samples（可选）**：在 Package Manager 中选中本包 → **Samples** → 按需点击 **Import**。
+**Samples（可选）**：安装核心包后，点击 `UnityRFramework → 安装 Samples`。工具会从
+`https://github.com/relly-sc/UnityRFramework-Samples.git#main` 安装独立 Samples 包；
+安装完成后，在 Package Manager 中选中 **UnityRFramework Samples** → **Samples** → 按需点击 **Import**。
+首次安装需可访问 GitHub，核心包与 Samples 包的版本应相同。未安装 Samples 时不影响核心框架使用。
 
 - `Sample.Demo`：官方可运行示例，**仅依赖内置 Helper、零第三方**。导入后先执行
   `UnityRFramework/Samples/Demo/导出配置与多语言`，该菜单会将配置、

@@ -42,8 +42,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6389cbfc804270544ac5ed6da7bd005c, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &828014825355657188
 GameObject:
   m_ObjectHideFlags: 0
@@ -1218,8 +1218,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   configHelperTypeName: UnityRFramework.Runtime.JsonConfigHelper
   protectionMode: 0
-  protectedSingleTableFormat: 0
-  protectedTableBundleFormat: 0
+  configKeyId: config-v1
+  configKeyFile: {fileID: 0}
+  protectionSourceRoot: Config/Binary
+  protectedSingleTableFormat: 1
+  protectedTableBundleFormat: 1
 --- !u!1 &6352145623489672633
 GameObject:
   m_ObjectHideFlags: 0
@@ -1532,8 +1535,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3aac3e47afcfd994a90fb7013f70651c, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   storageHelperTypeName: UnityRFramework.Runtime.DefaultStorageHelper
   storageSerializerTypeName: UnityRFramework.Runtime.JsonStorageSerializer
   storageDirectoryName: Saves
@@ -1636,7 +1639,7 @@ MonoBehaviour:
   resourceHelperTypeName: UnityRFramework.Expansion.YooAssetResourceHelper
   playMode: 2
   packageName: ExpansionDemoPackage
-  defaultHostServer: http://192.168.3.155/ExpansionDemoServer
+  defaultHostServer: http://192.168.3.155/ExpansionDemoPackage
   fallbackHostServer: 
   autoClearDiskCache: 1
   maxDiskCacheSizeGB: 4
