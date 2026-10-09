@@ -33,12 +33,6 @@ namespace UnityRFramework.Expansion
         /// <summary>正式二进制保护模式。</summary>
         public ConfigProtectionMode ConfigBinaryProtection = ConfigProtectionMode.None;
 
-        /// <summary>加密产物中的密钥编号。</summary>
-        public string ConfigProtectionKeyId = "config-v1";
-
-        /// <summary>偏移混淆密钥文件。</summary>
-        public string ConfigProtectionKeyFile = "Assets/ConfigSource/ConfigKey.bytes";
-
         /// <summary>运行时配置加载路径前缀。</summary>
         public string ConfigProtectionSourceRoot = "Config/Binary";
 

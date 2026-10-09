@@ -13,8 +13,6 @@ namespace UnityRFramework.Editor
     {
         private SerializedProperty configHelperTypeName;
         private SerializedProperty protectionMode;
-        private SerializedProperty configKeyId;
-        private SerializedProperty configKeyFile;
         private SerializedProperty protectionSourceRoot;
         private SerializedProperty protectedSingleTableFormat;
         private SerializedProperty protectedTableBundleFormat;
@@ -23,8 +21,6 @@ namespace UnityRFramework.Editor
         {
             configHelperTypeName = serializedObject.FindProperty("configHelperTypeName");
             protectionMode = serializedObject.FindProperty("protectionMode");
-            configKeyId = serializedObject.FindProperty("configKeyId");
-            configKeyFile = serializedObject.FindProperty("configKeyFile");
             protectionSourceRoot = serializedObject.FindProperty("protectionSourceRoot");
             protectedSingleTableFormat = serializedObject.FindProperty(
                 "protectedSingleTableFormat");
@@ -63,8 +59,6 @@ namespace UnityRFramework.Editor
                     MessageType.Info);
             }
             EditorGUILayout.PropertyField(protectionMode, new GUIContent("数据保护"));
-            EditorGUILayout.PropertyField(configKeyId, new GUIContent("Config 密钥编号"));
-            EditorGUILayout.PropertyField(configKeyFile, new GUIContent("Config 密钥文件"));
             if (protectionMode.enumValueIndex != 0)
             {
                 EditorGUILayout.PropertyField(
@@ -80,7 +74,7 @@ namespace UnityRFramework.Editor
                         new GUIContent("多表解密后格式"));
                 }
                 EditorGUILayout.HelpBox(
-                    "启用配置保护时，填写与导出端一致的 Config 密钥；业务代码无需注册。",
+                    "启用配置保护时自动读取 Assets/Resources/UnityRFramework/ConfigKey.bytes；业务代码无需注册。",
                     MessageType.Info);
             }
 

@@ -84,27 +84,15 @@ namespace UnityRFramework.Expansion
             if (options.ConfigBinaryProtection
                 == RFramework.ConfigProtectionMode.EncryptedAndAuthenticated)
             {
-                options.ConfigProtectionKeyId = EditorGUILayout.TextField(
-                    "密钥编号", options.ConfigProtectionKeyId);
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    options.ConfigProtectionKeyFile = EditorGUILayout.TextField(
-                        "Config 密钥文件", options.ConfigProtectionKeyFile);
-                    if (GUILayout.Button("选择", GUILayout.Width(52f)))
-                    {
-                        string selected = UnityRFramework.Editor.BuildAssetPathField.PickProjectFile(
-                            options.ConfigProtectionKeyFile, "bytes");
-                        if (selected != null) options.ConfigProtectionKeyFile = selected;
-                    }
                     if (GUILayout.Button("首次生成", GUILayout.Width(72f)))
                     {
-                        UnityRFramework.Editor.ConfigKeyFileGenerator.Generate(
-                            options.ConfigProtectionKeyFile);
+                        UnityRFramework.Editor.ConfigKeyFileGenerator.GenerateDefault();
                     }
                     if (GUILayout.Button("更换密钥", GUILayout.Width(72f)))
                     {
-                        UnityRFramework.Editor.ConfigKeyFileGenerator.Replace(
-                            options.ConfigProtectionKeyFile);
+                        UnityRFramework.Editor.ConfigKeyFileGenerator.ReplaceDefault();
                     }
                 }
                 options.ConfigProtectionSourceRoot = EditorGUILayout.TextField(

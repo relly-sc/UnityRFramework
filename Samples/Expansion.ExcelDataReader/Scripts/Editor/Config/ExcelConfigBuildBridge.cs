@@ -31,8 +31,6 @@ namespace UnityRFramework.Expansion
                 SelectedExporterIds = exporters,
                 ConfigReleaseFormat = source.ConfigReleaseFormat,
                 ConfigBinaryProtection = source.ConfigBinaryProtection,
-                ConfigProtectionKeyId = source.ConfigProtectionKeyId,
-                ConfigProtectionKeyFile = source.ConfigProtectionKeyFile,
                 ConfigProtectionSourceRoot = source.ConfigProtectionSourceRoot
             };
         }

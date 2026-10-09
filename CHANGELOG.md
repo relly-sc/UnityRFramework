@@ -11,6 +11,13 @@
 
 ## 未发布
 
+## 1.4.5 - 2026-10-09
+
+### 变更
+
+- Config 密钥与 YooAsset 密钥统一为固定的 Resources 路径和自动读取方式；配置表工具、构建步骤及 ConfigComponent 不再要求填写密钥路径或编号。
+- 现有 Config 密钥需原样移动到 `Assets/Resources/UnityRFramework/ConfigKey.bytes`，不要重新生成，否则旧加密配置将无法读取。
+
 ## 1.4.4 - 2026-10-09
 
 ### 变更

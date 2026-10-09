@@ -59,28 +59,19 @@ namespace UnityRFramework.Editor
                 new[] { "不加密", "加密并校验完整性" });
             if (protection.enumValueIndex != 0)
             {
-                EditorGUILayout.PropertyField(
-                    options.FindPropertyRelative("ConfigProtectionKeyId"),
-                    new GUIContent("密钥编号"));
-                BuildAssetPathField.DrawProjectFile(
-                    options.FindPropertyRelative("ConfigProtectionKeyFile"),
-                    new GUIContent("Config 密钥文件"),
-                    "bytes");
                 if (GUILayout.Button("首次生成 ConfigKey 密钥文件"))
                 {
-                    ConfigKeyFileGenerator.Generate(
-                        options.FindPropertyRelative("ConfigProtectionKeyFile").stringValue);
+                    ConfigKeyFileGenerator.GenerateDefault();
                 }
                 if (GUILayout.Button("更换 Config 密钥"))
                 {
-                    ConfigKeyFileGenerator.Replace(
-                        options.FindPropertyRelative("ConfigProtectionKeyFile").stringValue);
+                    ConfigKeyFileGenerator.ReplaceDefault();
                 }
                 EditorGUILayout.PropertyField(
                     options.FindPropertyRelative("ConfigProtectionSourceRoot"),
                     new GUIContent("运行时加载路径前缀"));
                 EditorGUILayout.HelpBox(
-                    "密钥文件经过简单偏移混淆；请将同一文件赋给框架入口的 ConfigComponent。",
+                    "密钥固定保存在 Assets/Resources/UnityRFramework/ConfigKey.bytes；ConfigComponent 自动读取。",
                     MessageType.Info);
             }
 

@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Text;
 using RFramework;
 
 namespace UnityRFramework.Editor
@@ -58,18 +57,11 @@ namespace UnityRFramework.Editor
                     $"Unsupported Config protection mode '{options.ConfigBinaryProtection}'.");
             }
 
-            string keyId = options.ConfigProtectionKeyId?.Trim();
-            if (string.IsNullOrEmpty(keyId)
-                || keyId.IndexOfAny(new[] { '\r', '\n' }) >= 0
-                || Encoding.UTF8.GetByteCount(keyId) > 255)
-            {
-                throw new RFrameworkException("Config protection KeyId is invalid.");
-            }
-
+            string keyId = Runtime.ConfigKeyFile.DefaultKeyId;
             string sourceRoot = NormalizeSourceRoot(options.ConfigProtectionSourceRoot);
             IKeyProvider provider = keyProvider ?? new ConfigKeyFileProvider(
                 keyId,
-                options.ConfigProtectionKeyFile);
+                ConfigKeyFileGenerator.DefaultPath);
             ValidateKey(provider, keyId);
             return new ConfigProtectionExporter(
                 options.ConfigBinaryProtection,

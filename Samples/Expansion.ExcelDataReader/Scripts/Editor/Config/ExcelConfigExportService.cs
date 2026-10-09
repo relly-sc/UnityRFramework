@@ -66,8 +66,6 @@ namespace UnityRFramework.Expansion
                 new ConfigPipelineOptions
                 {
                     ConfigBinaryProtection = options.ConfigBinaryProtection,
-                    ConfigProtectionKeyId = options.ConfigProtectionKeyId,
-                    ConfigProtectionKeyFile = options.ConfigProtectionKeyFile,
                     ConfigProtectionSourceRoot = options.ConfigProtectionSourceRoot,
                     ConfigReleaseFormat = options.ConfigReleaseFormat
                 },
