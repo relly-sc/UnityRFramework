@@ -1,13 +1,15 @@
 using System;
 using System.IO;
 using RFramework;
+using UnityEngine;
+using UnityRFramework.Runtime;
 using YooAsset;
 
 namespace UnityRFramework.Expansion.Editor
 {
     /// <summary>
     /// YooAsset Builder 可选的认证 Bundle 加密器。
-    /// 密钥只从环境变量读取，不写入 Unity 资产或构建报告。
+    /// 读取工具生成的 YooAssetKey.bytes，与 Player 使用同一份密钥。
     /// </summary>
     public sealed class UnityRFrameworkBundleEncryptor : IBundleEncryptor
     {
@@ -15,7 +17,7 @@ namespace UnityRFramework.Expansion.Editor
         public BundleEncryptResult Encrypt(BundleEncryptArgs args)
         {
             byte[] source = File.ReadAllBytes(args.FilePath);
-            EnvironmentKeyProvider provider = CreateEnvironmentKeyProvider(
+            IKeyProvider provider = CreateKeyProvider(
                 out string keyId);
             byte[] protectedData = YooAssetBundleProtection.Protect(
                 source,
@@ -24,17 +26,16 @@ namespace UnityRFramework.Expansion.Editor
             return new BundleEncryptResult(true, protectedData);
         }
 
-        /// <summary>校验当前 Builder 进程是否具备有效的加密密钥。</summary>
-        internal static bool TryValidateEnvironment(out string error)
+        /// <summary>校验当前 Builder 是否具备有效的密钥文件。</summary>
+        internal static bool TryValidateKey(out string error)
         {
             try
             {
-                EnvironmentKeyProvider provider = CreateEnvironmentKeyProvider(
-                    out string keyId);
+                IKeyProvider provider = CreateKeyProvider(out string keyId);
                 if (!provider.TryGetKey(keyId, out byte[] key) || key == null)
                 {
-                    error = $"环境变量 {YooAssetBundleProtection.BuildKeyEnvironmentVariable} "
-                        + "未提供可用密钥。";
+                    error = $"未找到 YooAsset Bundle 密钥，请生成 "
+                        + $"{YooAssetKeyFileGenerator.DefaultPath}。";
                     return false;
                 }
 
@@ -61,63 +62,53 @@ namespace UnityRFramework.Expansion.Editor
             }
         }
 
-        private static EnvironmentKeyProvider CreateEnvironmentKeyProvider(
-            out string keyId)
+        private static IKeyProvider CreateKeyProvider(out string keyId)
         {
-            keyId = Environment.GetEnvironmentVariable(
-                YooAssetBundleProtection.BuildKeyIdEnvironmentVariable);
-            if (string.IsNullOrWhiteSpace(keyId))
+            TextAsset keyFile = Resources.Load<TextAsset>(
+                YooAssetBundleProtection.DefaultKeyResourcePath);
+            if (keyFile != null)
             {
                 keyId = YooAssetBundleProtection.DefaultKeyId;
-            }
-            else
-            {
-                keyId = keyId.Trim();
+                return new KeyFileProvider(keyId, keyFile.bytes);
             }
 
-            return new EnvironmentKeyProvider(keyId);
+            throw new RFrameworkException(
+                $"YooAsset Bundle 密钥文件不存在：{YooAssetKeyFileGenerator.DefaultPath}");
         }
 
-        private sealed class EnvironmentKeyProvider : IKeyProvider
+        private sealed class KeyFileProvider : IKeyProvider
         {
             private readonly string expectedKeyId;
+            private readonly byte[] key;
 
-            internal EnvironmentKeyProvider(string expectedKeyId)
+            internal KeyFileProvider(string expectedKeyId, byte[] fileBytes)
             {
                 this.expectedKeyId = expectedKeyId;
+                try
+                {
+                    key = ConfigKeyFile.Decode(fileBytes);
+                }
+                catch (RFrameworkException exception)
+                {
+                    throw new RFrameworkException(
+                        "YooAsset bundle key file is invalid.",
+                        exception);
+                }
             }
 
-            public bool TryGetKey(string keyId, out byte[] key)
+            public bool TryGetKey(string keyId, out byte[] result)
             {
-                key = null;
                 if (!string.Equals(
                         keyId,
                         expectedKeyId,
                         StringComparison.Ordinal))
                 {
+                    result = null;
                     return false;
                 }
 
-                string encoded = Environment.GetEnvironmentVariable(
-                    YooAssetBundleProtection.BuildKeyEnvironmentVariable);
-                if (string.IsNullOrWhiteSpace(encoded))
-                {
-                    return false;
-                }
-
-                try
-                {
-                    key = Convert.FromBase64String(encoded.Trim());
-                    return true;
-                }
-                catch (FormatException exception)
-                {
-                    throw new RFrameworkException(
-                        $"Environment variable "
-                        + $"'{YooAssetBundleProtection.BuildKeyEnvironmentVariable}' "
-                        + "must be a Base64 encoded 32-byte key.",
-                        exception);
-                }
+                result = (byte[])key.Clone();
+                return true;
             }
         }
     }

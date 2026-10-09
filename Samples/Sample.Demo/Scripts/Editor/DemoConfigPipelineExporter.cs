@@ -33,7 +33,7 @@ namespace UnityRFramework.Sample
         private const string StreamingDemoDirectory = "Assets/StreamingAssets/Demo";
 
         /// <summary>Demo 一键导出菜单路径。</summary>
-        private const string MenuPath = "UnityRFramework/Demo/Export Config and Localization";
+        private const string MenuPath = "UnityRFramework/Samples/Demo/导出配置与多语言";
 
         /// <summary>
         /// 导出 Demo 配置与本地化数据，并同步运行时所需的 StreamingAssets 文件。

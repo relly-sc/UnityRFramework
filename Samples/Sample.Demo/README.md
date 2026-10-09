@@ -8,7 +8,7 @@ Package Manager 只会将本 Sample 复制到 `Assets/Samples/<包名>/<版本>/
 
 1. 等待 Unity 完成脚本编译。
 2. 在非 Play Mode 下执行
-   `UnityRFramework/Demo/Export Config and Localization`。
+   `UnityRFramework/Samples/Demo/导出配置与多语言`。
 3. 确认宿主工程中已生成：
    - `Assets/StreamingAssets/Config`
    - `Assets/StreamingAssets/Localization`
@@ -133,7 +133,7 @@ Samples/Sample.Demo/
 ## 更新数据
 
 默认管线不直接读取 Excel/XLSX。先手工将源表导出为 UTF-8 CSV，再执行
-`UnityRFramework/Demo/Export Config and Localization`。该入口会导出 JSON、二进制、
+`UnityRFramework/Samples/Demo/导出配置与多语言`。该入口会导出 JSON、二进制、
 Bundle 和 manifest，并按内容增量同步配置、本地化、音频和公告到
 `Assets/StreamingAssets`；源目录中已删除的旧产物也会同步清理。
 

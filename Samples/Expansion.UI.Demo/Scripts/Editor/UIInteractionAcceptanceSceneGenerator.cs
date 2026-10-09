@@ -21,7 +21,7 @@ namespace UnityRFramework.Expansion.UI.Demo.Editor
         private const string FrameworkPrefabPath =
             "Assets/UnityRFramework/Prefabs/UnityRFramework.prefab";
 
-        [MenuItem("UnityRFramework/Samples/生成 Expansion.UI.Demo 验收场景")]
+        [MenuItem("UnityRFramework/Expansion/UI Demo/生成验收场景")]
         private static void Generate()
         {
             EditorSceneManager.SaveOpenScenes();

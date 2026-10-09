@@ -77,7 +77,7 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 **Samples（可选）**：在 Package Manager 中选中本包 → **Samples** → 按需点击 **Import**。
 
 - `Sample.Demo`：官方可运行示例，**仅依赖内置 Helper、零第三方**。导入后先执行
-  `UnityRFramework/Demo/Export Config and Localization`，该菜单会将配置、
+  `UnityRFramework/Samples/Demo/导出配置与多语言`，该菜单会将配置、
   本地化、音频和公告同步到宿主工程的 `Assets/StreamingAssets`，完成后再打开
   `GameAssets/Scenes/DemoBoot.unity`。仅导入 Sample 后直接运行会缺少这些文件。
 - `Sample.Download`：内置 `DownloadModule` 的独立轻量验收场景，不依赖其他 Sample；
@@ -94,7 +94,7 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   模态弹窗、Toast、虚拟列表和红点树，不依赖 YooAsset、HybridCLR 或其他第三方插件。
 - `Expansion.YooAsset.Demo`：官方 Demo 的 YooAsset/UniTask 资源热更覆盖层，必须同时导入
   `Sample.Demo`、`Expansion.YooAsset`、`Expansion.UniTask` 并安装对应第三方包，再执行
-  `UnityRFramework/Expansion/YooAsset Demo/Rebuild Demo Overlay`。其 `Acceptance` 子目录
+  `UnityRFramework/Expansion/YooAsset Demo/重建 Demo 覆盖层`。其 `Acceptance` 子目录
   提供 YooAsset 与 UniTask 的专项验收，不单独注册为 Package Manager Sample。
 - `Expansion.SharpZipLib`：可选 ZIP 解压扩展，随 Sample 提供 SharpZipLib 1.4.2 Runtime DLL
   与 MIT 许可证。通过 `GameEntry.Download.SetArchiveHelper(...)` 注入后支持 Zip64、加密 ZIP
@@ -529,8 +529,10 @@ Config 工具中的加密配置使用以下三个字段：
 | 运行时加载路径前缀 | `Config/Binary` |
 
 在 CSV 配置表工具、Excel 配置表工具或构建步骤配置中点击“生成”，也可使用菜单
-`UnityRFramework/配置表工具/生成 Config 密钥文件`。工具会生成 32 字节随机密钥，并以带文件头、
-偏移混淆和 CRC32 校验的 `ConfigKey.bytes` 保存。重新生成会导致旧的加密 Config 无法读取。
+`UnityRFramework/配置表工具/首次生成 Config 密钥文件`。工具会生成 32 字节随机密钥，并以带文件头、
+偏移混淆和 CRC32 校验的 `ConfigKey.bytes` 保存。已有文件会保留原密钥，版本升级和构建应继续
+复用，并随项目提交或备份。仅主动执行“更换 Config 密钥”时替换密钥；更换后必须重新导出配置
+并发布使用新密钥的 Player，旧的加密 Config 无法读取。
 
 #### Player 运行时解密
 

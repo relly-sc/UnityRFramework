@@ -13,6 +13,25 @@ namespace UnityRFramework.Editor.Tests
     public sealed class KeyProviderTests
     {
         [Test]
+        public void FirstGenerationPreservesExistingConfigKeyFile()
+        {
+            string folder = "Assets/ConfigKeyTest_" + Guid.NewGuid().ToString("N");
+            string path = folder + "/ConfigKey.bytes";
+            Directory.CreateDirectory(folder);
+            byte[] original = ConfigKeyFile.Encode(CreateKey(42), 71);
+            File.WriteAllBytes(path, original);
+            try
+            {
+                Assert.IsFalse(ConfigKeyFileGenerator.Generate(path));
+                CollectionAssert.AreEqual(original, File.ReadAllBytes(path));
+            }
+            finally
+            {
+                if (!AssetDatabase.DeleteAsset(folder)) Directory.Delete(folder, true);
+            }
+        }
+
+        [Test]
         public void ConfigKeyFileRoundTripsAndRejectsTampering()
         {
             byte[] expected = CreateKey(23);

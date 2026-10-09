@@ -11,6 +11,17 @@
 
 ## 未发布
 
+## 1.4.4 - 2026-10-09
+
+### 变更
+
+- 编辑器菜单统一归类：CSV 与 Excel 放入配置表工具，第三方扩展及其 Demo 放入 Expansion，普通 Demo 放入 Samples。
+
+### 修复
+
+- 补齐 YooAsset Bundle 加密的默认密钥文件生成与 Player 自动注册流程，避免 Builder 能加密但 Player 未配置解密密钥。
+- Config 和 YooAsset 密钥工具区分首次生成与主动更换，首次生成保留已有密钥，避免小版本更新误使旧资源失效。
+
 ## 1.4.3 - 2026-10-08
 
 ### 变更
@@ -81,7 +92,8 @@
 | 1.1.0 | 2026-08-05 | 早期功能发布；完整差异请查看 Git Tag。 |
 | 1.0.0 | 2026-07-29 | 首个公开版本。 |
 
-[未发布]: https://github.com/relly-sc/UnityRFramework/compare/1.4.3...HEAD
+[未发布]: https://github.com/relly-sc/UnityRFramework/compare/1.4.4...HEAD
+[1.4.4]: https://github.com/relly-sc/UnityRFramework/compare/1.4.3...1.4.4
 [1.4.3]: https://github.com/relly-sc/UnityRFramework/compare/1.4.2...1.4.3
 [1.4.2]: https://github.com/relly-sc/UnityRFramework/compare/1.4.1...1.4.2
 [1.4.1]: https://github.com/relly-sc/UnityRFramework/compare/1.4.0...1.4.1

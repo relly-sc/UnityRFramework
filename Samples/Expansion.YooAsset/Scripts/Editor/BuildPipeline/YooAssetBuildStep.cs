@@ -650,7 +650,7 @@ namespace UnityRFramework.Editor
             }
 
             if (!global::UnityRFramework.Expansion.Editor.UnityRFrameworkBundleEncryptor
-                    .TryValidateEnvironment(out string error))
+                    .TryValidateKey(out string error))
             {
                 issues.Add(BuildValidationIssue.Error(
                     StepCode,

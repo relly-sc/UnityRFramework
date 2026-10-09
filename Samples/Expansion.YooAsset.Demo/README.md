@@ -24,14 +24,14 @@
 2. 导入 `Expansion.YooAsset` 与 `Expansion.UniTask` Sample。
 3. 导入本 `Expansion.YooAsset.Demo` Sample。
 4. 安装 YooAsset 3.0.5 与 UniTask。
-5. 先执行 `UnityRFramework/Demo/Export Config and Localization`，生成 Demo 公告等
+5. 先执行 `UnityRFramework/Samples/Demo/导出配置与多语言`，生成 Demo 公告等
    项目级 StreamingAssets 文件。
 
 ## 生成覆盖层
 
 在非 Play Mode 下执行：
 
-`UnityRFramework/Expansion/YooAsset Demo/Rebuild Demo Overlay`
+`UnityRFramework/Expansion/YooAsset Demo/重建 Demo 覆盖层`
 
 构建器会：
 
@@ -69,7 +69,7 @@ Demo Collector 使用 Asset GUID 生成短 Bundle 名，不把 UPM Sample 的完
 
 ### 首次发布
 
-1. 执行 `UnityRFramework/ExpansionDemo/Build Host Package`。该菜单会为当前平台
+1. 执行 `UnityRFramework/Expansion/YooAsset Demo/构建 Host Package`。该菜单会为当前平台
    构建新的 `ExpansionDemoPackage` 版本，并增量发布到
    `<工程根目录>/Bundles/ExpansionDemoServer`，不会改写 StreamingAssets。
 2. 在 HFS 或其他静态文件服务器中把 `Bundles/ExpansionDemoServer` 设为服务根目录。
@@ -80,7 +80,7 @@ Demo Collector 使用 Asset GUID 生成短 Bundle 名，不把 UPM Sample 的完
    - 部分内置：使用 `ClearAndCopyByTags`，并确保
      `BuiltinCatalog.bytes` 与实际内置 Bundle 一致。
    - 全部远程：通过
-     `UnityRFramework/Expansion/YooAsset Builtin Catalog`
+     `UnityRFramework/Expansion/YooAsset/内置资源清单工具`
      为 `ExpansionDemoPackage` 生成空 Catalog。
 4. 在生成的 `UnityRFramework.prefab` 上把 Resource 模式改为 `Host`，
    填写 `defaultHostServer`，需要时填写 `fallbackHostServer`。
@@ -89,7 +89,7 @@ Demo Collector 使用 Asset GUID 生成短 Bundle 名，不把 UPM Sample 的完
 ### 发布资源更新
 
 1. 修改 Demo 使用的配置、语言、音频、Prefab 或场景资源。
-2. 再次执行 `UnityRFramework/ExpansionDemo/Build Host Package`。
+2. 再次执行 `UnityRFramework/Expansion/YooAsset Demo/构建 Host Package`。
 3. 构建器会把新 Manifest、Hash、Bundle 和 `.version` 发布到同一服务目录；
    `.version` 在构建产物复制过程中覆盖为最新版本。
 4. 不替换已发布客户端中的旧 StreamingAssets。

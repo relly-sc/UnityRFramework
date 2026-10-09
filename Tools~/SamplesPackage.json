@@ -1,6 +1,6 @@
 {
   "name": "com.relly-sc.unityrframework.samples",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "displayName": "UnityRFramework Samples",
   "description": "UnityRFramework 官方示例、验收场景与可选扩展。按需导入，不属于框架核心运行依赖。",
   "documentationUrl": "https://github.com/relly-sc/UnityRFramework-Samples/blob/main/README.md",
@@ -17,7 +17,7 @@
     "expansion"
   ],
   "dependencies": {
-    "com.relly-sc.unityrframework": "1.4.3"
+    "com.relly-sc.unityrframework": "1.4.4"
   },
   "samples": [
     {
