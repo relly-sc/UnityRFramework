@@ -1356,6 +1356,18 @@ PrefabInstance:
       propertyPath: m_Name
       value: UnityRFramework
       objectReference: {fileID: 0}
+    - target: {fileID: 1398857529810386439, guid: c6ec5f46665c8db429b6ef170ec5221b, type: 3}
+      propertyPath: protectionMode
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1398857529810386439, guid: c6ec5f46665c8db429b6ef170ec5221b, type: 3}
+      propertyPath: protectedSingleTableFormat
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1398857529810386439, guid: c6ec5f46665c8db429b6ef170ec5221b, type: 3}
+      propertyPath: protectedTableBundleFormat
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1825794738314003970, guid: c6ec5f46665c8db429b6ef170ec5221b, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
