@@ -132,55 +132,41 @@ namespace UnityRFramework.Editor.Tests
         }
 
         [Test]
-        public void BuilderEncryptorRequiresValidEnvironmentKey()
+        public void GeneratedKeyFileConfiguresRuntimeDecryption()
         {
-            Type encryptor = FindType(
-                "UnityRFramework.Expansion.Editor.UnityRFrameworkBundleEncryptor");
             Type protection = FindType(
                 "UnityRFramework.Expansion.YooAssetBundleProtection");
-            if (encryptor == null || protection == null)
+            if (protection == null)
             {
                 Assert.Ignore("未导入 Expansion.YooAsset。");
             }
 
-            string keyVariable = (string)protection.GetField(
-                    "BuildKeyEnvironmentVariable",
-                    BindingFlags.Public | BindingFlags.Static)
-                .GetRawConstantValue();
-            string keyIdVariable = (string)protection.GetField(
-                    "BuildKeyIdEnvironmentVariable",
-                    BindingFlags.Public | BindingFlags.Static)
-                .GetRawConstantValue();
-            string previousKey = Environment.GetEnvironmentVariable(keyVariable);
-            string previousKeyId = Environment.GetEnvironmentVariable(keyIdVariable);
-            MethodInfo validate = encryptor.GetMethod(
-                "TryValidateEnvironment",
-                BindingFlags.NonPublic | BindingFlags.Static);
+            byte[] key = Enumerable.Range(0, 32)
+                .Select(value => (byte)value)
+                .ToArray();
+            byte[] keyFile = ConfigKeyFile.Encode(key, 73);
+            protection.GetMethod(
+                    "ConfigureKeyFile",
+                    BindingFlags.NonPublic | BindingFlags.Static)
+                .Invoke(null, new object[] { keyFile });
 
-            try
-            {
-                Environment.SetEnvironmentVariable(keyVariable, null);
-                object[] missingArguments = { null };
-                Assert.That(
-                    (bool)validate.Invoke(null, missingArguments),
-                    Is.False);
-                Assert.That((string)missingArguments[0], Does.Contain(keyVariable));
+            byte[] source = { 9, 8, 7, 6 };
+            TestKeyProvider provider = new TestKeyProvider();
+            byte[] protectedData = (byte[])protection.GetMethod(
+                    "Protect",
+                    BindingFlags.Public | BindingFlags.Static)
+                .Invoke(null, new object[]
+                {
+                    source,
+                    "YooAssetBundle",
+                    provider
+                });
+            byte[] restored = (byte[])protection.GetMethod(
+                    "Unprotect",
+                    BindingFlags.NonPublic | BindingFlags.Static)
+                .Invoke(null, new object[] { protectedData });
 
-                Environment.SetEnvironmentVariable(
-                    keyVariable,
-                    Convert.ToBase64String(new byte[32]));
-                Environment.SetEnvironmentVariable(keyIdVariable, "TestBundleKey");
-                object[] validArguments = { null };
-                Assert.That(
-                    (bool)validate.Invoke(null, validArguments),
-                    Is.True);
-                Assert.That(validArguments[0], Is.Null);
-            }
-            finally
-            {
-                Environment.SetEnvironmentVariable(keyVariable, previousKey);
-                Environment.SetEnvironmentVariable(keyIdVariable, previousKeyId);
-            }
+            Assert.That(restored, Is.EqualTo(source));
         }
 
         [Test]

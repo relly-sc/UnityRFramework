@@ -27,7 +27,7 @@ namespace UnityRFramework.Expansion
         /// <summary>
         /// 打开 Excel 配置表工具。
         /// </summary>
-        [MenuItem("UnityRFramework/Expansion/Excel 配置表工具")]
+        [MenuItem("UnityRFramework/配置表工具/Excel 配置表工具")]
         public static void Open()
         {
             ExcelConfigToolWindow window =
@@ -96,9 +96,14 @@ namespace UnityRFramework.Expansion
                             options.ConfigProtectionKeyFile, "bytes");
                         if (selected != null) options.ConfigProtectionKeyFile = selected;
                     }
-                    if (GUILayout.Button("生成", GUILayout.Width(52f)))
+                    if (GUILayout.Button("首次生成", GUILayout.Width(72f)))
                     {
                         UnityRFramework.Editor.ConfigKeyFileGenerator.Generate(
+                            options.ConfigProtectionKeyFile);
+                    }
+                    if (GUILayout.Button("更换密钥", GUILayout.Width(72f)))
+                    {
+                        UnityRFramework.Editor.ConfigKeyFileGenerator.Replace(
                             options.ConfigProtectionKeyFile);
                     }
                 }

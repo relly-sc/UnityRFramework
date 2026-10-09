@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 using RFramework;
+using UnityEngine;
 using UnityRFramework.Runtime;
 using YooAsset;
 
@@ -13,15 +14,11 @@ namespace UnityRFramework.Expansion
     /// </summary>
     public static class YooAssetBundleProtection
     {
-        /// <summary>Builder 读取 Base64 编码 32 字节密钥的环境变量名。</summary>
-        public const string BuildKeyEnvironmentVariable =
-            "UNITY_RFRAMEWORK_YOOASSET_KEY";
+        /// <summary>默认随 Player 发布的 YooAsset Bundle 密钥资源路径。</summary>
+        public const string DefaultKeyResourcePath =
+            "UnityRFramework/YooAssetKey";
 
-        /// <summary>Builder 读取密钥标识的可选环境变量名。</summary>
-        public const string BuildKeyIdEnvironmentVariable =
-            "UNITY_RFRAMEWORK_YOOASSET_KEY_ID";
-
-        /// <summary>未设置密钥标识环境变量时使用的默认标识。</summary>
+        /// <summary>YooAsset Bundle 密钥标识。</summary>
         public const string DefaultKeyId = "YooAssetBundle";
 
         private static readonly byte[] BundleContext =
@@ -70,6 +67,52 @@ namespace UnityRFramework.Expansion
             }
         }
 
+        /// <summary>从工具生成的 YooAssetKey.bytes 配置运行时解密。</summary>
+        internal static void ConfigureKeyFile(byte[] fileBytes)
+        {
+            byte[] key;
+            try
+            {
+                key = ConfigKeyFile.Decode(fileBytes);
+            }
+            catch (RFrameworkException exception)
+            {
+                throw new RFrameworkException(
+                    "YooAsset bundle key file is invalid.",
+                    exception);
+            }
+
+            try
+            {
+                Configure(new EmbeddedKeyProvider(DefaultKeyId, key));
+            }
+            finally
+            {
+                Array.Clear(key, 0, key.Length);
+            }
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnSubsystemRegistration()
+        {
+            Reset();
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void ConfigureDefaultKeyFile()
+        {
+            if (IsConfigured)
+            {
+                return;
+            }
+
+            TextAsset keyFile = Resources.Load<TextAsset>(DefaultKeyResourcePath);
+            if (keyFile != null)
+            {
+                ConfigureKeyFile(keyFile.bytes);
+            }
+        }
+
         /// <summary>使用与运行时解密一致的格式保护 Bundle 数据。</summary>
         /// <param name="data">待保护的 Bundle 数据。</param>
         /// <param name="keyId">写入保护头的密钥标识。</param>
@@ -111,6 +154,33 @@ namespace UnityRFramework.Expansion
                 data,
                 ProtectedDataPayloadKind.Custom,
                 BundleContext);
+        }
+
+        private sealed class EmbeddedKeyProvider : IKeyProvider
+        {
+            private readonly string keyId;
+            private readonly byte[] key;
+
+            internal EmbeddedKeyProvider(string keyId, byte[] key)
+            {
+                this.keyId = keyId;
+                this.key = (byte[])key.Clone();
+            }
+
+            public bool TryGetKey(string requestedKeyId, out byte[] result)
+            {
+                if (!string.Equals(
+                        keyId,
+                        requestedKeyId,
+                        StringComparison.Ordinal))
+                {
+                    result = null;
+                    return false;
+                }
+
+                result = (byte[])key.Clone();
+                return true;
+            }
         }
     }
 

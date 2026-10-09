@@ -22,7 +22,7 @@ namespace UnityRFramework.Expansion
         /// <summary>
         /// 打开 YooAsset 内置目录工具。
         /// </summary>
-        [MenuItem("UnityRFramework/Expansion/YooAsset Builtin Catalog")]
+        [MenuItem("UnityRFramework/Expansion/YooAsset/内置资源清单工具")]
         public static void Open()
         {
             YooAssetBuiltinCatalogWindow window =

@@ -22,7 +22,7 @@ Sample 目录，不允许 Sample 在导入过程中自动向宿主工程
    这些可选依赖。
 3. 等待 Unity 完成编译。
 4. 在非 Play Mode 下执行
-   `UnityRFramework/ExpansionAcceptance/Rebuild Acceptance Assets`。
+   `UnityRFramework/Expansion/YooAsset Demo/重建资源验收场景`。
 5. 确认已生成
    `Assets/StreamingAssets/ExpansionAcceptance/WebProbe.txt`。
 6. 打开当前导入目录中的
@@ -40,7 +40,7 @@ Sample 目录，不允许 Sample 在导入过程中自动向宿主工程
 
 在 Unity 菜单执行：
 
-`UnityRFramework/ExpansionAcceptance/Rebuild Acceptance Assets`
+`UnityRFramework/Expansion/YooAsset Demo/重建资源验收场景`
 
 构建器会在编辑器中完成以下工作：
 
@@ -172,7 +172,7 @@ Bundle；不应包含 `RemoteProbe` Bundle。服务器目录部署该版本的�
 
 先执行：
 
-`UnityRFramework/Expansion/YooAsset Builtin Catalog`
+`UnityRFramework/Expansion/YooAsset/内置资源清单工具`
 
 在工具中选择 `ExpansionAcceptancePackage`，然后点击：
 

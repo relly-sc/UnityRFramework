@@ -47,7 +47,7 @@ namespace UnityRFramework.Expansion
         /// <summary>
         /// 重建 ExpansionAcceptance 验收资产并将启动场景放到 Build Settings 第 0 项。
         /// </summary>
-        [MenuItem("UnityRFramework/ExpansionAcceptance/Rebuild Acceptance Assets")]
+        [MenuItem("UnityRFramework/Expansion/YooAsset Demo/重建资源验收场景")]
         public static void Rebuild()
         {
             EnsureDirectories();

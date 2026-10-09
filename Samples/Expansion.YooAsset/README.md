@@ -57,23 +57,21 @@ YooAsset 的 `EncryptionNone`，未选择时不会读取密钥或增加运行开
 
 启用步骤：
 
-1. 为 Unity Editor 进程设置环境变量 `UNITY_RFRAMEWORK_YOOASSET_KEY`，值为 Base64 编码的
-   32 字节密钥。可选设置 `UNITY_RFRAMEWORK_YOOASSET_KEY_ID`；未设置时使用
-   `YooAssetBundle`。
-2. 重启 Unity，在 `YooAsset/AssetBundle Builder` 中选择目标 Package 和 Pipeline，将
+1. 执行 `UnityRFramework/Expansion/YooAsset/首次生成 Bundle 密钥文件`。工具会生成独立的
+   `Assets/Resources/UnityRFramework/YooAssetKey.bytes`，不要与 `ConfigKey.bytes` 混用。
+2. 在 `YooAsset/AssetBundle Builder` 中选择目标 Package 和 Pipeline，将
    `Bundle Encryptor` 设为 `UnityRFrameworkBundleEncryptor`。
-3. 项目启动时，在调用 `GameEntry.Resource.InitializeAsync()` 前统一注册发布内容密钥：
+3. 使用构建工具或 YooAsset Builder 构建。Builder 会读取该文件加密 Bundle；Player 会在
+   首场景加载前自动读取同一文件并注册解密器，业务代码无需额外注册。
 
-```csharp
-RuntimeKeyProviderRegistry.ConfigureContentKeys(projectKeyProvider);
-```
+框架构建步骤会读取 YooAsset Builder 的当前加密器选择，并在正式打包前校验固定路径的密钥
+文件，不维护第二份加密开关。`ConfigComponent` 使用独立的 `ConfigKey.bytes` 自动配置 Config
+解密，不读取 YooAsset 密钥。未启用 Bundle 加密时，密钥文件不会改变明文加载流程。
 
-`projectKeyProvider` 必须实现 `RFramework.IKeyProvider`，并能按加密数据中保存的 `KeyId`
-返回密钥副本。不要把正式密钥直接序列化到 Prefab、ScriptableObject 或源码中。框架构建步骤
-会读取 YooAsset Builder 的当前加密器选择，并在正式打包前校验环境变量，不维护第二份加密开关。
-此注册入口只供资源扩展使用；`ConfigComponent` 使用独立的 `ConfigKey.bytes` 自动配置 Config
-解密，不读取 YooAsset 密钥。未启用 Bundle 加密时，注册提供器不会改变明文加载流程。
-`YooAssetBundleProtection.Configure` 仍保留为 YooAsset 专用显式覆盖入口。
+密钥首次生成后应长期复用，并随项目源码提交或备份。首次生成遇到已有文件会保留原密钥；
+版本升级和构建不会自动更换密钥。只有主动执行“更换 Bundle 密钥”才会替换密钥，此时旧包
+和缓存无法解密，需要重新构建全部 Bundle 并发布新 Player。固定密钥保持旧包可解密；
+是否需要下载由 Bundle 内容、构建缓存和 YooAsset 清单决定。
 
 当前实现属于整包内存解密，适合提高常规资源提取成本，但加载时会同时占用加密数据和解密后
 数据的内存。应控制单个 Bundle 大小；超大资源需要项目自行提供流式解密器。该能力不替代
@@ -81,8 +79,8 @@ Config 的可选数据保护，也不承诺客户端密钥无法被提取。
 
 Config 加密与 Bundle 加密可以叠加：YooAsset 先还原 Bundle，ConfigModule 再还原其中的
 配置 `.bytes`，两层保护格式和认证上下文互不冲突。通常只为同一保护目标选择一层即可；项目
-同时需要保护其他资源时允许叠加，并应为 Config 与 YooAsset Bundle 使用不同的环境变量、
-`KeyId` 和密钥材料，避免一个密钥泄漏同时失去两层保护。
+同时需要保护其他资源时允许叠加，并应为 Config 与 YooAsset Bundle 使用不同的密钥文件和
+密钥材料，避免一个密钥泄漏同时失去两层保护。
 
 ## 更新与缓存
 
@@ -120,7 +118,7 @@ Helper 加载场景时先检查 Player Build Settings。已加入 Build Settings
 
 菜单入口：
 
-`UnityRFramework/Expansion/YooAsset Builtin Catalog`
+`UnityRFramework/Expansion/YooAsset/内置资源清单工具`
 
 该工具根据 YooAsset `BundleCollectorSetting` 中的 Package 列表工作，可生成：
 

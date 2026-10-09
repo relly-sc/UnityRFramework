@@ -19,6 +19,6 @@ YooAsset、HybridCLR 或其他第三方插件。
 - Hierarchy 右键 `UnityRFramework/检查 UI Prefab`。
 - Project 视图右键 `UnityRFramework/从所选资源创建 SpriteAtlas`。
 - Project 视图右键 `UnityRFramework/检查 SpriteAtlas`。
-- `UnityRFramework/Samples/生成 Expansion.UI.Demo 验收场景`：重建交互与红点验收场景。
+- `UnityRFramework/Expansion/UI Demo/生成验收场景`：重建交互与红点验收场景。
 
 自检入口均位于 `GameObject/UnityRFramework`，按功能命名，不使用实施阶段编号。

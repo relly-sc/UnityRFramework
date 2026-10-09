@@ -21,7 +21,7 @@ namespace UnityRFramework.Editor
 
         private Vector2 scrollPosition;
 
-        [MenuItem("UnityRFramework/CSV 配置表工具")]
+        [MenuItem("UnityRFramework/配置表工具/CSV 配置表工具")]
         private static void Open()
         {
             ConfigPipelineWindow window = GetWindow<ConfigPipelineWindow>("CSV 配置表工具");
@@ -96,9 +96,13 @@ namespace UnityRFramework.Editor
                             "bytes");
                         if (selected != null) options.ConfigProtectionKeyFile = selected;
                     }
-                    if (GUILayout.Button("生成", GUILayout.Width(52f)))
+                    if (GUILayout.Button("首次生成", GUILayout.Width(72f)))
                     {
                         ConfigKeyFileGenerator.Generate(options.ConfigProtectionKeyFile);
+                    }
+                    if (GUILayout.Button("更换密钥", GUILayout.Width(72f)))
+                    {
+                        ConfigKeyFileGenerator.Replace(options.ConfigProtectionKeyFile);
                     }
                 }
                 options.ConfigProtectionSourceRoot = EditorGUILayout.TextField(

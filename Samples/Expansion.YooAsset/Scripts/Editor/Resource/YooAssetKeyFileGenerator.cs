@@ -3,21 +3,23 @@ using System.IO;
 using System.Security.Cryptography;
 using UnityEditor;
 using UnityEngine;
+using UnityRFramework.Runtime;
 
-namespace UnityRFramework.Editor
+namespace UnityRFramework.Expansion.Editor
 {
-    /// <summary>生成 Config 简单偏移混淆密钥文件。</summary>
-    public static class ConfigKeyFileGenerator
+    /// <summary>生成供 YooAsset Bundle 构建和 Player 解密共用的密钥文件。</summary>
+    public static class YooAssetKeyFileGenerator
     {
-        public const string DefaultPath = "Assets/ConfigSource/ConfigKey.bytes";
+        public const string DefaultPath =
+            "Assets/Resources/UnityRFramework/YooAssetKey.bytes";
 
-        [MenuItem("UnityRFramework/配置表工具/首次生成 Config 密钥文件")]
+        [MenuItem("UnityRFramework/Expansion/YooAsset/首次生成 Bundle 密钥文件")]
         public static void GenerateDefault()
         {
             Generate(DefaultPath);
         }
 
-        [MenuItem("UnityRFramework/配置表工具/更换 Config 密钥")]
+        [MenuItem("UnityRFramework/Expansion/YooAsset/更换 Bundle 密钥")]
         public static void ReplaceDefault()
         {
             Replace(DefaultPath);
@@ -38,23 +40,23 @@ namespace UnityRFramework.Editor
         private static bool WriteKey(string assetPath, bool replace)
         {
             assetPath = assetPath?.Replace('\\', '/');
-            if (string.IsNullOrWhiteSpace(assetPath)
-                || !assetPath.StartsWith("Assets/", StringComparison.Ordinal)
-                || !assetPath.EndsWith(".bytes", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(assetPath, DefaultPath, StringComparison.Ordinal))
             {
-                throw new ArgumentException("Config 密钥文件必须是 Assets 下的 .bytes 文件。", nameof(assetPath));
+                throw new ArgumentException(
+                    $"YooAsset 密钥文件必须位于 {DefaultPath}。",
+                    nameof(assetPath));
             }
 
             bool exists = File.Exists(assetPath);
             if (exists && !replace)
             {
-                Debug.Log($"Config 密钥文件已存在，保留原密钥：{assetPath}");
+                Debug.Log($"YooAsset Bundle 密钥文件已存在，保留原密钥：{assetPath}");
                 return false;
             }
 
             if (replace && (!exists || !EditorUtility.DisplayDialog(
-                    "更换 Config 密钥",
-                    "旧的加密 Config 将无法读取。需要重新导出配置并发布使用新密钥的 Player。确认更换？",
+                    "更换 YooAsset Bundle 密钥",
+                    "旧 Bundle 和缓存将无法解密。需要重新构建全部 Bundle 并发布使用新密钥的 Player，用户需重新下载。确认更换？",
                     "更换",
                     "取消")))
             {
@@ -69,17 +71,14 @@ namespace UnityRFramework.Editor
                 random.GetBytes(offsetBytes);
             }
 
-            string directory = Path.GetDirectoryName(assetPath);
-            if (!string.IsNullOrEmpty(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            File.WriteAllBytes(assetPath, Runtime.ConfigKeyFile.Encode(key, offsetBytes[0]));
+            Directory.CreateDirectory(Path.GetDirectoryName(assetPath));
+            File.WriteAllBytes(
+                assetPath,
+                ConfigKeyFile.Encode(key, offsetBytes[0]));
             Array.Clear(key, 0, key.Length);
             AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
             Selection.activeObject = AssetDatabase.LoadAssetAtPath<TextAsset>(assetPath);
-            Debug.Log($"Config 密钥文件已生成：{assetPath}");
+            Debug.Log($"YooAsset Bundle 密钥文件已生成：{assetPath}");
             return true;
         }
     }

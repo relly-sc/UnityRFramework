@@ -39,7 +39,7 @@ Config 与 Localization 使用和现有 CSV 工具一致的四行结构：
 
 菜单入口：
 
-`UnityRFramework/Expansion/Excel 配置表工具`
+`UnityRFramework/配置表工具/Excel 配置表工具`
 
 工具窗口分别提供 Config 与 Localization 区域，可配置：
 

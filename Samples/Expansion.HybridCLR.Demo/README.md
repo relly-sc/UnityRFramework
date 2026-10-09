@@ -27,7 +27,7 @@
    工具会设置 IL2CPP、执行 HybridCLR `Generate/All`、在本 Sample 的 `Generated` 目录
    创建独立框架预制体和序列化 UGUI、重建独立启动场景，并追加 `hotupdate` 收集规则。
 3. 为 `ExpansionHybridCLRDemoPackage` 准备内置目录。全部资源远程时，通过
-   `UnityRFramework/Expansion/YooAsset Builtin Catalog` 选择该 Package 并生成空
+   `UnityRFramework/Expansion/YooAsset/内置资源清单工具` 选择该 Package 并生成空
    `BuiltinCatalog`；存在内置 Bundle 时，按实际内置文件生成 Catalog。不能复用
    `ExpansionHybridCLRDemoPackage` 的 Catalog。
 4. 构建该平台 Player。此步骤会生成与该 Player 严格对应的裁剪后 AOT 程序集。

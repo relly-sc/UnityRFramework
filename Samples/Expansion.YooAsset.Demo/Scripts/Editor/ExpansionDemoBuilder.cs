@@ -56,7 +56,7 @@ namespace UnityRFramework.Expansion
         /// <summary>
         /// 重建第三方 Helper 覆盖层、YooAsset 收集规则和 Build Settings。
         /// </summary>
-        [MenuItem("UnityRFramework/ExpansionDemo/Rebuild Demo Overlay")]
+        [MenuItem("UnityRFramework/Expansion/YooAsset Demo/重建 Demo 覆盖层")]
         public static void Rebuild()
         {
             Rebuild(
@@ -127,7 +127,7 @@ namespace UnityRFramework.Expansion
         /// 为当前平台构建新的 Host Package，并发布到独立 HFS 服务目录。
         /// 不复制任何文件到 StreamingAssets。
         /// </summary>
-        [MenuItem("UnityRFramework/ExpansionDemo/Build Host Package")]
+        [MenuItem("UnityRFramework/Expansion/YooAsset Demo/构建 Host Package")]
         public static void BuildHostPackage()
         {
             BuildHostPackage(
