@@ -71,6 +71,8 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private static StorageComponent storageCache;
 
+        private static SettingComponent settingCache;
+
         /// <summary>
         /// 实体组件缓存。
         /// </summary>
@@ -268,6 +270,19 @@ namespace UnityRFramework.Runtime
             }
         }
 
+        /// <summary>获取应用基础设置组件。</summary>
+        public static SettingComponent Setting
+        {
+            get
+            {
+                if (settingCache == null)
+                {
+                    settingCache = Get<SettingComponent>();
+                }
+                return settingCache;
+            }
+        }
+
         /// <summary>
         /// 获取场景组件。
         /// </summary>
@@ -404,6 +419,7 @@ namespace UnityRFramework.Runtime
             webRequestCache = null;
             downloadCache = null;
             storageCache = null;
+            settingCache = null;
             entityCache = null;
             sceneCache = null;
             uiCache = null;

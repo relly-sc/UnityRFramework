@@ -545,6 +545,51 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &4969069293017697643
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2732462157498575946}
+  - component: {fileID: 723903207131931230}
+  m_Layer: 0
+  m_Name: Setting
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2732462157498575946
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4969069293017697643}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8620926308603613927}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &723903207131931230
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4969069293017697643}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 169a9afbaca651240a450d6126cf5eda, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  settingHelperTypeName: UnityRFramework.Runtime.PlayerPrefsSettingHelper
 --- !u!1 &5528815286685469551
 GameObject:
   m_ObjectHideFlags: 0
@@ -637,6 +682,7 @@ Transform:
   - {fileID: 8810000000000000002}
   - {fileID: 7118253476241208853}
   - {fileID: 6713609673569302495}
+  - {fileID: 2732462157498575946}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &5126782356442648373
@@ -1460,8 +1506,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   configHelperTypeName: UnityRFramework.Runtime.JsonConfigHelper
   protectionMode: 0
-  configKeyId: config-v1
-  configKeyFile: {fileID: 0}
   protectionSourceRoot: Config/Binary
   protectedSingleTableFormat: 1
   protectedTableBundleFormat: 1

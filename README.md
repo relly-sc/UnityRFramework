@@ -195,6 +195,7 @@ Player 后才会按 Profile 设置递增 Build Number。
 | **WebRequest** | HTTP GET/POST/PUT/DELETE，并发控制，超时+重试，multipart 上传+进度 | `GameEntry.WebRequest` |
 | **Download** | 大文件可靠下载，`.part` 断点续传、重试、速度/ETA、大小与 SHA-256 校验 | `GameEntry.Download` |
 | **Config** | 配置表管理与查询，默认 JSON + 内置 URFC 二进制，可扩展自定义格式 | `GameEntry.Config` |
+| **Setting** | 少量应用设置和简单键值，默认使用 Unity PlayerPrefs | `GameEntry.Setting` |
 | **Storage** | 多槽位存档、原子写入、备份恢复、版本迁移、可选压缩和加密认证 | `GameEntry.Storage` |
 | **Fsm** | 同步通用有限状态机，泛型 Owner，生命周期异常后停止运行 | `GameEntry.Fsm` |
 | **Procedure** | 同步游戏流程 FSM，Blackboard 跨状态共享数据 | `GameEntry.Procedure` |
@@ -650,6 +651,24 @@ Editor 代码生成可以实现 `IConfigCodeGenerator` 并通过
 `ConfigCodeGeneratorRegistry.Set()` 替换，`Reset()` 恢复框架默认生成器。自定义生成器仍须
 遵守当前 URFC v2、`IBinaryConfigCodec` 和自动注册契约；需要改变整个文件格式时应实现
 自定义 `ConfigHelperBase`。
+
+### Setting
+
+`SettingComponent` 位于框架入口 Prefab 的 `Setting` 子物体，默认使用 Unity PlayerPrefs。
+适合保存音量、语言、分辨率等少量非敏感设置，与 `Storage` 存档独立：
+
+```csharp
+float volume = GameEntry.Setting.GetFloat("Audio.MasterVolume", 1f);
+string language = GameEntry.Setting.GetString("Localization.Language", "zh-CN");
+GameEntry.Setting.SetFloat("Audio.MasterVolume", 0.8f);
+GameEntry.Setting.SetString("Localization.Language", "en");
+GameEntry.Setting.Save();
+```
+
+读取后仍需由业务代码将值应用到音频、本地化或屏幕设置；Setting 只负责持久化。
+支持 `bool`、`int`、`float`、`string` 的 `Get`/`Set`、`HasKey` 和 `DeleteKey`。
+修改设置后可显式调用 `Save()`；框架停止/软重启及应用暂停时也会保存待写入设置。
+PlayerPrefs 不加密，不要存密码、令牌或大量业务数据；这些也不应代替 Storage 存档。
 
 ### Storage 与基础安全
 
