@@ -708,6 +708,16 @@ namespace UnityRFramework.Runtime
                     moduleInfos.Add(new ModuleDebugInfo("Config",
                         string.Format("Tables: {0}", cfgM.ConfigCount), null));
 
+                SettingComponent setting = GameEntry.Get<SettingComponent>();
+                if (setting != null)
+                    moduleInfos.Add(new ModuleDebugInfo("Setting",
+                        setting.HasPendingChanges ? "Pending Save" : "Saved",
+                        new Dictionary<string, string>
+                        {
+                            { "Helper", setting.HelperName },
+                            { "Pending Save", setting.HasPendingChanges.ToString() }
+                        }));
+
                 // Scene
                 var sceneM = RFramework.RFrameworkModuleHost.Get<RFramework.ISceneModule>();
                 if (sceneM != null)

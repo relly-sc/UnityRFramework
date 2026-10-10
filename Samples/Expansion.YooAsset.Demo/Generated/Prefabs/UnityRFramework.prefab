@@ -1,5 +1,50 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &107497348653561630
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 856782428228951748}
+  - component: {fileID: 5923340464394916315}
+  m_Layer: 0
+  m_Name: Setting
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &856782428228951748
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 107497348653561630}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1825794738314003970}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5923340464394916315
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 107497348653561630}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 169a9afbaca651240a450d6126cf5eda, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  settingHelperTypeName: UnityRFramework.Runtime.PlayerPrefsSettingHelper
 --- !u!1 &453618729611517579
 GameObject:
   m_ObjectHideFlags: 0
@@ -147,6 +192,7 @@ Transform:
   - {fileID: 21790163296332577}
   - {fileID: 818843575856683787}
   - {fileID: 1770240587722855478}
+  - {fileID: 856782428228951748}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &3006306689066536698
@@ -1218,8 +1264,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   configHelperTypeName: UnityRFramework.Runtime.JsonConfigHelper
   protectionMode: 0
-  configKeyId: config-v1
-  configKeyFile: {fileID: 0}
   protectionSourceRoot: Config/Binary
   protectedSingleTableFormat: 1
   protectedTableBundleFormat: 1

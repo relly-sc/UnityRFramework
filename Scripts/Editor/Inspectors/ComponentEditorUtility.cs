@@ -221,6 +221,11 @@ namespace UnityRFramework.Editor
             {
                 DrawValue("Storage Root", EmptyFallback(storageComponent.StorageRootPath));
             }
+            else if (component is Runtime.SettingComponent settingComponent)
+            {
+                DrawValue("Setting Helper", settingComponent.HelperName);
+                DrawValue("Pending Save", FormatBoolean(settingComponent.HasPendingChanges));
+            }
 
             EditorGUILayout.EndVertical();
         }

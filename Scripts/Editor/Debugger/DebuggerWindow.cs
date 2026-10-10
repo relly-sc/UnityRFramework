@@ -738,6 +738,16 @@ namespace UnityRFramework.Editor
                         string.Format("Tables: {0}", cfgM.ConfigCount), details));
                 }
 
+                Runtime.SettingComponent setting = Runtime.GameEntry.Get<Runtime.SettingComponent>();
+                if (setting != null)
+                    moduleInfos.Add(new ModuleDebugInfo("Setting",
+                        setting.HasPendingChanges ? "Pending Save" : "Saved",
+                        new Dictionary<string, string>
+                        {
+                            { "Helper", setting.HelperName },
+                            { "Pending Save", setting.HasPendingChanges.ToString() }
+                        }));
+
                 // Scene
                 var sceneM = RFramework.RFrameworkModuleHost.Get<RFramework.ISceneModule>();
                 if (sceneM != null)

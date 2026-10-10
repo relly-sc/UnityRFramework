@@ -108,6 +108,8 @@ namespace UnityRFramework.Sample
             {
                 string next = GameEntry.Localization.CurrentLanguage == "zh-CN" ? "en" : "zh-CN";
                 await GameEntry.Localization.SwitchLanguageAsync(next);
+                GameEntry.Setting.SetString("Language", next);
+                GameEntry.Setting.Save();
                 RefreshAllText();
                 GameEntry.Event.Fire(new DemoLanguageChangedEvent(next));
             }

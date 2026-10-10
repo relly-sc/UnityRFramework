@@ -9,6 +9,12 @@
 - 重构、重写、架构调整或其他不兼容的大改动：主版本号加一，例如 `1.5.0` → `2.0.0`。
 - 每次版本发布都必须在本文件记录新增、变更和修复内容。
 
+## 1.7.0 - 未发布
+
+### 新增
+
+- 新增独立的 Setting 应用设置模块，默认通过 Unity PlayerPrefs 保存少量非敏感的 bool、int、float 和 string 设置；支持自定义 Helper，不与 Storage 存档共用槽位或密钥。Inspector、Editor Debugger 和 Player 屏幕调试窗口显示实际 Helper 与待保存状态。
+
 ## 1.6.0 - 2026-10-09
 
 ### 新增

@@ -65,8 +65,9 @@ namespace UnityRFramework.Sample
                 await DemoDataLoader.LoadAllAsync(ct);
                 ct.ThrowIfCancellationRequested();
                 DemoGameState.ResetSession(GameEntry.Config.GetAllConfigs<Demo_CharacterConfig>());
-                // LoadLanguageAsync 只缓存语言包；大厅创建前必须完成切换，保证首帧读取到正确语言。
-                await GameEntry.Localization.SwitchLanguageAsync("zh-CN");
+                // 大厅创建前应用上次保存的语言，保证首帧读取到正确译文。
+                string language = GameEntry.Setting.GetString("Language", "zh-CN");
+                await GameEntry.Localization.SwitchLanguageAsync(language, ct);
                 ct.ThrowIfCancellationRequested();
 
                 // 加载大厅场景（单场景模式替换当前启动场景）
