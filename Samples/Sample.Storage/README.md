@@ -15,6 +15,17 @@ Storage 存档模块的独立轻量验收 Sample，仅依赖 UnityRFramework 核
 
 场景使用独立目录 `Application.persistentDataPath/SampleStorage` 和专用密钥 `SaveKey.SampleStorage`，不会操作其他 Demo 的存档。
 
+## 自动存档槽位
+
+核心 Storage 提供固定的 `StorageSlotNames.AutoSave` 自动存档槽位。业务在重大选择确认、Boss 结算、传送或地图切换完成等时机调用：
+
+```csharp
+StorageResult result = await GameEntry.Storage.SaveAutoAsync(data, options);
+```
+
+该槽位可以使用 `LoadAsync(StorageSlotNames.AutoSave, ...)` 读取，也会出现在槽位列表中；
+但使用普通 `SaveAsync(StorageSlotNames.AutoSave, ...)` 写入会被拒绝，从接口层防止手动存档覆盖自动存档。
+
 ## 备份规则
 
 - 首次保存某个槽位时没有旧文件，因此不会产生备份。

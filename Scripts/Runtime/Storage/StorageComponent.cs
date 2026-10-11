@@ -137,6 +137,15 @@ namespace UnityRFramework.Runtime
             return storageModule.SaveAsync(slotName, data, options ?? CreateDefaultOptions(), ct);
         }
 
+        /// <summary>写入固定的自动存档槽位；普通保存接口不能覆盖该槽位。</summary>
+        public Task<StorageResult> SaveAutoAsync<T>(
+            T data, StorageOptions options = null,
+            CancellationToken ct = default(CancellationToken))
+        {
+            return GetStorageModule().SaveAutoAsync(
+                data, options ?? CreateDefaultOptions(), ct);
+        }
+
         /// <summary>加载槽位；未提供选项时使用 Inspector 默认值。</summary>
         public Task<StorageLoadResult<T>> LoadAsync<T>(
             string slotName, StorageOptions options = null,

@@ -718,6 +718,16 @@ namespace UnityRFramework.Runtime
                             { "Pending Save", setting.HasPendingChanges.ToString() }
                         }));
 
+                AdvertisementComponent advertisement = GameEntry.Get<AdvertisementComponent>();
+                if (advertisement != null)
+                    moduleInfos.Add(new ModuleDebugInfo("Advertisement",
+                        advertisement.IsSupported ? "Supported" : "Not Supported",
+                        new Dictionary<string, string>
+                        {
+                            { "Helper", advertisement.HelperName },
+                            { "Initialized", advertisement.IsInitialized.ToString() }
+                        }));
+
                 // Scene
                 var sceneM = RFramework.RFrameworkModuleHost.Get<RFramework.ISceneModule>();
                 if (sceneM != null)
