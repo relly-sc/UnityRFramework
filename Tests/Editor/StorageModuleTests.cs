@@ -112,7 +112,7 @@ namespace UnityRFramework.Editor.Tests
             Assert.IsTrue(AssetDatabase.IsValidFolder(root));
             Assert.IsNotNull(AssetDatabase.LoadAssetAtPath<MonoScript>(
                 root + "/Scripts/Runtime/StorageAcceptanceController.cs"));
-            Assert.IsTrue(File.ReadAllText("Assets/UnityRFramework/Package.json")
+            Assert.IsTrue(File.ReadAllText("Assets/UnityRFramework/Tools~/SamplesPackage.json")
                 .Contains("\"displayName\": \"Sample.Storage\""));
 
             string source = File.ReadAllText(
@@ -143,6 +143,24 @@ namespace UnityRFramework.Editor.Tests
             Assert.IsTrue(Await(module.ExistsAsync("slot-a")));
             Assert.IsTrue(Await(module.DeleteAsync("slot-a")).Succeeded);
             Assert.IsFalse(Await(module.ExistsAsync("slot-a")));
+        }
+
+        [Test]
+        public void AutomaticSaveUsesReservedSlotAndRejectsManualOverwrite()
+        {
+            StorageResult automatic = Await(module.SaveAutoAsync(
+                new SaveData(9, "automatic")));
+            StorageResult manual = Await(module.SaveAsync(
+                StorageSlotNames.AutoSave, new SaveData(10, "manual")));
+            StorageLoadResult<SaveData> loaded = Await(module.LoadAsync<SaveData>(
+                StorageSlotNames.AutoSave));
+
+            Assert.IsTrue(automatic.Succeeded);
+            Assert.IsFalse(manual.Succeeded);
+            Assert.AreEqual(StorageExceptionReason.InvalidArgument, manual.Reason);
+            Assert.IsTrue(loaded.Succeeded);
+            Assert.AreEqual(9, loaded.Data.Number);
+            Assert.AreEqual("automatic", loaded.Data.Text);
         }
 
         [Test]
