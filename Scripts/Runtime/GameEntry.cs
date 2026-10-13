@@ -103,6 +103,9 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private static NetworkComponent networkCache;
 
+        /// <summary>广告组件缓存。</summary>
+        private static AdvertisementComponent advertisementCache;
+
         // ====== 强类型静态快捷入口（内置模块） ======
 
         /// <summary>
@@ -373,6 +376,19 @@ namespace UnityRFramework.Runtime
             }
         }
 
+        /// <summary>获取统一广告组件。</summary>
+        public static AdvertisementComponent Advertisement
+        {
+            get
+            {
+                if (advertisementCache == null)
+                {
+                    advertisementCache = Get<AdvertisementComponent>();
+                }
+                return advertisementCache;
+            }
+        }
+
         // ====== 泛型查询（自定义组件） ======
 
         /// <summary>
@@ -426,6 +442,7 @@ namespace UnityRFramework.Runtime
             audioCache = null;
             localizationCache = null;
             networkCache = null;
+            advertisementCache = null;
         }
 
         // ====== 生命周期 ======

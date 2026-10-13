@@ -8,6 +8,10 @@
 
 版本新增、变更和修复记录见 [CHANGELOG.md](CHANGELOG.md)。
 
+## AI 开发技能
+
+核心包附带 [`Skills~/unityrframework/SKILL.md`](Skills~/unityrframework/SKILL.md)，供 AI 助手在使用框架的项目中识别模块、核对当前版本 API 和可选扩展。将 `Skills~/unityrframework` 文件夹复制到 AI 工具的技能目录（Codex 为 `~/.codex/skills/unityrframework`）后即可使用；它不会替项目安装 Samples 或第三方插件。
+
 ## 架构
 
 ```
@@ -197,6 +201,7 @@ Player 后才会按 Profile 设置递增 Build Number。
 | **Config** | 配置表管理与查询，默认 JSON + 内置 URFC 二进制，可扩展自定义格式 | `GameEntry.Config` |
 | **Setting** | 少量应用设置和简单键值，默认使用 Unity PlayerPrefs | `GameEntry.Setting` |
 | **Storage** | 多槽位存档、原子写入、备份恢复、版本迁移、可选压缩和加密认证 | `GameEntry.Storage` |
+| **Advertisement** | 统一广告调用接口，默认空实现，平台 SDK 由项目通过 Helper 接入 | `GameEntry.Advertisement` |
 | **Fsm** | 同步通用有限状态机，泛型 Owner，生命周期异常后停止运行 | `GameEntry.Fsm` |
 | **Procedure** | 同步游戏流程 FSM，Blackboard 跨状态共享数据 | `GameEntry.Procedure` |
 | **Entity** | 游戏实体生命周期，实体组自管实例缓存，父子附加 | `GameEntry.Entity` |
@@ -700,6 +705,14 @@ Android Keystore 或 Keychain。卸载重装、清除应用数据或密钥丢失
 Config、Storage、YooAsset Bundle 加密和 Obfuz 均为可选能力，默认不启用且使用不同密钥。
 Windows、Android、macOS、iOS 已完成纯核心 Config、`YooAsset + Config` 以及
 `YooAsset + Config + Obfuz` 的 Player 构建和运行验收。
+
+### Advertisement
+
+通过 `GameEntry.Advertisement` 获取广告组件，使用 `Load`、`IsReady`、`Show` 和 `Hide`
+操作广告位。核心支持 Banner、Interstitial 和 Rewarded 类型；默认的
+`DefaultAdvertisementHelper` 不展示广告，`Show` 返回 `false` 并回调 `NotSupported`。
+真实广告平台需由项目实现 `AdvertisementHelperBase` 并安装、初始化对应 Helper。
+激励奖励应在 `AdvertisementResult.Rewarded` 回调中发放，不能根据 `Show` 的返回值发奖。
 
 ### Fsm
 
