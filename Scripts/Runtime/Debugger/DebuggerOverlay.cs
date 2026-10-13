@@ -718,7 +718,7 @@ namespace UnityRFramework.Runtime
                             { "Pending Save", setting.HasPendingChanges.ToString() }
                         }));
 
-                AdvertisementComponent advertisement = GameEntry.Get<AdvertisementComponent>();
+                AdvertisementComponent advertisement = GameEntry.Advertisement;
                 if (advertisement != null)
                     moduleInfos.Add(new ModuleDebugInfo("Advertisement",
                         advertisement.IsSupported ? "Supported" : "Not Supported",
