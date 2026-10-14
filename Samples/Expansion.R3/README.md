@@ -15,6 +15,10 @@
 
 **只安装 UPM 的 `R3.Unity` 不会提供 `R3.dll`**，两步都需要。项目已有其他扩展的同名 .NET DLL 时应统一依赖，不能再导入第二份同名程序集。本开发工程复用了已有的 `Microsoft.Bcl.AsyncInterfaces` 和 `System.Runtime.CompilerServices.Unsafe`，不要求消费项目导入 SharpCompress。
 
+`UnityRFramework → 安装扩展与示例` 可以自动安装固定版本的 R3.Unity；R3 本体仍按上述
+NuGet 流程安装。工具检查 R3 本体版本，缺失或不匹配时不会导入扩展代码，准备好后再次
+点击“安装并导入”即可。不自动引入 NuGetForUnity，也不重复复制项目已有的 .NET DLL。
+
 本扩展和 Demo 不创建 asmdef：运行时脚本随宿主编入 `Assembly-CSharp`，Editor 子目录编入 `Assembly-CSharp-Editor`。`UnityRFramework.Expansion` 是命名空间，不是独立程序集名。
 
 自定义业务 asmdef 不能反向引用默认的 `Assembly-CSharp`。若项目已有自定义业务程序集，需要使用这些扩展类型时，可在明确规划后把导入的扩展源码纳入已有业务程序集，并添加实际需要的 `UnityRFramework.Runtime`、`RFramework.Library`、`R3.Unity` 和预编译 DLL 引用；不要默认给扩展或 Demo 新增 asmdef。R3 自身的第三方程序集不受此规则限制。

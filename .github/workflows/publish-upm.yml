@@ -103,4 +103,16 @@ jobs:
           git commit -F "$commit_message_file"
           git branch -M main
           git remote add origin "git@github.com:relly-sc/UnityRFramework-Samples.git"
+          # Version branches pin Samples without creating user-controlled release tags.
+          package_version="$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          version_branch="versions/$package_version"
+          if [[ -n "$(git ls-remote --heads origin "refs/heads/$version_branch")" ]]; then
+            git fetch origin "$version_branch"
+            if ! git diff --quiet FETCH_HEAD HEAD -- .; then
+              echo "Samples version $package_version is already published with different content. Increment the package version." >&2
+              exit 1
+            fi
+          else
+            git push origin "HEAD:refs/heads/$version_branch"
+          fi
           git push --force origin main

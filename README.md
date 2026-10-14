@@ -99,10 +99,21 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 > 核心包请使用 `#upm` 分支安装。该分支由 GitHub Actions 根据开发仓库的 `main` 生成，
 > 不包含示例和可选扩展；请勿从开发仓库的 `main` 分支直接安装。
 
-**Samples（可选）**：安装核心包后，点击 `UnityRFramework → 安装 Samples`。工具会从
-`https://github.com/relly-sc/UnityRFramework-Samples.git#main` 安装独立 Samples 包；
-安装完成后，在 Package Manager 中选中 **UnityRFramework Samples** → **Samples** → 按需点击 **Import**。
-首次安装需可访问 GitHub，核心包与 Samples 包的版本应相同。未安装 Samples 时不影响核心框架使用。
+**Samples（可选）**：安装核心包后，点击 `UnityRFramework → 安装 Samples`，工具从官方
+Samples 仓库的 `versions/{框架版本}` 分支安装相同版本的独立包，不跟随最新 `main`。
+安装完成后打开 `UnityRFramework → 安装扩展与示例`，选择需要的功能，点击“安装并导入”。
+工具会先安装固定版本的 UPM 插件，再按依赖顺序导入所需扩展和 Demo；不会默认安装全部插件。
+首次安装需能访问 GitHub，并在本机安装可供 Unity 使用的 Git。仅用核心时不需要 Samples。
+
+插件版本随框架发布清单维护，不因第三方发布新版而自动升级。已有不同版本或未固定的 Git
+分支时，安装前显示变更并确认；本地或嵌入式插件版本不匹配时停止，不删除用户源码。
+更新框架后可用“同步并重新导入”同步插件与已导入代码；覆盖前请备份导入目录中的业务改动。
+普通“安装并导入”会跳过当前版本已导入的目录，不覆盖用户修改，也不会复制第二份旧版脚本。
+
+UPM 以外的准备工作仍需按插件要求完成：R3 本体及 .NET 依赖通过 NuGetForUnity 安装，
+Obfuz 先生成加密虚拟机与密钥，HybridCLR 通过 Installer 初始化本机原生环境。
+安装器会阻止缺少 R3 本体或 Obfuz 生成类型时导入会报错的代码。
+直接使用 Package Manager 原生的 Samples → Import 不经过框架依赖检查，需自行准备依赖。
 
 - `Sample.Demo`：官方可运行示例，**仅依赖内置 Helper、零第三方**。导入后先执行
   `UnityRFramework/Samples/Demo/导出配置与多语言`，该菜单会将配置、
@@ -111,8 +122,8 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 - `Sample.Download`：内置 `DownloadModule` 的独立轻量验收场景，不依赖其他 Sample；
   覆盖进度、取消、断点续传、大小与 SHA-256 校验、ZIP 解压和软重启。导入后打开
   `GameAssets/Scenes/DownloadAcceptance.unity`，完整步骤见 Sample 自带 README。
-- `Expansion.YooAsset`：YooAsset 资源辅助器桥接实现。需手动安装 YooAsset 3.0.5+。
-- `Expansion.UniTask`：UniTask Web 请求辅助器桥接实现。需手动安装 UniTask。
+- `Expansion.YooAsset`：YooAsset 资源辅助器桥接实现，安装工具固定使用 YooAsset 3.0.5。
+- `Expansion.UniTask`：UniTask Web 请求辅助器桥接实现，安装工具固定使用 UniTask 2.5.11。
 - `Expansion.R3`：R3 事件桥接和 UI/Entity 订阅生命周期管理，需先安装 R3 本体与 R3.Unity；不替换核心 Event/Timer，也不强制 MVVM。安装与用法见 [扩展说明](Samples/Expansion.R3/README.md)。
 - `Expansion.R3.Demo`：独立中文 UGUI 响应式交互示例，演示积分绑定、条件联动、搜索防抖及窗口开关退订。导入扩展和 Demo 后，从 `UnityRFramework → Expansion → R3 → 打开响应式交互示例` 运行，详见 [示例说明](Samples/Expansion.R3.Demo/README.md)。
 - `Expansion.ExcelDataReader`：ExcelDataReader 配置表导出工具，支持从 XLSX/XLS

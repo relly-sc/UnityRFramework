@@ -5,11 +5,14 @@
 
 ## 前置依赖
 
-- UniTask（`com.cysharp.unitask`）。
+- UniTask 2.5.11（`com.cysharp.unitask`，当前固定版本）。
 - UnityRFramework Runtime。
 
 UniTask 是可选第三方依赖。导入本 Sample 前应先在宿主项目安装 UniTask，否则 Sample
 中引用 `Cysharp.Threading.Tasks` 的脚本无法编译。
+
+可通过 `UnityRFramework → 安装扩展与示例` 的“安装并导入”，先安装固定版本 UniTask，
+再导入本扩展。工具不会将已有本地插件替换为远端包。
 
 ## 配置
 

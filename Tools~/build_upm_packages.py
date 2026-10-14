@@ -63,6 +63,13 @@ def load_manifests() -> tuple[dict, dict]:
             "核心版本、Samples 版本及 Samples 对核心的依赖版本必须完全一致："
             f"core={version!r}, samples={samples_version!r}, dependency={dependency_version!r}"
         )
+    catalog = load_manifest(ROOT / "Scripts" / "Editor" / "FrameworkSamples.json")
+    if catalog.get("frameworkVersion") != version:
+        raise ValueError("扩展依赖清单版本必须与核心版本一致。")
+    if {sample["name"] for sample in catalog["samples"]} != {
+        sample["displayName"] for sample in samples_manifest["samples"]
+    }:
+        raise ValueError("扩展依赖清单与 Samples 声明不一致。")
     return core_manifest, samples_manifest
 
 
