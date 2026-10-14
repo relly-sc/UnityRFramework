@@ -218,7 +218,6 @@ namespace UnityRFramework.Editor
                         if (!sample.Import(Sample.ImportOptions.OverridePreviousImports))
                             throw new InvalidOperationException("Sample 导入失败：" + definition.name);
                     }
-                    Finish("扩展与示例导入完成：" + string.Join(", ", plan.Select(s => s.name)), false);
                 }
                 finally
                 {
@@ -227,7 +226,10 @@ namespace UnityRFramework.Editor
                     job = null;
                     AssetDatabase.StopAssetEditing();
                     AssetDatabase.AllowAutoRefresh();
+                    // 恢复自动刷新不会主动扫描刚复制的 Sample 文件。
+                    AssetDatabase.Refresh();
                 }
+                Finish("扩展与示例导入完成：" + string.Join(", ", plan.Select(s => s.name)), false);
             }
             catch (Exception error) { Finish("安装已停止：" + error.Message, true); }
         }
