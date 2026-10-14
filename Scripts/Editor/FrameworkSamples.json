@@ -1,0 +1,34 @@
+{
+  "frameworkVersion": "1.11.0",
+  "packages": [
+    { "name": "com.tuyoogame.yooasset", "version": "3.0.5", "url": "https://github.com/tuyoogame/YooAsset.git?path=Assets/YooAsset#3.0.5" },
+    { "name": "com.cysharp.unitask", "version": "2.5.11", "url": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask#2.5.11" },
+    { "name": "com.code-philosophy.hybridclr", "version": "8.13.0", "url": "https://github.com/focus-creative-games/hybridclr_unity.git#v8.13.0" },
+    { "name": "com.code-philosophy.obfuz", "version": "3.1.0", "url": "https://github.com/focus-creative-games/obfuz.git#v3.1.0" },
+    { "name": "com.code-philosophy.obfuz4hybridclr", "version": "3.0.1", "url": "https://github.com/focus-creative-games/obfuz4hybridclr.git#v3.0.1" },
+    { "name": "com.cysharp.r3", "version": "1.3.1", "url": "https://github.com/Cysharp/R3.git?path=src/R3.Unity/Assets/R3.Unity#1.3.1" }
+  ],
+  "samples": [
+    { "name": "Sample.Demo" },
+    { "name": "Sample.Download" },
+    { "name": "Sample.Storage" },
+    { "name": "Sample.UI" },
+    { "name": "Expansion.UI" },
+    { "name": "Expansion.UI.Demo", "dependencies": ["Expansion.UI"] },
+    { "name": "Expansion.HybridCLR", "packages": ["com.code-philosophy.hybridclr"], "notice": "适配 HybridCLR 8.13.0，不支持 9.x。安装插件后仍需执行 HybridCLR/Installer 完成本机原生环境初始化。" },
+    { "name": "Expansion.HybridCLR.Demo", "dependencies": ["Expansion.YooAsset.Demo", "Expansion.HybridCLR"] },
+    { "name": "Expansion.Obfuz", "dependencies": ["Expansion.HybridCLR"], "packages": ["com.code-philosophy.obfuz", "com.code-philosophy.obfuz4hybridclr"], "requiredType": "Obfuz.EncryptionVM.GeneratedEncryptionVirtualMachine", "notice": "安装插件后先按 Obfuz 官方流程生成加密虚拟机及密钥，再导入此扩展。", "helpUrl": "https://www.obfuz.com/docs/beginner/quickstart" },
+    { "name": "Expansion.Security.Android" },
+    { "name": "Expansion.Security.iOS" },
+    { "name": "Expansion.Security.macOS" },
+    { "name": "Expansion.Security.Windows" },
+    { "name": "Expansion.YooAsset" , "packages": ["com.tuyoogame.yooasset"] },
+    { "name": "Expansion.UniTask", "packages": ["com.cysharp.unitask"] },
+    { "name": "Expansion.YooAsset.Demo", "dependencies": ["Sample.Demo", "Expansion.YooAsset", "Expansion.UniTask"] },
+    { "name": "Expansion.R3", "packages": ["com.cysharp.r3"], "requiredAssembly": "R3", "assemblyVersion": "1.3.1.0", "notice": "R3.Unity 可以自动安装；R3 本体须先通过 NuGetForUnity 安装 R3 1.3.1 及其 .NET 依赖。", "helpUrl": "https://github.com/Cysharp/R3#unity" },
+    { "name": "Expansion.R3.Demo", "dependencies": ["Expansion.R3"] },
+    { "name": "Expansion.SharpZipLib", "notice": "已内置 SharpZipLib 1.4.2 及许可证。" },
+    { "name": "Expansion.SharpCompress", "notice": "已内置 SharpCompress 0.50.1、必要依赖及许可证。" },
+    { "name": "Expansion.ExcelDataReader", "notice": "已内置 ExcelDataReader 的编辑器依赖及许可证。" }
+  ]
+}

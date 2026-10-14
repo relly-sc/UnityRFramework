@@ -15,6 +15,10 @@ Obfuz4HybridCLR `3.0.1`。其他版本需要重新验证联合生成入口和运
 
 依赖均需由使用者按官方文档手动安装、生成加密虚拟机及密钥，并完成运行时初始化。
 
+`UnityRFramework → 安装扩展与示例` 可自动安装上述固定 UPM 版本及 HybridCLR 扩展。
+先点击“安装依赖”，按 Obfuz 官方流程生成 `GeneratedEncryptionVirtualMachine` 与密钥，
+再点击“安装并导入”。未找到生成类型时安装器会停止导入代码，不把生成步骤伪装成插件已就绪。
+
 ## 设置
 
 1. 打开 `Obfuz/Settings...`。

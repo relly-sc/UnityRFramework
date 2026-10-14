@@ -6,11 +6,15 @@
 
 ## 前置依赖
 
-- YooAsset 3.0.5 或兼容版本。
+- YooAsset 3.0.5（当前固定版本）。
 - UnityRFramework Runtime。
 
 YooAsset 是可选第三方依赖。导入本 Sample 前应先在宿主项目安装 YooAsset，否则
 Sample 中引用 `YooAsset` 命名空间的脚本无法编译。
+
+推荐使用 `UnityRFramework → 安装扩展与示例` 的“安装并导入”，自动先安装固定版本
+YooAsset，再导入本扩展；无需手工添加 OpenUPM 注册表。仅更新依赖不会同步旧导入源码，
+升级框架后按需选择“同步并重新导入”，覆盖前先备份项目改动。
 
 ## 配置
 

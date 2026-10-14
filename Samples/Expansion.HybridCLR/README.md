@@ -11,11 +11,15 @@ Runtime，也不提供第二套下载器；DLL、PDB、AOT 补充元数据和 Ma
 ## 依赖
 
 - UnityRFramework
-- HybridCLR 8.13.0+
+- HybridCLR 8.13.0（当前固定适配版本，不支持 9.x）
 - IL2CPP 目标平台
 
 核心包不会自动安装 HybridCLR。导入本 Sample 前，应先按 HybridCLR 官方流程安装插件，
 再执行 `HybridCLR/Installer...` 完成本机初始化。
+
+也可通过 `UnityRFramework → 安装扩展与示例` 选择本扩展，由工具先安装固定的 HybridCLR
+8.13.0，再导入扩展代码。项目已安装 9.x 时会明确提示版本更换并要求确认；不会修改本地或
+嵌入式插件源码。插件安装不等于原生环境初始化，Installer 仍需在本机执行。
 
 ## 提供能力
 
