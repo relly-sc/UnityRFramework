@@ -10,7 +10,26 @@
 
 ## AI 开发技能
 
-核心包附带 [`Skills~/unityrframework/SKILL.md`](Skills~/unityrframework/SKILL.md)，供 AI 助手在使用框架的项目中识别模块、核对当前版本 API 和可选扩展。将 `Skills~/unityrframework` 文件夹复制到 AI 工具的技能目录（Codex 为 `~/.codex/skills/unityrframework`）后即可使用；它不会替项目安装 Samples 或第三方插件。
+核心包附带 **UnityRFramework Skills**（[`Skills~/unityrframework-skills/SKILL.md`](Skills~/unityrframework-skills/SKILL.md)），供 AI 助手在使用框架的项目中识别模块、核对当前版本 API 和可选扩展。技能标识和安装目录名为 `unityrframework-skills`，安装的是 AI 技能，不是框架包。
+
+技能按需求提供模块选型、正常使用流程、生命周期与常见误用、业务脚本规范、当前版本 API 查询方法和跨模块业务示例。它不强制 MVC/MVP/MVVM，不默认安装第三方依赖，也不会把源码核对或 Editor 成功当作 Player/真机验收。
+
+通过 `UnityRFramework → 安装 AI 技能` 打开窗口，在目标 Agent 的“项目”或“全局”一行点击“安装”。项目安装只用于当前工程，全局安装用于本机当前用户的多个工程。窗口显示实际目标路径、安装状态和更新按钮，也可卸载本工具安装的技能；它不会安装 Agent 软件、Samples、第三方插件或修改 MCP 配置。
+
+同一 Agent 的项目安装与全局安装互斥：安装一处后，另一处不可安装，原位置仍可更新、卸载。切换范围时先卸载原位置，工具不会自动删除它。自定义目录若匹配预置 Agent 的路径，也遵循此规则。
+
+| Agent | 项目技能目录 | 全局技能目录 |
+| --- | --- | --- |
+| [Claude Code](https://code.claude.com/docs/en/skills) | `.claude/skills` | `~/.claude/skills` |
+| [Codex](https://learn.chatgpt.com/docs/build-skills) | `.agents/skills` | `~/.agents/skills` |
+| [Antigravity IDE](https://antigravity.google/docs/skills) | `.agents/skills` | `~/.gemini/config/skills` |
+| [Cursor](https://cursor.com/docs/skills) | `.cursor/skills` | `~/.cursor/skills` |
+| [OpenCode](https://opencode.ai/docs/skills/) | `.opencode/skills` | `~/.config/opencode/skills` |
+| [Kimi Code](https://www.kimi.com/code/docs/kimi-code-cli/customization/skills.html) | `.kimi-code/skills` | `~/.kimi-code/skills`，设置 `KIMI_CODE_HOME` 时使用其下的 `skills` |
+
+窗口底部支持“自定义安装目录”：手动输入绝对路径或点击“浏览”，选择 Agent 扫描的技能父目录，工具会在其中创建 `unityrframework-skills` 子目录。不要选择技能文件夹本身，工具会提示选择其上一级目录，避免重复嵌套。此处同样提供安装、更新和卸载操作；未选择有效目录时按钮置灰并显示原因，单个预置路径不可用不会影响其他 Agent 的显示。适用于其他支持 `SKILL.md` 的 Agent 或非默认安装位置；自定义目录须由对应 Agent 配置为技能扫描目录。
+
+Codex 和 Antigravity 的项目安装共用同一目录，安装其中一个后，两行状态都会更新。框架更新后，重新打开窗口或点击刷新，有技能源文件变化时显示“更新”，点击即可完整替换旧技能并清理旧版文件。已有技能被手动修改或由其他方式安装时，显示“覆盖更新”，确认后才替换，同名目录内的本地修改会丢失，请先备份。卸载仅允许本工具管理且未手动修改的目录，不会影响其他技能。安装或更新后按 Agent 的发现机制刷新技能或重新启动会话。也可以手动复制 `Skills~/unityrframework-skills` 到上述技能目录。
 
 ## 架构
 
