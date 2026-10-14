@@ -1,6 +1,6 @@
 {
   "name": "com.relly-sc.unityrframework.samples",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "displayName": "UnityRFramework Samples",
   "description": "UnityRFramework 官方示例、验收场景与可选扩展。按需导入，不属于框架核心运行依赖。",
   "documentationUrl": "https://github.com/relly-sc/UnityRFramework-Samples/blob/main/README.md",
@@ -17,7 +17,7 @@
     "expansion"
   ],
   "dependencies": {
-    "com.relly-sc.unityrframework": "1.9.0"
+    "com.relly-sc.unityrframework": "1.10.0"
   },
   "samples": [
     {
@@ -99,6 +99,16 @@
       "displayName": "Expansion.UniTask",
       "description": "UniTask Web 请求辅助器桥接实现。需手动安装 UniTask。",
       "path": "Samples~/Expansion.UniTask"
+    },
+    {
+      "displayName": "Expansion.R3",
+      "description": "可选 R3 响应式桥接：观察框架事件，自动管理 UI 打开和实体显示周期内的订阅。需先安装 R3 本体及 R3.Unity；不改变核心模块接口。",
+      "path": "Samples~/Expansion.R3"
+    },
+    {
+      "displayName": "Expansion.R3.Demo",
+      "description": "R3 中文 UGUI 示例，包含积分绑定、组合条件、搜索防抖、框架事件及界面反复开关。依赖 Expansion.R3、R3 和 R3.Unity，不依赖 UniTask。",
+      "path": "Samples~/Expansion.R3.Demo"
     },
     {
       "displayName": "Expansion.SharpZipLib",
