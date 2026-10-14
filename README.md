@@ -45,6 +45,8 @@ Samples/Expansion.UI.Demo/        ← UI 扩展功能 Demo 与验收场景
 Samples/Expansion.YooAsset/       ← YooAsset 资源辅助器桥接实现
 Samples/Expansion.YooAsset.Demo/  ← YooAsset 资源热更 Demo 与专项验收
 Samples/Expansion.UniTask/        ← UniTask Web 请求辅助器桥接实现
+Samples/Expansion.R3/             ← R3 事件桥接与订阅生命周期扩展
+Samples/Expansion.R3.Demo/        ← R3 响应式交互示例
 Samples/Expansion.SharpZipLib/   ← SharpZipLib ZIP 解压辅助器桥接实现
 Samples/Expansion.SharpCompress/ ← SharpCompress 多格式解压辅助器桥接实现
 Samples/Expansion.ExcelDataReader/ ← ExcelDataReader 配置表导出工具（EditorOnly）
@@ -111,6 +113,8 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
   `GameAssets/Scenes/DownloadAcceptance.unity`，完整步骤见 Sample 自带 README。
 - `Expansion.YooAsset`：YooAsset 资源辅助器桥接实现。需手动安装 YooAsset 3.0.5+。
 - `Expansion.UniTask`：UniTask Web 请求辅助器桥接实现。需手动安装 UniTask。
+- `Expansion.R3`：R3 事件桥接和 UI/Entity 订阅生命周期管理，需先安装 R3 本体与 R3.Unity；不替换核心 Event/Timer，也不强制 MVVM。安装与用法见 [扩展说明](Samples/Expansion.R3/README.md)。
+- `Expansion.R3.Demo`：独立中文 UGUI 响应式交互示例，演示积分绑定、条件联动、搜索防抖及窗口开关退订。导入扩展和 Demo 后，从 `UnityRFramework → Expansion → R3 → 打开响应式交互示例` 运行，详见 [示例说明](Samples/Expansion.R3.Demo/README.md)。
 - `Expansion.ExcelDataReader`：ExcelDataReader 配置表导出工具，支持从 XLSX/XLS
   生成 Config 与 Localization 数据；已内置 EditorOnly 依赖 DLL，无需手动安装。
 - `Sample.UI`：只验收框架核心 UI Module，不依赖 Expansion 或第三方插件；详见其 README。

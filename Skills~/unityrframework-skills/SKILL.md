@@ -30,7 +30,7 @@ description: 在已安装 UnityRFramework 的 Unity 项目中实现业务功能�
 | 音频、事件、计时、状态机、应用流程、场景、通信 | [核心模块](references/核心模块.md) 中对应章节。 |
 | 广告或简单数值防护 | [Advertisement](references/核心模块.md#advertisement) 或 [基础安全](references/核心模块.md#基础安全)，不夸大默认能力。 |
 | 构建 Player/资源/热更，处理 Profile 和报告 | [构建工具](references/构建工具.md)。 |
-| YooAsset、HybridCLR、Obfuz、Excel、UI 工具、平台密钥仓 | [可选扩展](references/可选扩展.md)，再看当前导入扩展的 README 和源码。 |
+| YooAsset、HybridCLR、Obfuz、Excel、UI 工具、R3、平台密钥仓 | [可选扩展](references/可选扩展.md)，再看当前导入扩展的 README 和源码。 |
 | 设置界面、读档、加载界面等跨模块业务 | [业务示例](references/业务示例.md)，地址和参数由项目提供。 |
 | 查方法签名、生命周期、Helper、示例或测试 | [API 查询](references/API查询.md)，以当前安装源码为事实源。 |
 
