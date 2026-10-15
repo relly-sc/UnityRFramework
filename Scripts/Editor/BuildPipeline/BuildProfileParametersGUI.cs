@@ -227,8 +227,9 @@ namespace UnityRFramework.Editor
                     return "HotUpdate：准备 HybridCLR/Obfuz 热更代码并构建 YooAsset 资源包；"
                         + "不导出 Config，也不构建 Player。";
                 case BuildRecipe.Release:
-                    return "Release：执行配置导出、HybridCLR Player 准备、Player 构建、"
-                        + "热更代码发布和资源构建的完整流程。";
+                    return "Release：普通项目先导出配置和构建资源，再构建 Player。"
+                        + "启用 HybridCLR 时先建立 Player AOT 基线，再发布代码和资源；"
+                        + "YooAsset 启用内置拷贝时会再次打包最终 Player。";
                 default:
                     return "未知 Recipe，无法确定构建范围。";
             }

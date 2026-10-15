@@ -91,7 +91,7 @@ namespace UnityRFramework.Editor
     /// 并构建 Player，再由本步骤基于新基线整理热更产物。
     /// </summary>
     public sealed class HybridCLRBuildStep : BuildPipelineStepBase,
-        IBuildIntegrationActivationController
+        IBuildIntegrationActivationController, IRequiresPlayerBuildBaseline
     {
         /// <summary>错误码：HybridCLR 热更准备。</summary>
         private const string StepCode = "HYBRIDCLR";

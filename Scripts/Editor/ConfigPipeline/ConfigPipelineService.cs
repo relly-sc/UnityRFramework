@@ -785,7 +785,7 @@ namespace UnityRFramework.Editor
             return changed;
         }
 
-        private static void ValidateOptions(
+        internal static void ValidateOptions(
             ConfigPipelineOptions options, bool requireConfigSource, bool requireLocalizationSource)
         {
             if (options == null)
@@ -793,13 +793,20 @@ namespace UnityRFramework.Editor
                 throw new RFrameworkException("Config pipeline options are invalid.");
             }
 
-            ResolveDirectory(options.ConfigSourceDirectory, requireConfigSource);
-            ResolveDirectory(options.LocalizationSourceDirectory, requireLocalizationSource);
-            ResolveDirectory(options.GeneratedCodeDirectory, false);
-            string configOutputRoot = ResolveDirectory(options.ConfigOutputDirectory, false);
-            string localizationOutputRoot = ResolveDirectory(
-                options.LocalizationOutputDirectory, false);
-            if (string.Equals(
+            string configOutputRoot = null;
+            string localizationOutputRoot = null;
+            if (requireConfigSource)
+            {
+                ResolveDirectory(options.ConfigSourceDirectory, true);
+                ResolveDirectory(options.GeneratedCodeDirectory, false);
+                configOutputRoot = ResolveDirectory(options.ConfigOutputDirectory, false);
+            }
+            if (requireLocalizationSource)
+            {
+                ResolveDirectory(options.LocalizationSourceDirectory, true);
+                localizationOutputRoot = ResolveDirectory(options.LocalizationOutputDirectory, false);
+            }
+            if (requireConfigSource && requireLocalizationSource && string.Equals(
                 configOutputRoot, localizationOutputRoot, StringComparison.OrdinalIgnoreCase))
             {
                 throw new RFrameworkException(

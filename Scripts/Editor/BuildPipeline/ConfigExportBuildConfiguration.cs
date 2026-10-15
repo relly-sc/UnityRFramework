@@ -22,6 +22,12 @@ namespace UnityRFramework.Editor
         /// <summary>Config 使用 CSV 核心工具或可选 Excel 扩展工具。</summary>
         public ConfigExportTool ExportTool = ConfigExportTool.Csv;
 
+        [Tooltip("导出 Config 配置表；关闭后不检查或读取 Config 源目录及密钥。")]
+        public bool ExportConfig = true;
+
+        [Tooltip("导出 Localization 多语言表；没有多语言表的项目可关闭，不检查或读取该源目录。")]
+        public bool ExportLocalization = true;
+
         /// <summary>是否执行正式发布配置泄漏检查。</summary>
         [Tooltip("检查被 Player、Resources、StreamingAssets 或 YooAsset 收集的开发配置和密钥文件。")]
         public bool ReleaseLeakCheck = true;

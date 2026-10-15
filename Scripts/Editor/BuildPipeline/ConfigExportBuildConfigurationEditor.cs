@@ -23,68 +23,72 @@ namespace UnityRFramework.Editor
                 return;
             }
 
-            EditorGUILayout.LabelField("路径", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(
-                serializedObject.FindProperty("ExportTool"),
-                new GUIContent("Config 导出工具"));
-            DrawDirectory(options, "ConfigSourceDirectory", "Config 源目录");
-            DrawDirectory(
-                options,
-                "LocalizationSourceDirectory",
-                "Localization 源目录");
-            DrawDirectory(options, "GeneratedCodeDirectory", "生成代码目录");
-            DrawDirectory(options, "ConfigOutputDirectory", "Config 输出目录");
-            DrawDirectory(
-                options,
-                "LocalizationOutputDirectory",
-                "Localization 输出目录");
-
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField("Config", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(
-                options.FindPropertyRelative("ExportConfigBundle"));
-            EditorGUILayout.PropertyField(
-                options.FindPropertyRelative("ConfigBundleName"));
-            SerializedProperty releaseFormat = options.FindPropertyRelative(
-                "ConfigReleaseFormat");
-            releaseFormat.enumValueIndex = EditorGUILayout.Popup(
-                "内容格式",
-                releaseFormat.enumValueIndex,
-                new[] { "框架二进制", "JSON" });
-            SerializedProperty protection = options.FindPropertyRelative(
-                "ConfigBinaryProtection");
-            protection.enumValueIndex = EditorGUILayout.Popup(
-                "正式二进制保护",
-                protection.enumValueIndex,
-                new[] { "不加密", "加密并校验完整性" });
-            if (protection.enumValueIndex != 0)
+            SerializedProperty exportConfig = serializedObject.FindProperty("ExportConfig");
+            SerializedProperty exportLocalization = serializedObject.FindProperty("ExportLocalization");
+            EditorGUILayout.PropertyField(exportConfig, new GUIContent("导出 Config"));
+            EditorGUILayout.PropertyField(exportLocalization, new GUIContent("导出 Localization"));
+            using (new EditorGUI.DisabledScope(!exportConfig.boolValue))
             {
-                if (GUILayout.Button("首次生成 ConfigKey 密钥文件"))
-                {
-                    ConfigKeyFileGenerator.GenerateDefault();
-                }
-                if (GUILayout.Button("更换 Config 密钥"))
-                {
-                    ConfigKeyFileGenerator.ReplaceDefault();
-                }
+                EditorGUILayout.LabelField("Config 路径", EditorStyles.boldLabel);
                 EditorGUILayout.PropertyField(
-                    options.FindPropertyRelative("ConfigProtectionSourceRoot"),
-                    new GUIContent("运行时加载路径前缀"));
-                EditorGUILayout.HelpBox(
-                    "密钥固定保存在 Assets/Resources/UnityRFramework/ConfigKey.bytes；ConfigComponent 自动读取。",
-                    MessageType.Info);
+                    serializedObject.FindProperty("ExportTool"),
+                    new GUIContent("Config 导出工具"));
+                DrawDirectory(options, "ConfigSourceDirectory", "Config 源目录");
+                DrawDirectory(options, "GeneratedCodeDirectory", "生成代码目录");
+                DrawDirectory(options, "ConfigOutputDirectory", "Config 输出目录");
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("Config", EditorStyles.boldLabel);
+                EditorGUILayout.PropertyField(
+                    options.FindPropertyRelative("ExportConfigBundle"));
+                EditorGUILayout.PropertyField(
+                    options.FindPropertyRelative("ConfigBundleName"));
+                SerializedProperty releaseFormat = options.FindPropertyRelative(
+                    "ConfigReleaseFormat");
+                releaseFormat.enumValueIndex = EditorGUILayout.Popup(
+                    "内容格式",
+                    releaseFormat.enumValueIndex,
+                    new[] { "框架二进制", "JSON" });
+                SerializedProperty protection = options.FindPropertyRelative(
+                    "ConfigBinaryProtection");
+                protection.enumValueIndex = EditorGUILayout.Popup(
+                    "正式二进制保护",
+                    protection.enumValueIndex,
+                    new[] { "不加密", "加密并校验完整性" });
+                if (protection.enumValueIndex != 0)
+                {
+                    if (GUILayout.Button("首次生成 ConfigKey 密钥文件"))
+                    {
+                        ConfigKeyFileGenerator.GenerateDefault();
+                    }
+                    if (GUILayout.Button("更换 Config 密钥"))
+                    {
+                        ConfigKeyFileGenerator.ReplaceDefault();
+                    }
+                    EditorGUILayout.PropertyField(
+                        options.FindPropertyRelative("ConfigProtectionSourceRoot"),
+                        new GUIContent("运行时加载路径前缀"));
+                    EditorGUILayout.HelpBox(
+                        "密钥固定保存在 Assets/Resources/UnityRFramework/ConfigKey.bytes；ConfigComponent 自动读取。",
+                        MessageType.Info);
+                }
+
+                EditorGUILayout.PropertyField(
+                    options.FindPropertyRelative("GeneratedNamespace"),
+                    new GUIContent("生成命名空间"));
             }
 
-            EditorGUILayout.PropertyField(
-                options.FindPropertyRelative("GeneratedNamespace"),
-                new GUIContent("生成命名空间"));
-
-            EditorGUILayout.Space(4f);
-            EditorGUILayout.LabelField("Localization", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(
-                options.FindPropertyRelative("ExportLocalizationBundle"));
-            EditorGUILayout.PropertyField(
-                options.FindPropertyRelative("LocalizationBundleName"));
+            using (new EditorGUI.DisabledScope(!exportLocalization.boolValue))
+            {
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("Localization", EditorStyles.boldLabel);
+                DrawDirectory(options, "LocalizationSourceDirectory", "Localization 源目录");
+                DrawDirectory(options, "LocalizationOutputDirectory", "Localization 输出目录");
+                EditorGUILayout.PropertyField(
+                    options.FindPropertyRelative("ExportLocalizationBundle"));
+                EditorGUILayout.PropertyField(
+                    options.FindPropertyRelative("LocalizationBundleName"));
+            }
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField("正式发布检查", EditorStyles.boldLabel);

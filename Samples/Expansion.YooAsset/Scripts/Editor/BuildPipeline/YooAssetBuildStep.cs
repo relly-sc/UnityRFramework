@@ -137,9 +137,7 @@ namespace UnityRFramework.Editor
                 settings.PackageName,
                 issues);
 
-            string pipelineName = string.IsNullOrWhiteSpace(settings.BuildPipelineName)
-                ? BundleBuilderSetting.GetPackageBuildPipeline(settings.PackageName)
-                : settings.BuildPipelineName.Trim();
+            string pipelineName = GetEffectivePipelineName(settings);
             if (!YooAssetBuildConfiguration.IsSupportedBuildPipeline(pipelineName))
             {
                 issues.Add(BuildValidationIssue.Error(
@@ -200,9 +198,7 @@ namespace UnityRFramework.Editor
                 // 同步 Profile 配置回 YooAsset 插件设置：Profile 为空字段走 Builder 当前值
                 // （默认 ScriptableBuildPipeline），非空字段覆盖插件按 Package 持久化的设置，
                 // 避免每次修改都要打开插件窗口。执行前统一写回后再分发构建。
-                string effectivePipeline = string.IsNullOrWhiteSpace(settings.BuildPipelineName)
-                    ? BundleBuilderSetting.GetPackageBuildPipeline(packageName)
-                    : settings.BuildPipelineName.Trim();
+                string effectivePipeline = GetEffectivePipelineName(settings);
                 BundleBuilderSetting.SetPackageBuildPipeline(packageName, effectivePipeline);
                 BundleBuilderSetting.SetPackageClearBuildCache(
                     packageName,
@@ -630,6 +626,13 @@ namespace UnityRFramework.Editor
                        $"创建 {settingName} 实例失败：'{className}'。");
         }
 
+        internal static string GetEffectivePipelineName(YooAssetBuildConfiguration settings)
+        {
+            return string.IsNullOrWhiteSpace(settings.BuildPipelineName)
+                ? BundleBuilderSetting.GetPackageBuildPipeline(settings.PackageName.Trim())
+                : settings.BuildPipelineName.Trim();
+        }
+
         private static void ValidateBundleEncryption(
             string packageName,
             string pipelineName,
@@ -659,5 +662,50 @@ namespace UnityRFramework.Editor
             }
         }
 
+    }
+
+    /// <summary>基线优先发布完成资源内置后，重新打包最终 Player。</summary>
+    public sealed class YooAssetBuiltinPlayerStep : BuildPipelineStepBase,
+        IAutomaticBuildPipelineStep
+    {
+        public override string Id => "yooasset.finalize-player";
+        public override string DisplayName => "将最新 YooAsset 内置资源打入 Player";
+        public override BuildPipelineStage Stage => BuildPipelineStage.Finalize;
+        public override int Order => 30;
+        public override bool CallsBuildPipeline => true;
+        public override bool RequiresManualCleanup => true;
+        public override IReadOnlyList<string> Dependencies =>
+            new[] { "core.build-player", "yooasset" };
+
+        public bool ShouldInclude(UnityRFrameworkBuildProfile profile, BuildRecipe recipe)
+        {
+            if (profile == null || recipe != BuildRecipe.Release
+                || !BuildStepConfigLocator.HasEnabledEntry(profile, "yooasset"))
+            {
+                return false;
+            }
+
+            bool needsBaseline = BuildPipelineStepRegistry.GetAll().Any(step =>
+                step is IRequiresPlayerBuildBaseline
+                && BuildStepConfigLocator.HasEnabledEntry(profile, step.Id));
+            var settings = BuildStepConfigLocator.GetConfiguration<YooAssetBuildConfiguration>(
+                profile, "yooasset");
+            return needsBaseline && settings != null
+                && !string.IsNullOrWhiteSpace(settings.PackageName)
+                && BundleBuilderSetting.GetPackageBundledCopyOption(
+                    settings.PackageName.Trim(), YooAssetBuildStep.GetEffectivePipelineName(settings))
+                    != EBundledCopyOption.None;
+        }
+
+        public override bool CanRun(BuildPipelineContext context)
+        {
+            return context != null && ShouldInclude(context.Profile, context.Recipe)
+                && new BuildPlayerStep().CanRun(context);
+        }
+
+        public override BuildStepResult Execute(BuildPipelineContext context)
+        {
+            return new BuildPlayerStep().Execute(context);
+        }
     }
 }

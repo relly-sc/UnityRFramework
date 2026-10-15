@@ -22,7 +22,7 @@ namespace UnityRFramework.Editor
     }
 
     /// <summary>
-    /// 构建流水线固定阶段。Expansion 只能注册到这些阶段，不能改变阶段顺序。
+    /// 构建流水线固定阶段；依赖 Player AOT 基线的 Release 使用基线优先顺序。
     /// </summary>
     public enum BuildPipelineStage
     {
@@ -373,8 +373,14 @@ namespace UnityRFramework.Editor
             }
 
             List<IBuildPipelineStep> ready = new List<IBuildPipelineStep>();
+            bool playerFirst = false;
             foreach (string id in selected)
             {
+                if (recipe == BuildRecipe.Release
+                    && registered[id] is IRequiresPlayerBuildBaseline)
+                {
+                    playerFirst = true;
+                }
                 if (incoming[id] == 0)
                 {
                     ready.Add(registered[id]);
@@ -384,7 +390,7 @@ namespace UnityRFramework.Editor
             List<IBuildPipelineStep> result = new List<IBuildPipelineStep>(selected.Count);
             while (ready.Count > 0)
             {
-                ready.Sort((left, right) => CompareStepsForRecipe(left, right, recipe));
+                ready.Sort((left, right) => CompareStepsForRecipe(left, right, playerFirst));
                 IBuildPipelineStep step = ready[0];
                 ready.RemoveAt(0);
                 result.Add(step);
@@ -413,16 +419,14 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// 按 Recipe 计算步骤顺序。Release 是唯一需要跨越固定阶段重排的方案：
-        /// 先完成 Player，取得最新 AOT 基线，再编译并发布热更代码与资源。
-        /// 其他 Recipe 继续使用固定阶段顺序，避免影响已有构建语义。
+        /// 仅依赖 AOT 基线的 Release 先构建 Player；普通发布先完成数据与资源。
         /// </summary>
         private static int CompareStepsForRecipe(
             IBuildPipelineStep left,
             IBuildPipelineStep right,
-            BuildRecipe recipe)
+            bool playerFirst)
         {
-            if (recipe != BuildRecipe.Release)
+            if (!playerFirst)
             {
                 return BuildPipelineStepRegistry.CompareSteps(left, right);
             }
@@ -445,7 +449,7 @@ namespace UnityRFramework.Editor
         }
 
         /// <summary>
-        /// Release 阶段顺序：Player 准备 -> Player 构建 -> 代码准备 -> 资源构建。
+        /// 基线优先的 Release 顺序：Player 准备 -> Player 构建 -> 代码准备 -> 资源构建。
         /// Validate、平台切换和参数应用仍然位于最前，Finalize 位于最后。
         /// </summary>
         private static int GetReleaseStageRank(BuildPipelineStage stage)
