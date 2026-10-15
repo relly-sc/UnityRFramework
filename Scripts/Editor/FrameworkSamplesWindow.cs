@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -12,6 +13,7 @@ namespace UnityRFramework.Editor
     {
         private FrameworkSampleCatalog catalog;
         private string catalogPath;
+        private string developmentSamplesRoot;
         private Vector2 scroll;
         private string error;
 
@@ -29,6 +31,7 @@ namespace UnityRFramework.Editor
             {
                 catalogPath = FrameworkSampleCatalog.GetCatalogPath(this);
                 catalog = FrameworkSampleCatalog.Load(catalogPath);
+                developmentSamplesRoot = FrameworkSampleCatalog.GetDevelopmentSamplesRoot(catalogPath);
                 var core = PackageInfo.FindForPackageName(FrameworkSampleCatalog.CorePackage);
                 if (core != null && core.version != catalog.frameworkVersion)
                     throw new InvalidOperationException("核心包与扩展依赖清单版本不一致。");
@@ -43,29 +46,32 @@ namespace UnityRFramework.Editor
         {
             if (catalog == null) { EditorGUILayout.HelpBox(error ?? "无法读取版本清单。", MessageType.Error); return; }
             var samples = PackageInfo.FindForPackageName(FrameworkSampleCatalog.SamplesPackage);
+            bool development = developmentSamplesRoot != null;
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
                 GUILayout.Label("框架 " + catalog.frameworkVersion);
                 GUILayout.FlexibleSpace();
-                GUILayout.Label(samples == null ? "Samples 未安装" : "Samples " + samples.version);
+                GUILayout.Label(development ? "开发源码" : samples == null ? "Samples 未安装" : "Samples " + samples.version);
                 if (GUILayout.Button(EditorGUIUtility.IconContent("Refresh", "|刷新版本与安装状态"), EditorStyles.toolbarButton,
                     GUILayout.Width(24))) OnEnable();
             }
             bool versionMatches = samples != null && samples.version == catalog.frameworkVersion;
             var imported = new Dictionary<string, bool>();
-            if (versionMatches)
+            if (!development && versionMatches)
             {
                 try { imported = FrameworkSamplesInstaller.GetSamples(catalog).ToDictionary(s => s.displayName, s => s.isImported); }
                 catch (Exception exception) { error = exception.Message; }
             }
-            if (!versionMatches)
+            if (development)
+                EditorGUILayout.HelpBox("当前为框架开发源码，直接使用本地 Samples，无需安装或重复导入。", MessageType.Info);
+            else if (!versionMatches)
             {
                 EditorGUILayout.HelpBox(samples == null ? "尚未安装 Samples 包。" : "核心与 Samples 版本不一致。", MessageType.Warning);
                 using (new EditorGUI.DisabledScope(FrameworkSamplesInstaller.IsBusy || SamplesPackageInstaller.IsBusy))
                     if (GUILayout.Button(samples == null ? "安装 Samples" : "更新 Samples")) SamplesPackageInstaller.Install();
             }
             if (!string.IsNullOrEmpty(error)) EditorGUILayout.HelpBox(error, MessageType.Error);
-            if (!string.IsNullOrEmpty(FrameworkSamplesInstaller.Message))
+            if (!development && !string.IsNullOrEmpty(FrameworkSamplesInstaller.Message))
                 EditorGUILayout.HelpBox(FrameworkSamplesInstaller.Message, MessageType.Info);
             var installed = PackageInfo.GetAllRegisteredPackages();
             scroll = EditorGUILayout.BeginScrollView(scroll);
@@ -74,7 +80,10 @@ namespace UnityRFramework.Editor
                 using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
                 {
                     EditorGUILayout.LabelField(definition.name, EditorStyles.boldLabel);
-                    EditorGUILayout.LabelField(imported.TryGetValue(definition.name, out bool exists) && exists ? "已导入" : "未导入");
+                    EditorGUILayout.LabelField(definition.description, EditorStyles.wordWrappedLabel);
+                    EditorGUILayout.LabelField(development
+                        ? Directory.Exists(Path.Combine(developmentSamplesRoot, definition.name)) ? "源码已包含" : "本地源码缺失"
+                        : imported.TryGetValue(definition.name, out bool exists) && exists ? "已导入" : "未导入");
                     var plan = catalog.Resolve(new[] { definition.name });
                     var dependencies = catalog.GetPackages(plan);
                     foreach (var dependency in dependencies)
@@ -87,13 +96,16 @@ namespace UnityRFramework.Editor
                     }
                     foreach (var required in plan.Where(s => !string.IsNullOrEmpty(s.notice)))
                         EditorGUILayout.LabelField(required.notice, EditorStyles.wordWrappedLabel);
-                    using (new EditorGUI.DisabledScope(!versionMatches || FrameworkSamplesInstaller.IsBusy || SamplesPackageInstaller.IsBusy
-                        || EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling))
-                    using (new EditorGUILayout.HorizontalScope())
+                    if (!development)
                     {
-                        if (dependencies.Length > 0 && GUILayout.Button("安装依赖")) BeginInstall(definition.name, false, false);
-                        if (GUILayout.Button(dependencies.Length > 0 ? "安装并导入" : "导入")) BeginInstall(definition.name, true, false);
-                        if (GUILayout.Button(dependencies.Length > 0 ? "同步并重新导入" : "重新导入")) BeginInstall(definition.name, true, true);
+                        using (new EditorGUI.DisabledScope(!versionMatches || FrameworkSamplesInstaller.IsBusy || SamplesPackageInstaller.IsBusy
+                            || EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling))
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            if (dependencies.Length > 0 && GUILayout.Button("安装依赖")) BeginInstall(definition.name, false, false);
+                            if (GUILayout.Button(dependencies.Length > 0 ? "安装并导入" : "导入")) BeginInstall(definition.name, true, false);
+                            if (GUILayout.Button(dependencies.Length > 0 ? "同步并重新导入" : "重新导入")) BeginInstall(definition.name, true, true);
+                        }
                     }
                     if (!string.IsNullOrEmpty(definition.helpUrl) && GUILayout.Button("官方依赖说明"))
                         Application.OpenURL(definition.helpUrl);

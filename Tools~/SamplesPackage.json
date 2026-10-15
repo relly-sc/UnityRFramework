@@ -1,6 +1,6 @@
 {
   "name": "com.relly-sc.unityrframework.samples",
-  "version": "1.11.1",
+  "version": "1.11.2",
   "displayName": "UnityRFramework Samples",
   "description": "UnityRFramework 官方示例、验收场景与可选扩展。按需导入，不属于框架核心运行依赖。",
   "documentationUrl": "https://github.com/relly-sc/UnityRFramework-Samples/blob/main/README.md",
@@ -17,7 +17,7 @@
     "expansion"
   ],
   "dependencies": {
-    "com.relly-sc.unityrframework": "1.11.1"
+    "com.relly-sc.unityrframework": "1.11.2"
   },
   "samples": [
     {
@@ -52,7 +52,7 @@
     },
     {
       "displayName": "Expansion.HybridCLR",
-      "description": "HybridCLR 代码热更新通用加载扩展，提供清单、AOT 元数据、程序集入口契约与产物准备工具。需手动安装并初始化 HybridCLR。",
+      "description": "HybridCLR 代码热更新通用加载扩展，提供清单、AOT 元数据、程序集入口契约与产物准备工具。安装工具自动安装固定版本插件，本机原生环境仍需通过 HybridCLR/Installer 初始化。",
       "path": "Samples~/Expansion.HybridCLR"
     },
     {
@@ -62,7 +62,7 @@
     },
     {
       "displayName": "Expansion.Obfuz",
-      "description": "Obfuz 可选代码混淆构建扩展，提供构建工具中的 Obfuz 步骤，并支持与 HybridCLR 的 Obfuz4HybridCLR 扩展衔接。需手动安装并配置 Obfuz 与 Obfuz4HybridCLR；未导入时不影响核心框架。",
+      "description": "Obfuz 可选代码混淆构建扩展，提供构建工具中的 Obfuz 步骤，并支持与 HybridCLR 的 Obfuz4HybridCLR 扩展衔接。安装工具自动安装固定版本插件，需先按官方流程生成加密虚拟机及密钥。",
       "path": "Samples~/Expansion.Obfuz"
     },
     {
@@ -92,17 +92,17 @@
     },
     {
       "displayName": "Expansion.YooAsset",
-      "description": "YooAsset 资源辅助器桥接实现。需手动安装 YooAsset 3.0.5+。",
+      "description": "YooAsset 资源辅助器桥接，支持资源热更新、AssetBundle 加载、内置资源清单及可选包加密。安装工具自动安装固定版本 YooAsset，不包含 Demo 场景。",
       "path": "Samples~/Expansion.YooAsset"
     },
     {
       "displayName": "Expansion.UniTask",
-      "description": "UniTask Web 请求辅助器桥接实现。需手动安装 UniTask。",
+      "description": "UniTask Web 请求辅助器桥接，为框架提供异步 Web 请求实现。安装工具自动安装固定版本 UniTask，不改变核心业务架构。",
       "path": "Samples~/Expansion.UniTask"
     },
     {
       "displayName": "Expansion.R3",
-      "description": "可选 R3 响应式桥接：观察框架事件，自动管理 UI 打开和实体显示周期内的订阅。需先安装 R3 本体及 R3.Unity；不改变核心模块接口。",
+      "description": "可选 R3 响应式桥接：观察框架事件，自动管理 UI 打开和实体显示周期内的订阅。R3.Unity 由安装工具自动安装，R3 本体及其 .NET 依赖需先通过 NuGetForUnity 安装；不改变核心模块接口。",
       "path": "Samples~/Expansion.R3"
     },
     {

@@ -59,6 +59,8 @@ namespace UnityRFramework.Editor
 
         internal static void Start(string catalogPath, string[] selected, bool import, bool overwrite)
         {
+            if (FrameworkSampleCatalog.GetDevelopmentSamplesRoot(catalogPath) != null)
+                throw new InvalidOperationException("框架开发源码已包含 Samples，无需下载或重复导入。");
             if (IsBusy || SamplesPackageInstaller.IsBusy || EditorApplication.isCompiling || EditorApplication.isUpdating
                 || EditorApplication.isPlayingOrWillChangePlaymode)
                 throw new InvalidOperationException("请等待当前任务完成，并在非 Play Mode 下安装。");

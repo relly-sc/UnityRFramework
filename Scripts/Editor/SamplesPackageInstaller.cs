@@ -31,7 +31,6 @@ namespace UnityRFramework.Editor
             return "https://github.com/relly-sc/UnityRFramework-Samples.git#versions/" + Uri.EscapeDataString(version);
         }
 
-        [MenuItem("UnityRFramework/安装 Samples")]
         internal static void Install()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating)
