@@ -47,6 +47,13 @@ def load_manifest(path: Path) -> dict:
         return json.load(stream)
 
 
+def version_tuple(value: str) -> tuple[int, int, int]:
+    parts = value.split(".")
+    if len(parts) != 3 or any(not part.isdigit() for part in parts):
+        raise ValueError(f"版本号必须是主版本.次版本.修订号：{value!r}")
+    return tuple(int(part) for part in parts)
+
+
 def load_manifests() -> tuple[dict, dict]:
     core_manifest = load_manifest(ROOT / "Package.json")
     samples_manifest = load_manifest(ROOT / "Tools~" / "SamplesPackage.json")
@@ -57,15 +64,18 @@ def load_manifests() -> tuple[dict, dict]:
 
     version = core_manifest.get("version")
     samples_version = samples_manifest.get("version")
-    dependency_version = samples_manifest.get("dependencies", {}).get(CORE_PACKAGE_NAME)
-    if not version or samples_version != version or dependency_version != version:
-        raise ValueError(
-            "核心版本、Samples 版本及 Samples 对核心的依赖版本必须完全一致："
-            f"core={version!r}, samples={samples_version!r}, dependency={dependency_version!r}"
-        )
+    samples_minimum_framework_version = samples_manifest.get("minimumFrameworkVersion")
+    if not version or not samples_version or not samples_minimum_framework_version:
+        raise ValueError("核心或 Samples 清单缺少版本信息。")
+    if version_tuple(samples_minimum_framework_version) > version_tuple(version):
+        raise ValueError("Samples 最低核心版本不能高于当前核心版本。")
     catalog = load_manifest(ROOT / "Scripts" / "Editor" / "FrameworkSamples.json")
     if catalog.get("frameworkVersion") != version:
         raise ValueError("扩展依赖清单版本必须与核心版本一致。")
+    if catalog.get("samplesVersion") != samples_version:
+        raise ValueError("扩展依赖清单中的 Samples 版本必须与 Samples 包版本一致。")
+    if catalog.get("samplesMinimumFrameworkVersion") != samples_minimum_framework_version:
+        raise ValueError("扩展依赖清单中的 Samples 最低核心版本必须与 Samples 包声明一致。")
     if {sample["name"] for sample in catalog["samples"]} != {
         sample["displayName"] for sample in samples_manifest["samples"]
     }:
@@ -157,7 +167,8 @@ def main() -> None:
 
     print(f"核心包：{core_output}")
     print(f"Samples 包：{samples_output}")
-    print(f"版本：{core_manifest['version']}")
+    print(f"核心版本：{core_manifest['version']}")
+    print(f"Samples 版本：{samples_manifest['version']}")
 
 
 if __name__ == "__main__":

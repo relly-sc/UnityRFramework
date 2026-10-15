@@ -40,13 +40,15 @@ namespace UnityRFramework.Editor
         public string helpUrl;
     }
 
-    /// <summary>随框架发布的固定版本清单；核心不引用任何第三方类型。</summary>
+    /// <summary>随框架发布的扩展清单；Samples 版本与核心版本独立管理。</summary>
     [Serializable]
     internal sealed class FrameworkSampleCatalog
     {
         internal const string CorePackage = "com.relly-sc.unityrframework";
         internal const string SamplesPackage = "com.relly-sc.unityrframework.samples";
         public string frameworkVersion;
+        public string samplesVersion;
+        public string samplesMinimumFrameworkVersion;
         public FrameworkPackageDependency[] packages;
         public FrameworkSampleDefinition[] samples;
 
@@ -59,8 +61,13 @@ namespace UnityRFramework.Editor
 
         internal void Validate()
         {
-            if (string.IsNullOrEmpty(frameworkVersion) || samples == null || packages == null)
-                throw new InvalidDataException("扩展安装清单缺少版本、Samples 或依赖信息。");
+            if (string.IsNullOrEmpty(frameworkVersion) || string.IsNullOrEmpty(samplesVersion)
+                || string.IsNullOrEmpty(samplesMinimumFrameworkVersion) || samples == null || packages == null
+                || !TryParseVersion(frameworkVersion, out _)
+                || !TryParseVersion(samplesVersion, out _)
+                || !TryParseVersion(samplesMinimumFrameworkVersion, out _)
+                || !IsVersionAtLeast(frameworkVersion, samplesMinimumFrameworkVersion))
+                throw new InvalidDataException($"扩展安装清单缺少有效版本：核心={frameworkVersion ?? "空"}，Samples={samplesVersion ?? "空"}，最低核心={samplesMinimumFrameworkVersion ?? "空"}。");
             if (samples.Any(s => s == null || string.IsNullOrEmpty(s.name))
                 || packages.Any(p => p == null || string.IsNullOrEmpty(p.name)
                     || string.IsNullOrEmpty(p.version) || string.IsNullOrEmpty(p.url)
@@ -70,6 +77,21 @@ namespace UnityRFramework.Editor
                 || packages.Select(p => p.name).Distinct().Count() != packages.Length)
                 throw new InvalidDataException("扩展安装清单包含重复名称或未固定版本的依赖。");
             foreach (var sample in samples) Resolve(new[] { sample.name });
+        }
+
+        internal static bool IsVersionAtLeast(string actual, string minimum)
+        {
+            return TryParseVersion(actual, out var actualVersion)
+                && TryParseVersion(minimum, out var minimumVersion)
+                && actualVersion >= minimumVersion;
+        }
+
+        private static bool TryParseVersion(string value, out Version version)
+        {
+            version = null;
+            return !string.IsNullOrWhiteSpace(value)
+                && Version.TryParse(value, out version)
+                && version.Build >= 0 && version.Revision < 0;
         }
 
         /// <summary>按依赖优先排序并去重；未知项或循环引用不允许进入安装阶段。</summary>

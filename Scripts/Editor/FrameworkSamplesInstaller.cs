@@ -23,6 +23,7 @@ namespace UnityRFramework.Editor
         {
             public string catalogPath;
             public string frameworkVersion;
+            public string samplesVersion;
             public string[] selected;
             public string[] plannedSamples;
             public string[] approvedPackages;
@@ -52,8 +53,11 @@ namespace UnityRFramework.Editor
         {
             PackageInfo package = PackageInfo.FindForPackageName(FrameworkSampleCatalog.SamplesPackage);
             if (package == null) throw new InvalidOperationException("尚未安装 Samples 包。");
-            if (package.version != catalog.frameworkVersion)
-                throw new InvalidOperationException($"Samples {package.version} 与框架 {catalog.frameworkVersion} 不一致，请先更新 Samples 包。");
+            PackageInfo core = PackageInfo.FindForPackageName(FrameworkSampleCatalog.CorePackage);
+            if (core == null || !FrameworkSampleCatalog.IsVersionAtLeast(core.version, catalog.samplesMinimumFrameworkVersion))
+                throw new InvalidOperationException($"当前核心版本 {core?.version ?? "未安装"} 低于 Samples 要求的最低核心版本 {catalog.samplesMinimumFrameworkVersion}。");
+            if (package.version != catalog.samplesVersion)
+                throw new InvalidOperationException($"当前 Samples {package.version}，清单要求 {catalog.samplesVersion}，请先更新 Samples 包。");
             return Sample.FindByPackage(package.name, package.version).ToArray();
         }
 
@@ -108,6 +112,7 @@ namespace UnityRFramework.Editor
             job = new Job
             {
                 catalogPath = catalogPath, frameworkVersion = catalog.frameworkVersion,
+                samplesVersion = catalog.samplesVersion,
                 selected = selected, approvedPackages = changes.Select(p => p.url).ToArray(),
                 plannedSamples = plan.Select(s => s.name).ToArray(),
                 import = import, overwrite = overwrite
@@ -147,12 +152,14 @@ namespace UnityRFramework.Editor
             }
         }
 
-        internal static void ValidatePlan(string expectedVersion, string actualVersion,
+        internal static void ValidatePlan(string expectedFrameworkVersion, string actualFrameworkVersion,
+            string expectedSamplesVersion, string actualSamplesVersion,
             string[] approvedSamples, IEnumerable<FrameworkSampleDefinition> plan)
         {
-            if (actualVersion != expectedVersion || approvedSamples == null
+            if (actualFrameworkVersion != expectedFrameworkVersion
+                || actualSamplesVersion != expectedSamplesVersion || approvedSamples == null
                 || !approvedSamples.SequenceEqual(plan.Select(s => s.name)))
-                throw new InvalidOperationException("任务期间框架版本或 Sample 依赖已变化，请重新确认安装。");
+                throw new InvalidOperationException("任务期间核心版本、Samples 版本或 Sample 依赖已变化，请重新确认安装。");
         }
 
         private static void Save() => SessionState.SetString(JobKey, JsonUtility.ToJson(job));
@@ -182,7 +189,8 @@ namespace UnityRFramework.Editor
                 listing = null;
                 var catalog = FrameworkSampleCatalog.Load(job.catalogPath);
                 var plan = catalog.Resolve(job.selected);
-                ValidatePlan(job.frameworkVersion, catalog.frameworkVersion, job.plannedSamples, plan);
+                ValidatePlan(job.frameworkVersion, catalog.frameworkVersion, job.samplesVersion,
+                    catalog.samplesVersion, job.plannedSamples, plan);
                 var changes = catalog.GetPackages(plan).Where(d =>
                     !Matches(d, installed.FirstOrDefault(p => p.name == d.name))).ToArray();
                 if (changes.Length > 0)
