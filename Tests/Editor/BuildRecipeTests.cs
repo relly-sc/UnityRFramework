@@ -14,7 +14,7 @@ namespace UnityRFramework.Editor.Tests
         {
         }
 
-        private sealed class TestStep : BuildPipelineStepBase
+        private class TestStep : BuildPipelineStepBase
         {
             private readonly string id;
             private readonly BuildPipelineStage stage;
@@ -44,6 +44,13 @@ namespace UnityRFramework.Editor.Tests
             public override BuildStepResult Execute(BuildPipelineContext context)
             {
                 return BuildStepResult.Succeeded("ok");
+            }
+        }
+
+        private sealed class BaselineStep : TestStep, IRequiresPlayerBuildBaseline
+        {
+            public BaselineStep() : base("prepare", BuildPipelineStage.PrepareCode, 100)
+            {
             }
         }
 
@@ -108,7 +115,7 @@ namespace UnityRFramework.Editor.Tests
                 new TestStep("core.build-player", BuildPipelineStage.BuildPlayer),
                 new TestStep("core.apply-profile", BuildPipelineStage.ApplySettings),
                 new TestStep("core.switch-target", BuildPipelineStage.SwitchTarget),
-                new TestStep("prepare", BuildPipelineStage.PrepareCode, 100),
+                new BaselineStep(),
                 new TestStep("core.validate", BuildPipelineStage.Validate)
             };
 
@@ -127,6 +134,37 @@ namespace UnityRFramework.Editor.Tests
                     "core.finalize"
                 },
                 plan.StepIds);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void OrdinaryRelease_BuildsResourcesBeforePlayer(bool installedDisabledBaseline)
+        {
+            var profile = CreateProfile(BuildRecipe.Release);
+            AddStep(profile, "resources");
+            AddStep(profile, "code");
+            AddStep(profile, "prepare", false);
+            var available = new List<IBuildPipelineStep>
+            {
+                new TestStep("core.validate", BuildPipelineStage.Validate),
+                new TestStep("core.switch-target", BuildPipelineStage.SwitchTarget),
+                new TestStep("core.apply-profile", BuildPipelineStage.ApplySettings),
+                new TestStep("code", BuildPipelineStage.PrepareCode),
+                new TestStep("resources", BuildPipelineStage.BuildAssets),
+                new TestStep("core.build-player", BuildPipelineStage.BuildPlayer),
+                new TestStep("core.finalize", BuildPipelineStage.Finalize)
+            };
+            if (installedDisabledBaseline) available.Add(new BaselineStep());
+            try
+            {
+                var plan = BuildRecipePlanner.Create(profile, available);
+                Assert.That(plan.IsValid, Is.True);
+                CollectionAssert.AreEqual(new[] {
+                    "core.validate", "core.switch-target", "core.apply-profile", "code",
+                    "resources", "core.build-player", "core.finalize"
+                }, plan.StepIds);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(profile); }
         }
 
         [Test]

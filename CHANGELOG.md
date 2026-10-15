@@ -9,6 +9,22 @@
 - 重构、重写、架构调整或其他不兼容的大改动：主版本号加一，例如 `1.5.0` → `2.0.0`。
 - 每次版本发布都必须在本文件记录新增、变更和修复内容。
 
+## 1.12.0 - 2026-10-15
+
+### 新增
+
+- Config 构建步骤支持分别启用 Config 与 Localization 导出，未启用的内容不检查源目录、不读取密钥或改写产物；CSV、Excel、输出路径及保护模式继续由框架配置资产管理。
+- Obfuz 基础扩展支持无 HybridCLR 的普通 Player 构建，与 YooAsset Offline/Host 模式无耦合；构建结束检查混淆回调结果并归档映射，缺少成功回调或混淆失败不报告成功。
+- 将 HybridCLR 联合准备、热更程序集混淆及最终 Player 重建移到可选的 Expansion.Obfuz.HybridCLR，由安装工具按需安装固定版本依赖；基础扩展不再强制安装 HybridCLR 与 Obfuz4HybridCLR。
+
+### 变更
+
+- 已有 HybridCLR 混淆项目更新后需额外导入联合扩展，Profile 仍启用 hybridclr 与 obfuz；普通 Player 项目只启用 obfuz。两种场景均以 Obfuz Settings 为混淆参数事实源。
+
+### 修复
+
+- Release 不再对普通项目强制采用 Player 优先顺序，Config 与 YooAsset 资源先完成再打包 Player，支持 Offline 一次完成发布；仅启用需要 AOT 基线的步骤时保留 Player 优先，YooAsset 开启内置拷贝后自动补建最终 Player。
+
 ## 1.11.2 - 2026-10-15
 
 ### 修复

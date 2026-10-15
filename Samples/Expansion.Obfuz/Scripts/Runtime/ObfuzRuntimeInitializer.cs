@@ -7,7 +7,7 @@ namespace UnityRFramework.Expansion
 {
     /// <summary>
     /// 在任何混淆代码执行前初始化 Obfuz 静态加密服务。
-    /// 该脚本位于 AOT 程序集侧，供混淆后的热更新程序集使用。
+    /// 适用于普通 Player；有热更新时该脚本须保留在 AOT 程序集侧。
     /// </summary>
     internal static class ObfuzRuntimeInitializer
     {

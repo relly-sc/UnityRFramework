@@ -41,6 +41,16 @@ Helper 才释放对应 YooAsset Handle。
 只使用随 Player 内置的 YooAsset 文件。构建 Package 时需将 Catalog、Manifest、Hash
 和所需 Bundle 正确复制到 YooAsset 的 StreamingAssets 目录。
 
+使用框架构建工具时启用 `yooasset` 步骤，在原生 Bundle Builder 中将该 Package 的
+`Bundled Copy Option` 设为 `ClearAndCopyAll`（完整离线资源）。`None` 不内置资源；
+按标签拷贝只适用于项目明确需要的资源子集。框架读取当前 Package 与 Pipeline 的设置，
+不自动更改拷贝选项。
+
+直接执行 `Release` 即可：普通项目先导出配置和构建资源，再构建 Player，无需手动拆成
+Assets → Player。启用 HybridCLR 时先构建 Player 取得 AOT 基线，随后发布代码和资源；
+若 YooAsset 开启内置拷贝，会在资源完成后再次打包最终 Player，确保最新清单和资源入包。
+Host 模式使用内置资源时同样适用；未内置资源时不增加这轮 Player 构建。
+
 ### Host
 
 使用“内置文件 + YooAsset 磁盘缓存 + 远程服务器”的组合。服务器 URL 必须直接指向

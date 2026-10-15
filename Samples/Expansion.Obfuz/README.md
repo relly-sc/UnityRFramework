@@ -1,41 +1,38 @@
 # Expansion.Obfuz
 
-可选的 Obfuz 构建扩展。它为 UnityRFramework 构建工具提供 Obfuz 步骤，并通过
-Obfuz4HybridCLR 处理 HybridCLR 热更新程序集。核心框架、普通 Sample 和未启用 Obfuz
-步骤的构建不依赖本扩展。
+可选的普通 Player 代码混淆构建扩展。只依赖 Obfuz，不依赖 HybridCLR、Obfuz4HybridCLR 或 YooAsset。
+YooAsset 的 Offline/Host 模式与代码混淆无关，按项目需要单独配置。
 
-## 依赖
+## 安装与准备
 
-- `Expansion.HybridCLR`
-- Obfuz
-- Obfuz4HybridCLR
+1. 打开 `UnityRFramework → 安装扩展与示例`，选择本扩展，先安装依赖。
+2. 当前固定 Obfuz 版本为 `3.1.0`。按官方流程生成 `GeneratedEncryptionVirtualMachine` 与密钥，再导入扩展源码。
+3. 静态密钥须位于 `Assets/Resources/Obfuz/defaultStaticSecretKey.bytes`，由扩展的运行时初始化器读取。
+4. 在 Obfuz Settings 配置混淆程序集和引用关系，启用构建混淆开关。反射、序列化和字符串入口按业务需要排除。
+5. 在框架 Profile 中启用 `obfuz` 并绑定配置资产，使用 `Player` 或 `Release` 构建；无需启用 `hybridclr`。
 
-当前验收版本组合：Unity `2022.3.49f1c1`、HybridCLR `8.13.0`、Obfuz `3.1.0`、
-Obfuz4HybridCLR `3.0.1`。其他版本需要重新验证联合生成入口和运行时兼容性。
+Obfuz Settings 是混淆参数的唯一事实源。框架不会复制程序集清单、密钥及输出参数，也不会替用户永久修改插件设置。
+Profile 未启用 `obfuz` 时仍会临时关闭其构建回调，并在任务结束恢复原值，避免其他构建意外混淆。
 
-依赖均需由使用者按官方文档手动安装、生成加密虚拟机及密钥，并完成运行时初始化。
+## 构建与映射
 
-`UnityRFramework → 安装扩展与示例` 可自动安装上述固定 UPM 版本及 HybridCLR 扩展。
-先点击“安装依赖”，按 Obfuz 官方流程生成 `GeneratedEncryptionVirtualMachine` 与密钥，
-再点击“安装并导入”。未找到生成类型时安装器会停止导入代码，不把生成步骤伪装成插件已就绪。
+普通 Player 在 Unity 构建期间由 Obfuz 官方回调执行混淆。框架检查本次回调是否成功；
+未收到成功结果或混淆失败时构建任务失败，不把原生 Player 构建成功等同于混淆成功。
 
-## 设置
+成功后映射归档到：
 
-1. 打开 `Obfuz/Settings...`。
-2. 在 `Assembly Settings/Assemblies To Obfuscate` 中加入需要混淆的程序集。热更新闭环
-   至少应包含 HybridCLR Settings 中配置的热更新程序集。
-3. 在 UnityRFramework 构建 Profile 中启用 `hybridclr` 与 `obfuz` 步骤，使用
-   `Release` 完成 Player、AOT 基线、热更新程序集混淆和 YooAsset 资源发布闭环。
+`Bundles/ObfuzMappings/{目标平台}/{公共版本-构建号}/{时间}/symbol-mapping.xml`
 
-Obfuz Settings 是混淆参数的唯一事实源；构建工具只校验并执行，不会自动改写这些设置。
+该目录不进入 Player 或 UPM 包。还原异常堆栈应使用对应构建批次的映射，不能用其他版本替换。
 
-每次 Obfuz 热更混淆或完整发布成功后，构建工具会把当前符号映射复制到：
-`Bundles/ObfuzMappings/{目标平台}/{公共版本-构建号}/{时间}/symbol-mapping.xml`。
-该目录用于异常堆栈还原和版本追溯，不会进入 Player 或 UPM 包。发生混淆相关异常时，
-使用与 Player、热更新程序集完全相同版本的映射文件，再按 Obfuz 官方工具进行还原；
-不要用其他构建批次的映射文件替换。
+## HybridCLR 联合混淆
 
-参考官方文档：
+需要热更新时额外导入 `Expansion.Obfuz.HybridCLR`，由其处理 Obfuz4HybridCLR 联合准备、AOT 基线、热更程序集混淆及最终 Player 重建。
+Profile 仍启用 `hybridclr` 与 `obfuz`，不增加额外业务步骤。普通 Player 无需安装这部分依赖。
+
+旧版热更项目升级后需通过安装工具重新导入基础扩展和联合扩展，先备份原导入目录中的业务改动，避免新旧步骤重复编译。
+
+## 官方参考
 
 - https://www.obfuz.com/docs/manual/configuration
 - https://www.obfuz.com/docs/manual/call-obfuscation

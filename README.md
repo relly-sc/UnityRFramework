@@ -53,6 +53,7 @@ Samples/Expansion.ExcelDataReader/ ← ExcelDataReader 配置表导出工具（E
 Samples/Expansion.HybridCLR/      ← HybridCLR 通用代码热更新加载扩展
 Samples/Expansion.HybridCLR.Demo/ ← HybridCLR 代码热更新 Demo 与验收覆盖层
 Samples/Expansion.Obfuz/          ← Obfuz 可选代码混淆构建扩展
+Samples/Expansion.Obfuz.HybridCLR/ ← 可选 HybridCLR 联合混淆构建
 ```
 
 `main` 开发分支使用 `Samples/` 便于直接编译和维护；GitHub Actions 发布 UPM
@@ -155,8 +156,9 @@ Obfuz 先生成加密虚拟机与密钥，HybridCLR 通过 Installer 初始化�
   启动覆盖层；它使用独立的 YooAsset Package、收集分组和 Host 发布目录，不会把代码
   热更新资源使用独立 Package，不写入普通 YooAsset Demo 的 Package。详细首包、Host 更新和 Player 验收
   顺序见该 Sample 的 README。
-- `Expansion.Obfuz`：可选 Obfuz 代码混淆构建扩展。需手动安装并配置 Obfuz 与
-  `Obfuz4HybridCLR`；导入后可在构建工具中启用 Obfuz 步骤。它不属于核心包强制依赖，
+- `Expansion.Obfuz`：可选普通 Player 代码混淆扩展，只依赖 Obfuz，不要求 HybridCLR，
+  也不受 YooAsset Offline/Host 模式影响。热更联合混淆另选 `Expansion.Obfuz.HybridCLR`，
+  安装工具自动补齐固定版本依赖；虚拟机、密钥及原生环境仍按插件要求准备。它不属于核心包强制依赖，
   未导入 Obfuz 时不会影响框架、普通 Sample 或其他未启用 Obfuz 步骤的构建。
 - `Expansion`：与框架模块无关的通用组件和开发辅助能力。
 
@@ -182,6 +184,11 @@ Obfuz 先生成加密虚拟机与密钥，HybridCLR 通过 Installer 初始化�
 
 ### Flavor 与 Recipe
 
+Config 步骤的配置资产可分别启用“导出 Config”和“导出 Localization”，默认两者开启。
+只有 Excel 配置表、没有多语言表的项目：Config 导出工具选 Excel，关闭“导出 Localization”，
+填写 Config 源目录、生成代码目录、输出目录和保护模式即可；关闭的部分不检查源目录，也不修改旧产物。
+普通 Player 混淆仅需启用 `obfuz`；有 HybridCLR 热更时再导入联合扩展并启用 `hybridclr`。
+
 Flavor 只表示构建用途，并提供一组可显式应用的调试参数建议，不会自动切换 Mono/IL2CPP：
 
 | Flavor | 推荐用途 | 推荐调试参数 |
@@ -197,7 +204,7 @@ Recipe 决定本次实际执行范围：
 | `Player` | 应用 Profile 参数并构建 Player，不发布资源或热更代码 |
 | `Assets` | 导出 Config 并构建 YooAsset 资源包，不构建 Player |
 | `HotUpdate` | 准备 HybridCLR/Obfuz 热更代码并构建 YooAsset 资源包，不构建 Player |
-| `Release` | 配置导出、Player 准备与构建、热更代码发布和资源构建的完整流程 |
+| `Release` | 普通项目先导出配置、构建资源，再构建 Player；HybridCLR 项目先建立 Player AOT 基线，再发布代码与资源，YooAsset 启用内置拷贝时最后重新打包 Player |
 
 具体步骤仍以 Profile 中已启用的条目为准。脚本后端必须根据项目技术栈单独选择；例如
 使用 HybridCLR 时应选择 IL2CPP，不能依赖 Flavor 自动修改。

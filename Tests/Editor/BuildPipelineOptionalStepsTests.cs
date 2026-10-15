@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEditor;
@@ -146,12 +148,63 @@ namespace UnityRFramework.Editor.Tests
         }
 
         [Test]
-        public void ObfuzStep_RequiresHybridClr()
+        public void ObfuzStep_DoesNotRequireHybridClrAndJointStepIsAutomatic()
         {
             IBuildPipelineStep step = FindStep("obfuz");
 
             Assert.That(step, Is.Not.Null);
-            CollectionAssert.Contains(step.Dependencies, "hybridclr");
+            Assert.That(step.Dependencies, Is.Empty);
+            var joint = FindStep("obfuz.hotupdate");
+            Assert.That(joint, Is.InstanceOf<IAutomaticBuildPipelineStep>());
+            CollectionAssert.Contains(joint.Dependencies, "hybridclr");
+            CollectionAssert.Contains(joint.Dependencies, "obfuz");
+        }
+
+        [TestCase(BuildRecipe.Player)]
+        [TestCase(BuildRecipe.Release)]
+        public void OrdinaryPlayerObfuzPlan_DoesNotIncludeHybridClrOrRebuild(BuildRecipe recipe)
+        {
+            var profile = CreateProfile(recipe);
+            AddConfiguredStep(profile, "obfuz");
+            try
+            {
+                var plan = BuildRecipePlanner.Create(profile);
+                Assert.That(plan.IsValid, Is.True);
+                Assert.That(plan.Contains("obfuz.validate-player"), Is.True);
+                Assert.That(plan.Contains("obfuz.finalize-player"), Is.True);
+                Assert.That(plan.Contains("hybridclr.prepare-player"), Is.False);
+                Assert.That(plan.Contains("obfuz.prepare-player"), Is.False);
+                Assert.That(plan.Contains("obfuz.rebuild-player"), Is.False);
+                Assert.That(plan.Contains("obfuz.hotupdate"), Is.False);
+                Assert.That(IndexOf(plan.StepIds, "obfuz.validate-player"), Is.LessThan(IndexOf(plan.StepIds, "core.build-player")));
+                Assert.That(IndexOf(plan.StepIds, "obfuz.finalize-player"), Is.LessThan(IndexOf(plan.StepIds, "core.finalize")));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(profile.Steps[0].Configuration);
+                UnityEngine.Object.DestroyImmediate(profile);
+            }
+        }
+
+        [Test]
+        public void ObfuzPlayerResult_MissingOrFailedCallbackCannotReportSuccess()
+        {
+            Type step = FindStep("obfuz").GetType();
+            const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
+            const string key = "UnityRFramework.Obfuz.PlayerResult";
+            string previous = SessionState.GetString(key, string.Empty);
+            try
+            {
+                step.GetMethod("ResetPlayerResult", flags).Invoke(null, null);
+                Assert.That(FindStep("obfuz.finalize-player").Execute(null).Status, Is.EqualTo(BuildStepStatus.Failed));
+                step.GetMethod("RecordPlayerResult", flags).Invoke(null, new object[] { false });
+                Assert.That(FindStep("obfuz.finalize-player").Execute(null).Status, Is.EqualTo(BuildStepStatus.Failed));
+                step.GetMethod("RecordPlayerResult", flags).Invoke(null, new object[] { true });
+                Assert.That(step.GetProperty("PlayerSucceeded", flags).GetValue(null), Is.True);
+                step.GetMethod("ResetPlayerResult", flags).Invoke(null, null);
+                Assert.That(step.GetProperty("PlayerSucceeded", flags).GetValue(null), Is.False);
+            }
+            finally { SessionState.SetString(key, previous); }
         }
 
         [Test]
@@ -275,6 +328,104 @@ namespace UnityRFramework.Editor.Tests
                         && issue.Level == BuildValidationLevel.Error));
         }
 
+        [TestCase(ConfigExportTool.Csv)]
+        [TestCase(ConfigExportTool.Excel)]
+        public void ConfigOnlyExport_DoesNotRequireOrTouchLocalization(ConfigExportTool tool)
+        {
+            const string workbook = "Assets/UnityRFramework/Samples/Sample.Demo/ConfigSource/Config/Demo_Reward.xlsx";
+            if (tool == ConfigExportTool.Excel && !File.Exists(workbook)) Assert.Ignore("Excel 示例源未导入。");
+            string root = "Assets/Temp/FrameworkBuildTests/" + Guid.NewGuid().ToString("N");
+            var profile = CreateProfile(BuildRecipe.Assets);
+            var configuration = ScriptableObject.CreateInstance<ConfigExportBuildConfiguration>();
+            try
+            {
+                Directory.CreateDirectory(root + "/Source");
+                if (tool == ConfigExportTool.Excel) File.Copy(workbook, root + "/Source/Demo_Reward.xlsx");
+                else File.WriteAllText(root + "/Source/BuildTestRow.csv", "Id,Name\nint,string\n编号,名称\n1,Hello");
+                Directory.CreateDirectory(root + "/Localization");
+                string sentinel = root + "/Localization/keep.json";
+                File.WriteAllText(sentinel, "user-owned");
+                configuration.ExportTool = tool;
+                configuration.ExportLocalization = false;
+                configuration.Options.ConfigSourceDirectory = root + "/Source";
+                configuration.Options.LocalizationSourceDirectory = string.Empty;
+                configuration.Options.LocalizationOutputDirectory = root + "/Localization";
+                configuration.Options.ConfigOutputDirectory = root + "/Config";
+                configuration.Options.GeneratedCodeDirectory = root + "/Generated";
+                configuration.Options.GeneratedNamespace = "BuildTests";
+                profile.Steps.Add(new BuildStepSettings { StepId = "config", Enabled = true, Configuration = configuration });
+                var context = BuildPipelineContext.Create(profile, new Dictionary<string, IBuildPipelineStep>(), default);
+                var step = new ConfigExportStep();
+                var issues = new List<BuildValidationIssue>();
+                step.Validate(context, issues);
+                Assert.That(issues, Is.Empty);
+                var result = step.Execute(context);
+                Assert.That(result.Status, Is.EqualTo(BuildStepStatus.Succeeded), result.Message);
+                Assert.That(Directory.GetFiles(root + "/Config/Binary", "*.bytes"), Is.Not.Empty);
+                Assert.That(File.ReadAllText(sentinel), Is.EqualTo("user-owned"));
+                CollectionAssert.AreEqual(new[] { sentinel }, Directory.GetFiles(root + "/Localization")
+                    .Where(path => !path.EndsWith(".meta", StringComparison.Ordinal)).Select(path => path.Replace('\\', '/')));
+                configuration.ExportLocalization = true;
+                configuration.Options.LocalizationSourceDirectory = root + "/Source";
+                configuration.Options.LocalizationOutputDirectory = configuration.Options.ConfigOutputDirectory;
+                step.Validate(context, issues);
+                Assert.That(issues, Has.Count.EqualTo(1));
+                StringAssert.Contains("output directories must be different", issues[0].Message);
+                Assert.That(step.Execute(context).Status, Is.EqualTo(BuildStepStatus.Failed));
+            }
+            finally
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+                if (File.Exists(root + ".meta")) File.Delete(root + ".meta");
+                AssetDatabase.Refresh();
+                UnityEngine.Object.DestroyImmediate(configuration);
+                UnityEngine.Object.DestroyImmediate(profile);
+            }
+        }
+
+        [Test]
+        public void LocalizationOnlyExport_DoesNotRequireConfigSourceExcelOrConfigKey()
+        {
+            string root = "Assets/Temp/FrameworkBuildTests/" + Guid.NewGuid().ToString("N");
+            var profile = CreateProfile(BuildRecipe.Assets);
+            var configuration = ScriptableObject.CreateInstance<ConfigExportBuildConfiguration>();
+            try
+            {
+                Directory.CreateDirectory(root + "/Languages");
+                File.WriteAllText(root + "/Languages/en.csv", "Key,Value\nstring,string\n键,值\nhello,Hello");
+                configuration.ExportConfig = false;
+                configuration.ExportTool = ConfigExportTool.Excel;
+                configuration.Options.ConfigSourceDirectory = string.Empty;
+                configuration.Options.ConfigOutputDirectory = string.Empty;
+                configuration.Options.GeneratedCodeDirectory = string.Empty;
+                configuration.Options.ConfigBinaryProtection = RFramework.ConfigProtectionMode.EncryptedAndAuthenticated;
+                configuration.Options.ConfigProtectionSourceRoot = "";
+                configuration.Options.LocalizationSourceDirectory = root + "/Languages";
+                configuration.Options.LocalizationOutputDirectory = root + "/Output";
+                profile.Steps.Add(new BuildStepSettings { StepId = "config", Enabled = true, Configuration = configuration });
+                var context = BuildPipelineContext.Create(profile, new Dictionary<string, IBuildPipelineStep>(), default);
+                var step = new ConfigExportStep();
+                var issues = new List<BuildValidationIssue>();
+                step.Validate(context, issues);
+                Assert.That(issues, Is.Empty);
+                var result = step.Execute(context);
+                Assert.That(result.Status, Is.EqualTo(BuildStepStatus.Succeeded), result.Message);
+                Assert.That(File.Exists(root + "/Output/Json/en.json"), Is.True);
+                configuration.ExportLocalization = false;
+                step.Validate(context, issues);
+                Assert.That(issues, Has.Count.EqualTo(1));
+                Assert.That(step.Execute(context).Status, Is.EqualTo(BuildStepStatus.Failed));
+            }
+            finally
+            {
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+                if (File.Exists(root + ".meta")) File.Delete(root + ".meta");
+                AssetDatabase.Refresh();
+                UnityEngine.Object.DestroyImmediate(configuration);
+                UnityEngine.Object.DestroyImmediate(profile);
+            }
+        }
+
         [Test]
         public void HotUpdateRecipe_OrdersImportedStepsByStageAndDependency()
         {
@@ -286,11 +437,12 @@ namespace UnityRFramework.Editor.Tests
             BuildRecipePlan plan = BuildRecipePlanner.Create(profile);
 
             Assert.That(plan.IsValid, Is.True);
+            Assert.That(plan.Contains("obfuz.hotupdate"), Is.True);
             Assert.That(
                 IndexOf(plan.StepIds, "hybridclr"),
-                Is.LessThan(IndexOf(plan.StepIds, "obfuz")));
+                Is.LessThan(IndexOf(plan.StepIds, "obfuz.hotupdate")));
             Assert.That(
-                IndexOf(plan.StepIds, "obfuz"),
+                IndexOf(plan.StepIds, "obfuz.hotupdate"),
                 Is.LessThan(IndexOf(plan.StepIds, "yooasset")));
         }
 
@@ -323,9 +475,9 @@ namespace UnityRFramework.Editor.Tests
             Assert.That(plan.IsValid, Is.True);
             Assert.That(
                 IndexOf(plan.StepIds, "hybridclr"),
-                Is.LessThan(IndexOf(plan.StepIds, "obfuz")));
+                Is.LessThan(IndexOf(plan.StepIds, "obfuz.hotupdate")));
             Assert.That(
-                IndexOf(plan.StepIds, "obfuz"),
+                IndexOf(plan.StepIds, "obfuz.hotupdate"),
                 Is.LessThan(IndexOf(plan.StepIds, "yooasset")));
             Assert.That(
                 IndexOf(plan.StepIds, "hybridclr.prepare-player"),
@@ -333,6 +485,84 @@ namespace UnityRFramework.Editor.Tests
             Assert.That(
                 IndexOf(plan.StepIds, "core.build-player"),
                 Is.LessThan(IndexOf(plan.StepIds, "hybridclr")));
+        }
+
+        [TestCase(BuildRecipe.Release, false, "ClearAndCopyAll", true)]
+        [TestCase(BuildRecipe.Release, true, "None", true)]
+        [TestCase(BuildRecipe.Release, true, "ClearAndCopyAll", true)]
+        [TestCase(BuildRecipe.Release, true, "ClearAndCopyByTags", false)]
+        [TestCase(BuildRecipe.Release, true, "OnlyCopyAll", true)]
+        [TestCase(BuildRecipe.Release, true, "OnlyCopyByTags", true)]
+        [TestCase(BuildRecipe.Assets, true, "ClearAndCopyAll", true)]
+        [TestCase(BuildRecipe.HotUpdate, true, "ClearAndCopyAll", true)]
+        [TestCase(BuildRecipe.Player, true, "ClearAndCopyAll", true)]
+        public void YooAssetBuiltinRelease_OrdersResourcesAndFinalPlayer(
+            BuildRecipe recipe, bool hybridEnabled, string copyOption, bool overridePipeline)
+        {
+            var profile = CreateProfile(recipe);
+            var yoo = AddConfiguredStep(profile, "yooasset").Configuration;
+            AddConfiguredStep(profile, "hybridclr", hybridEnabled);
+            AddConfiguredStep(profile, "obfuz");
+            AddConfiguredStep(profile, "config");
+            string package = "FrameworkOrderTest_" + Guid.NewGuid().ToString("N");
+            const string pipeline = "LegacyBuildPipeline";
+            string prefix = PlayerSettings.productGUID + "_" + package;
+            Type builder = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType("YooAsset.Editor.BundleBuilderSetting"))
+                .First(type => type != null);
+            MethodInfo setCopy = builder.GetMethod("SetPackageBundledCopyOption");
+            object copy = Enum.Parse(setCopy.GetParameters()[2].ParameterType, copyOption);
+            try
+            {
+                yoo.GetType().GetField("PackageName").SetValue(yoo, package);
+                yoo.GetType().GetField("BuildPipelineName").SetValue(yoo,
+                    overridePipeline ? pipeline : string.Empty);
+                builder.GetMethod("SetPackageBuildPipeline").Invoke(null, new object[] {
+                    package, overridePipeline ? "ScriptableBuildPipeline" : pipeline
+                });
+                setCopy.Invoke(null, new[] { (object)package, pipeline, copy });
+
+                var plan = BuildRecipePlanner.Create(profile);
+                Assert.That(plan.IsValid, Is.True);
+                const string finalId = "yooasset.finalize-player";
+                bool finalPlayer = recipe == BuildRecipe.Release && hybridEnabled && copyOption != "None";
+                Assert.That(plan.Contains(finalId), Is.EqualTo(finalPlayer));
+                if (recipe == BuildRecipe.Release)
+                {
+                    Assert.That(IndexOf(plan.StepIds, "config"), Is.LessThan(IndexOf(plan.StepIds, "yooasset")));
+                    if (!hybridEnabled)
+                    {
+                        Assert.That(IndexOf(plan.StepIds, "yooasset"), Is.LessThan(IndexOf(plan.StepIds, "core.build-player")));
+                    }
+                    else
+                    {
+                        Assert.That(IndexOf(plan.StepIds, "obfuz.rebuild-player"), Is.LessThan(IndexOf(plan.StepIds, "hybridclr")));
+                        Assert.That(IndexOf(plan.StepIds, "hybridclr"), Is.LessThan(IndexOf(plan.StepIds, "yooasset")));
+                    }
+                }
+                if (finalPlayer)
+                {
+                    Assert.That(IndexOf(plan.StepIds, "yooasset"), Is.LessThan(IndexOf(plan.StepIds, finalId)));
+                    Assert.That(IndexOf(plan.StepIds, finalId), Is.LessThan(IndexOf(plan.StepIds, "obfuz.finalize-player")));
+                    Assert.That(IndexOf(plan.StepIds, "obfuz.finalize-player"), Is.LessThan(IndexOf(plan.StepIds, "core.finalize")));
+                    var step = FindStep(finalId);
+                    Assert.That(step.CallsBuildPipeline, Is.True);
+                    CollectionAssert.AreEquivalent(new[] { "core.build-player", "yooasset" }, step.Dependencies);
+                    var context = BuildPipelineContext.Create(profile,
+                        new Dictionary<string, IBuildPipelineStep>(), new System.Threading.CancellationToken(true));
+                    Assert.That(step.CanRun(context), Is.True);
+                    Assert.That(step.Execute(context).Status, Is.EqualTo(BuildStepStatus.Cancelled));
+                }
+                Assert.That(builder.GetMethod("GetPackageBundledCopyOption").Invoke(null,
+                    new object[] { package, pipeline }), Is.EqualTo(copy), "计划解析不应修改原生 Builder 设置。");
+            }
+            finally
+            {
+                EditorPrefs.DeleteKey(prefix + "_BuildPipelineName");
+                EditorPrefs.DeleteKey(prefix + "_" + pipeline + "_EBundledCopyOption");
+                foreach (var entry in profile.Steps) UnityEngine.Object.DestroyImmediate(entry.Configuration);
+                UnityEngine.Object.DestroyImmediate(profile);
+            }
         }
 
         [Test]

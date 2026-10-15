@@ -74,6 +74,8 @@ HybridCLR Settings 当前实际配置；请通过“打开 HybridCLR 设置”�
 
 选择 `Release` Recipe 时，上述动作在一条流水线内按“Generate/All → Player →
 CompileDll/整理产物 → Obfuz（按需）→ YooAsset（按需）”顺序执行。
+若 YooAsset 开启内置拷贝，资源完成后会再次打包最终 Player，确保最新清单和资源随包发布；
+未启用内置拷贝时不增加这轮 Player 构建。
 
 不使用构建工具时，仍可手动调用 `HybridCLRArtifactBuilder.GenerateCurrentTarget()`、构建
 Player，再调用 `HybridCLRArtifactBuilder.CompileAndStage(...)`。

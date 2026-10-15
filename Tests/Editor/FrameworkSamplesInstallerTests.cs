@@ -67,6 +67,17 @@ namespace UnityRFramework.Editor.Tests
         }
 
         [Test]
+        public void ObfuzPlayer_InstallsNoHybridClrAndJointExtensionResolvesBoth()
+        {
+            var ordinary = catalog.Resolve(new[] { "Expansion.Obfuz" });
+            CollectionAssert.AreEqual(new[] { "Expansion.Obfuz" }, ordinary.Select(s => s.name));
+            CollectionAssert.AreEqual(new[] { "com.code-philosophy.obfuz" }, catalog.GetPackages(ordinary).Select(p => p.name));
+            var joint = catalog.Resolve(new[] { "Expansion.Obfuz.HybridCLR" });
+            CollectionAssert.AreEqual(new[] { "Expansion.Obfuz", "Expansion.HybridCLR", "Expansion.Obfuz.HybridCLR" }, joint.Select(s => s.name));
+            CollectionAssert.AreEquivalent(new[] { "com.code-philosophy.obfuz", "com.code-philosophy.hybridclr", "com.code-philosophy.obfuz4hybridclr" }, catalog.GetPackages(joint).Select(p => p.name));
+        }
+
+        [Test]
         public void CoreSample_DoesNotInstallThirdPartyPackages()
         {
             Assert.That(catalog.GetPackages(catalog.Resolve(new[] { "Sample.Demo" })), Is.Empty);

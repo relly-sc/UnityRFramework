@@ -218,6 +218,11 @@ namespace UnityRFramework.Editor
             BuildRecipe recipe);
     }
 
+    /// <summary>代码准备依赖本次 Player 产生的 AOT 基线，Release 需先构建 Player。</summary>
+    public interface IRequiresPlayerBuildBaseline
+    {
+    }
+
     /// <summary>
     /// 控制具有独立 Player 构建回调的第三方集成开关。
     /// 构建工具在 Player/Release 任务中临时关闭 Profile 未启用的集成，

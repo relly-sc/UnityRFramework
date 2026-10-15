@@ -8,7 +8,7 @@ using UnityEngine;
 namespace UnityRFramework.Editor
 {
     /// <summary>
-    /// Config 配置导出步骤：复用 ConfigPipelineService 全量导出 Config 与 Localization。
+    /// Config 配置导出步骤：按配置独立导出 Config 与 Localization。
     /// 从步骤条目绑定的 <see cref="ConfigExportBuildConfiguration"/> 读取导出路径与格式；
     /// Config 和 Localization 的 JSON、二进制内容都保留，由对应 Helper 决定运行时读取格式。
     /// 正式内容格式由 ConfigReleaseFormat 决定。导出失败立即停止，不使用旧配置产物继续构建。
@@ -96,7 +96,11 @@ namespace UnityRFramework.Editor
                 options = new ConfigPipelineOptions();
             }
 
-            if (!IsAssetsDirectoryExisting(options.ConfigSourceDirectory))
+            if (!settings.ExportConfig && !settings.ExportLocalization)
+                issues.Add(BuildValidationIssue.Error(StepCode,
+                    "请至少启用 Config 或 Localization 导出，或禁用此构建步骤。", StepGroup));
+
+            if (settings.ExportConfig && !IsAssetsDirectoryExisting(options.ConfigSourceDirectory))
             {
                 issues.Add(BuildValidationIssue.Error(
                     StepCode,
@@ -104,7 +108,7 @@ namespace UnityRFramework.Editor
                     StepGroup));
             }
 
-            if (settings.ExportTool == ConfigExportTool.Excel
+            if (settings.ExportConfig && settings.ExportTool == ConfigExportTool.Excel
                 && FindExcelBridge() == null)
             {
                 issues.Add(BuildValidationIssue.Error(
@@ -113,7 +117,7 @@ namespace UnityRFramework.Editor
                     StepGroup));
             }
 
-            if (!IsAssetsDirectoryExisting(options.LocalizationSourceDirectory))
+            if (settings.ExportLocalization && !IsAssetsDirectoryExisting(options.LocalizationSourceDirectory))
             {
                 issues.Add(BuildValidationIssue.Error(
                     StepCode,
@@ -123,7 +127,10 @@ namespace UnityRFramework.Editor
 
             try
             {
-                ConfigProtectionExporter.Create(options, null);
+                if ((!settings.ExportConfig || IsAssetsDirectoryExisting(options.ConfigSourceDirectory))
+                    && (!settings.ExportLocalization || IsAssetsDirectoryExisting(options.LocalizationSourceDirectory)))
+                    ConfigPipelineService.ValidateOptions(options, settings.ExportConfig, settings.ExportLocalization);
+                if (settings.ExportConfig) ConfigProtectionExporter.Create(options, null);
             }
             catch (Exception exception)
             {
@@ -160,25 +167,27 @@ namespace UnityRFramework.Editor
 
             try
             {
-                int configWritten;
-                ConfigPipelineReport localizationReport;
-                if (settings.ExportTool == ConfigExportTool.Excel)
-                {
-                    configWritten = ExportExcel(options);
-                    localizationReport = ConfigPipelineService.ExportLocalization(options);
-                }
+                if (!settings.ExportConfig && !settings.ExportLocalization)
+                    throw new InvalidOperationException("未启用任何配置导出内容。");
+                ConfigPipelineService.ValidateOptions(options, settings.ExportConfig, settings.ExportLocalization);
+                int writtenCount = 0;
+                if (settings.ExportConfig && settings.ExportLocalization && settings.ExportTool == ConfigExportTool.Csv)
+                    writtenCount = ConfigPipelineService.ExportAll(options).WrittenFileCount;
                 else
                 {
-                    ConfigPipelineReport report = ConfigPipelineService.ExportAll(options);
-                    configWritten = report.WrittenFileCount;
-                    localizationReport = null;
+                    if (settings.ExportConfig)
+                        writtenCount += settings.ExportTool == ConfigExportTool.Excel
+                            ? ExportExcel(options)
+                            : ConfigPipelineService.ExportConfig(options).WrittenFileCount;
+                    if (settings.ExportLocalization)
+                        writtenCount += ConfigPipelineService.ExportLocalization(options).WrittenFileCount;
                 }
 
-                int writtenCount = configWritten
-                    + (localizationReport?.WrittenFileCount ?? 0);
-
+                string exported = settings.ExportConfig
+                    ? settings.ExportLocalization ? "Config/Localization" : "Config"
+                    : "Localization";
                 return BuildStepResult.Succeeded(
-                    $"Config/Localization 导出完成：{writtenCount} 个文件变更，JSON 与二进制内容均已保留。");
+                    $"{exported} 导出完成：{writtenCount} 个文件变更，JSON 与二进制内容均已保留。");
             }
             catch (Exception exception)
             {
@@ -215,7 +224,11 @@ namespace UnityRFramework.Editor
                 throw new InvalidOperationException("Excel 配置表构建桥接不可用。");
             }
 
-            return (int)method.Invoke(null, new object[] { options });
+            try { return (int)method.Invoke(null, new object[] { options }); }
+            catch (TargetInvocationException exception) when (exception.InnerException != null)
+            {
+                throw new InvalidOperationException(exception.InnerException.Message, exception.InnerException);
+            }
         }
 
         /// <summary>
