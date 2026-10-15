@@ -1,5 +1,5 @@
 {
-  "frameworkVersion": "1.12.0",
+  "frameworkVersion": "1.12.1",
   "packages": [
     { "name": "com.tuyoogame.yooasset", "version": "3.0.5", "url": "https://github.com/tuyoogame/YooAsset.git?path=Assets/YooAsset#3.0.5" },
     { "name": "com.cysharp.unitask", "version": "2.5.11", "url": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask#2.5.11" },

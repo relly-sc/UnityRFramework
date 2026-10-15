@@ -19,8 +19,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG_NAME" \
-            --repo "$GITHUB_REPOSITORY" \
-            --verify-tag \
-            --title "UnityRFramework $TAG_NAME" \
-            --generate-notes
+          set -euo pipefail
+          if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already exists; preserving its title and notes."
+          elif gh release create "$TAG_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "UnityRFramework $TAG_NAME" \
+              --generate-notes; then
+            echo "Release created."
+          else
+            # A maintainer may have created the release after the initial check.
+            gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null
+          fi
