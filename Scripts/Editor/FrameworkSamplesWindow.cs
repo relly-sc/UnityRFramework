@@ -8,12 +8,13 @@ using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 namespace UnityRFramework.Editor
 {
-    /// <summary>按框架固定版本清单安装依赖，之后导入所需扩展及示例。</summary>
+    /// <summary>按核心清单安装兼容的依赖，之后导入所需扩展及示例。</summary>
     internal sealed class FrameworkSamplesWindow : EditorWindow
     {
         private FrameworkSampleCatalog catalog;
         private string catalogPath;
         private string developmentSamplesRoot;
+        private PackageInfo core;
         private Vector2 scroll;
         private string error;
 
@@ -32,7 +33,7 @@ namespace UnityRFramework.Editor
                 catalogPath = FrameworkSampleCatalog.GetCatalogPath(this);
                 catalog = FrameworkSampleCatalog.Load(catalogPath);
                 developmentSamplesRoot = FrameworkSampleCatalog.GetDevelopmentSamplesRoot(catalogPath);
-                var core = PackageInfo.FindForPackageName(FrameworkSampleCatalog.CorePackage);
+                core = PackageInfo.FindForPackageName(FrameworkSampleCatalog.CorePackage);
                 if (core != null && core.version != catalog.frameworkVersion)
                     throw new InvalidOperationException("核心包与扩展依赖清单版本不一致。");
                 error = null;
@@ -49,13 +50,14 @@ namespace UnityRFramework.Editor
             bool development = developmentSamplesRoot != null;
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
-                GUILayout.Label("框架 " + catalog.frameworkVersion);
+                GUILayout.Label("框架 " + (core?.version ?? catalog.frameworkVersion));
                 GUILayout.FlexibleSpace();
                 GUILayout.Label(development ? "开发源码" : samples == null ? "Samples 未安装" : "Samples " + samples.version);
                 if (GUILayout.Button(EditorGUIUtility.IconContent("Refresh", "|刷新版本与安装状态"), EditorStyles.toolbarButton,
                     GUILayout.Width(24))) OnEnable();
             }
-            bool versionMatches = samples != null && samples.version == catalog.frameworkVersion;
+            bool versionMatches = samples != null && samples.version == catalog.samplesVersion
+                && core != null && FrameworkSampleCatalog.IsVersionAtLeast(core.version, catalog.samplesMinimumFrameworkVersion);
             var imported = new Dictionary<string, bool>();
             if (!development && versionMatches)
             {
@@ -66,7 +68,12 @@ namespace UnityRFramework.Editor
                 EditorGUILayout.HelpBox("当前为框架开发源码，直接使用本地 Samples，无需安装或重复导入。", MessageType.Info);
             else if (!versionMatches)
             {
-                EditorGUILayout.HelpBox(samples == null ? "尚未安装 Samples 包。" : "核心与 Samples 版本不一致。", MessageType.Warning);
+                string message = samples == null
+                    ? $"尚未安装 Samples 包，建议安装 {catalog.samplesVersion}。"
+                    : samples.version != catalog.samplesVersion
+                        ? $"当前 Samples {samples.version}，建议安装 {catalog.samplesVersion}。"
+                        : $"当前核心版本不满足 Samples 的最低要求 {catalog.samplesMinimumFrameworkVersion}。";
+                EditorGUILayout.HelpBox(message, MessageType.Warning);
                 using (new EditorGUI.DisabledScope(FrameworkSamplesInstaller.IsBusy || SamplesPackageInstaller.IsBusy))
                     if (GUILayout.Button(samples == null ? "安装 Samples" : "更新 Samples")) SamplesPackageInstaller.Install();
             }

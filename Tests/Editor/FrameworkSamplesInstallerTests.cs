@@ -129,11 +129,21 @@ namespace UnityRFramework.Editor.Tests
             var plan = catalog.Resolve(new[] { "Expansion.HybridCLR.Demo" });
             string[] names = plan.Select(s => s.name).ToArray();
             Assert.DoesNotThrow(() => FrameworkSamplesInstaller.ValidatePlan(catalog.frameworkVersion,
-                catalog.frameworkVersion, names, plan));
+                catalog.frameworkVersion, catalog.samplesVersion, catalog.samplesVersion, names, plan));
             Assert.Throws<InvalidOperationException>(() => FrameworkSamplesInstaller.ValidatePlan("old",
-                catalog.frameworkVersion, names, plan));
+                catalog.frameworkVersion, catalog.samplesVersion, catalog.samplesVersion, names, plan));
             Assert.Throws<InvalidOperationException>(() => FrameworkSamplesInstaller.ValidatePlan(catalog.frameworkVersion,
-                catalog.frameworkVersion, names.Take(1).ToArray(), plan));
+                catalog.frameworkVersion, "old", catalog.samplesVersion, names, plan));
+            Assert.Throws<InvalidOperationException>(() => FrameworkSamplesInstaller.ValidatePlan(catalog.frameworkVersion,
+                catalog.frameworkVersion, catalog.samplesVersion, catalog.samplesVersion, names.Take(1).ToArray(), plan));
+        }
+
+        [Test]
+        public void SamplesVersion_IsIndependentAndSupportsNewerCompatibleCore()
+        {
+            Assert.That(catalog.samplesVersion, Is.Not.EqualTo(string.Empty));
+            Assert.That(FrameworkSampleCatalog.IsVersionAtLeast("1.12.2", catalog.samplesMinimumFrameworkVersion), Is.True);
+            Assert.That(FrameworkSampleCatalog.IsVersionAtLeast("1.12.0", catalog.samplesMinimumFrameworkVersion), Is.False);
         }
 
         [Test]
@@ -149,7 +159,7 @@ namespace UnityRFramework.Editor.Tests
         }
 
         [Test]
-        public void SamplesUrl_PinsFrameworkVersionInsteadOfLatestMain()
+        public void SamplesUrl_PinsSamplesVersionInsteadOfLatestMain()
         {
             Assert.That(SamplesPackageInstaller.GetSamplesUrl("1.11.0"), Does.EndWith("#versions/1.11.0"));
             Assert.Throws<ArgumentException>(() => SamplesPackageInstaller.GetSamplesUrl(" "));

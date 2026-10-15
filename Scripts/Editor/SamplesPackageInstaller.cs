@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using UnityEditor;
 using UnityEditor.PackageManager;
 using UnityEditor.PackageManager.Requests;
@@ -16,12 +17,12 @@ namespace UnityRFramework.Editor
         private const string PendingVersionKey = "UnityRFramework.Samples.PendingVersion";
         private static AddRequest request;
         private static ListRequest resumeListing;
-        private static string coreVersion;
-        internal static bool IsBusy => !string.IsNullOrEmpty(coreVersion);
+        private static string samplesVersion;
+        internal static bool IsBusy => !string.IsNullOrEmpty(samplesVersion);
 
         static SamplesPackageInstaller()
         {
-            coreVersion = SessionState.GetString(PendingVersionKey, string.Empty);
+            samplesVersion = SessionState.GetString(PendingVersionKey, string.Empty);
             if (IsBusy) EditorApplication.update += CheckResult;
         }
 
@@ -54,21 +55,29 @@ namespace UnityRFramework.Editor
                 return;
             }
 
+            var catalog = FrameworkSampleCatalog.Load(Path.Combine(core.resolvedPath, "Scripts", "Editor", "FrameworkSamples.json"));
+            if (core.version != catalog.frameworkVersion)
+            {
+                EditorUtility.DisplayDialog("安装 Samples", "核心包版本与自身扩展清单不一致，请先刷新 Package Manager。", "确定");
+                return;
+            }
+
             PackageInfo installed = PackageInfo.FindForPackageName(SamplesPackage);
-            if (installed != null && installed.version == core.version)
+            if (installed != null && installed.version == catalog.samplesVersion)
             {
                 FrameworkSamplesWindow.Open();
                 return;
             }
             if (installed != null && FrameworkPackageDependency.IsProtected(installed.source))
             {
-                EditorUtility.DisplayDialog("安装 Samples", "Samples 是本地或嵌入式包，请自行同步到与核心一致的版本。安装器不会覆盖本地源码。", "确定");
+                EditorUtility.DisplayDialog("安装 Samples", "Samples 是本地或嵌入式包，请自行同步到兼容当前核心的版本。安装器不会覆盖本地源码。", "确定");
                 return;
             }
 
             if (!EditorUtility.DisplayDialog(
                     "安装 Samples",
-                    $"将安装与核心 {core.version} 对应的固定版本 Samples。\n"
+                    $"将安装与当前核心兼容的 Samples {catalog.samplesVersion}。\n"
+                    + $"Samples 最低支持核心版本：{catalog.samplesMinimumFrameworkVersion}。\n"
                     + (installed == null ? string.Empty : $"当前 Samples：{installed.version}。\n")
                     + "不会自动导入全部示例或安装全部第三方插件。",
                     "安装",
@@ -79,15 +88,15 @@ namespace UnityRFramework.Editor
 
             try
             {
-                coreVersion = core.version;
-                SessionState.SetString(PendingVersionKey, coreVersion);
-                request = Client.Add(GetSamplesUrl(coreVersion));
+                samplesVersion = catalog.samplesVersion;
+                SessionState.SetString(PendingVersionKey, samplesVersion);
+                request = Client.Add(GetSamplesUrl(samplesVersion));
                 EditorApplication.update += CheckResult;
             }
             catch (Exception exception)
             {
                 request = null;
-                coreVersion = null;
+                samplesVersion = null;
                 SessionState.EraseString(PendingVersionKey);
                 Debug.LogError($"Samples 安装未启动：{exception.Message}");
             }
@@ -127,13 +136,13 @@ namespace UnityRFramework.Editor
                 foreach (var package in resumeListing.Result)
                     if (package.name == SamplesPackage) { samples = package; break; }
             }
-            string expected = coreVersion;
+            string expected = samplesVersion;
             Stop(null);
             if (samples == null || !string.Equals(samples.version, expected, StringComparison.Ordinal))
             {
                 Debug.LogError(
-                    $"Samples 与核心版本不一致：核心 {expected}，Samples {samples?.version}。"
-                    + "请更新核心包和 Samples 包至相同版本。");
+                    $"Samples 安装结果版本不正确：要求 {expected}，实际 {samples?.version ?? "未安装"}。"
+                    + "请重新打开安装工具检查。");
                 return;
             }
 
@@ -147,7 +156,7 @@ namespace UnityRFramework.Editor
             SessionState.EraseString(PendingVersionKey);
             request = null;
             resumeListing = null;
-            coreVersion = null;
+            samplesVersion = null;
             if (error != null) Debug.LogError(error);
         }
     }
