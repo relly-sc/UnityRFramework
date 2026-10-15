@@ -24,6 +24,37 @@ namespace UnityRFramework.Editor.Tests
             catalog = FrameworkSampleCatalog.Load(Path.Combine(Path.GetDirectoryName(script), "FrameworkSamples.json"));
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void DevelopmentSource_UsesRepositoryLayoutInsteadOfProjectNameOrImportedSamples(bool development)
+        {
+            string root = Path.Combine(Path.GetTempPath(), "FrameworkSamplesTests", Guid.NewGuid().ToString("N"));
+            string catalogPath = Path.Combine(root, "Scripts", "Editor", "FrameworkSamples.json");
+            try
+            {
+                Directory.CreateDirectory(Path.Combine(root, "Samples"));
+                Directory.CreateDirectory(Path.Combine(root, "Samples~"));
+                if (development)
+                {
+                    Directory.CreateDirectory(Path.Combine(root, "Tools~"));
+                    File.WriteAllText(Path.Combine(root, "Tools~", "SamplesPackage.json"), "{}");
+                }
+                Assert.That(FrameworkSampleCatalog.GetDevelopmentSamplesRoot(catalogPath),
+                    Is.EqualTo(development ? Path.Combine(root, "Samples") : null));
+                if (development)
+                    Assert.Throws<InvalidOperationException>(() => FrameworkSamplesInstaller.Start(
+                        catalogPath, new[] { "Sample.Demo" }, true, true));
+            }
+            finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+        }
+
+        [Test]
+        public void EverySample_HasDescriptionBeforeSamplesPackageIsInstalled()
+        {
+            foreach (var sample in catalog.samples)
+                Assert.That(string.IsNullOrWhiteSpace(sample.description), Is.False, sample.name);
+        }
+
         [Test]
         public void HybridClrDemo_ResolvesOnlyRequiredPackagesAndSamplesInOrder()
         {
@@ -140,9 +171,12 @@ namespace UnityRFramework.Editor.Tests
                 window.titleContent = new GUIContent("扩展与示例");
                 window.Show();
                 window.Focus();
+                var sourceField = typeof(FrameworkSamplesWindow).GetField("developmentSamplesRoot", BindingFlags.Instance | BindingFlags.NonPublic);
+                foreach (string sourceRoot in new[] { (string)sourceField.GetValue(window), null }.Distinct())
                 foreach (var view in new[] { (width: 480, height: 360, scroll: 0), (width: 960, height: 680, scroll: 0),
                     (width: 480, height: 360, scroll: 650) })
                 {
+                    sourceField.SetValue(window, sourceRoot);
                     window.position = new Rect(80, 80, view.width, view.height);
                     typeof(FrameworkSamplesWindow).GetField("scroll", BindingFlags.Instance | BindingFlags.NonPublic)
                         .SetValue(window, new Vector2(0, view.scroll));
@@ -158,7 +192,7 @@ namespace UnityRFramework.Editor.Tests
                             window.position.position, image.width, image.height));
                         image.Apply();
                         string path = Path.Combine(Directory.GetParent(Application.dataPath).FullName,
-                            "Temp", $"扩展安装窗口-{image.width}-{view.scroll}.png");
+                            "Temp", $"扩展安装窗口-{(sourceRoot == null ? "消费级" : "开发")}-{image.width}-{view.scroll}.png");
                         Directory.CreateDirectory(Path.GetDirectoryName(path));
                         File.WriteAllBytes(path, image.EncodeToPNG());
                     }

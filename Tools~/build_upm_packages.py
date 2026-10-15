@@ -70,6 +70,10 @@ def load_manifests() -> tuple[dict, dict]:
         sample["displayName"] for sample in samples_manifest["samples"]
     }:
         raise ValueError("扩展依赖清单与 Samples 声明不一致。")
+    descriptions = {sample["displayName"]: sample.get("description") for sample in samples_manifest["samples"]}
+    for sample in catalog["samples"]:
+        if not sample.get("description", "").strip() or sample["description"] != descriptions[sample["name"]]:
+            raise ValueError(f"扩展安装清单与 Samples 简介缺失或不一致：{sample['name']}")
     return core_manifest, samples_manifest
 
 

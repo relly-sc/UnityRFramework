@@ -30,6 +30,7 @@ namespace UnityRFramework.Editor
     internal sealed class FrameworkSampleDefinition
     {
         public string name;
+        public string description;
         public string[] dependencies;
         public string[] packages;
         public string requiredAssembly;
@@ -113,6 +114,14 @@ namespace UnityRFramework.Editor
             if (!string.IsNullOrEmpty(sample.requiredType) && !hasType(sample.requiredType))
                 return sample.name + "：" + sample.notice;
             return null;
+        }
+
+        internal static string GetDevelopmentSamplesRoot(string catalogPath)
+        {
+            string root = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(catalogPath), "../.."));
+            // 发布包不包含 Tools~，不能仅凭项目名称或已导入的 Samples 目录判断。
+            return File.Exists(Path.Combine(root, "Tools~", "SamplesPackage.json"))
+                ? Path.Combine(root, "Samples") : null;
         }
 
         internal static string GetCatalogPath(EditorWindow window)
