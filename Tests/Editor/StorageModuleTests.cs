@@ -178,6 +178,232 @@ namespace UnityRFramework.Editor.Tests
             CollectionAssert.AreEqual(new byte[] { 0, 1, 2 }, helper.GetCurrent("slot"));
         }
 
+        [TestCase(false, 10)]
+        [TestCase(true, 10)]
+        [TestCase(false, -2)]
+        [TestCase(true, -2)]
+        public void BusinessInvalidPrimaryCanReadBackupWithoutChangingEitherFile(bool protect, int backupNumber)
+        {
+            module.SetDataProtector(new DefaultDataProtector(new TestKeyProvider("SaveKey", CreateKey(7))));
+            var options = new StorageOptions
+            {
+                ProtectionMode = protect ? StorageProtectionMode.EncryptedAndAuthenticated : StorageProtectionMode.None,
+                CompressionMode = protect ? StorageCompressionMode.GZip : StorageCompressionMode.None
+            };
+            Assert.IsTrue(Await(module.SaveAsync("business", new SaveData(backupNumber, "backup"), options)).Succeeded);
+            Assert.IsTrue(Await(module.SaveAsync("business", new SaveData(-1, "primary"), options)).Succeeded);
+            byte[] primaryBytes = (byte[])helper.GetCurrent("business").Clone();
+            byte[] backupBytes = (byte[])helper.GetBackup("business").Clone();
+
+            var primary = Await(module.LoadAsync<SaveData>("business", options));
+            Assert.IsTrue(primary.Succeeded, primary.Message);
+            Assert.IsFalse(primary.RecoveredFromBackup);
+            Assert.That(primary.Data.Number, Is.LessThan(0), "框架可读不代表业务数据合法。");
+            Assert.AreEqual(0, helper.BackupReads);
+
+            var backup = Await(module.LoadBackupAsync<SaveData>("business", options));
+            Assert.IsTrue(backup.Succeeded, backup.Message);
+            Assert.IsTrue(backup.RecoveredFromBackup);
+            Assert.AreEqual("business", backup.SlotName);
+            Assert.AreEqual(backupNumber, backup.Data.Number);
+            var liveData = new SaveData(99, "live");
+            if (backup.Data.Number >= 0) liveData = backup.Data;
+            Assert.AreEqual(backupNumber >= 0 ? backupNumber : 99, liveData.Number,
+                "业务校验失败时应保留当前对局，不自动采用非法备份。");
+            CollectionAssert.AreEqual(primaryBytes, helper.GetCurrent("business"));
+            CollectionAssert.AreEqual(backupBytes, helper.GetBackup("business"));
+        }
+
+        [Test]
+        public void ExplicitBackupUsesFullPipelineAndMigrationEvenWhenAutomaticRecoveryIsDisabled()
+        {
+            module.SetDataProtector(new DefaultDataProtector(new TestKeyProvider("SaveKey", CreateKey(17))));
+            var options = new StorageOptions
+            {
+                ProtectionMode = StorageProtectionMode.EncryptedAndAuthenticated,
+                CompressionMode = StorageCompressionMode.GZip,
+                RecoverFromBackup = false
+            };
+            Await(module.SaveAsync("migration-backup", new SaveData(4, "old"), options));
+            Await(module.SaveAsync("migration-backup", new SaveData(9, "current"), options));
+            byte[] primary = (byte[])helper.GetCurrent("migration-backup").Clone();
+            byte[] previous = (byte[])helper.GetBackup("migration-backup").Clone();
+            options.Version = 2;
+
+            var result = Await(module.LoadBackupAsync("migration-backup", options, new IncrementMigration()));
+
+            Assert.IsTrue(result.Succeeded, result.Message);
+            Assert.IsTrue(result.RecoveredFromBackup);
+            Assert.AreEqual(5, result.Data.Number);
+            Assert.AreEqual(2, result.Version);
+            Assert.AreEqual(0, helper.PrimaryReads);
+            CollectionAssert.AreEqual(primary, helper.GetCurrent("migration-backup"));
+            CollectionAssert.AreEqual(previous, helper.GetBackup("migration-backup"));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void NewerPrimaryIsRejectedBeforeDeserializationAndNeverFallsBack(bool serializerFails)
+        {
+            Await(module.SaveAsync("future", new SaveData(1, "backup")));
+            Await(module.SaveAsync("future", new SaveData(2, "future"), new StorageOptions { Version = 2 }));
+            var serializer = new TestSerializer();
+            module.SetSerializer(serializerFails ? (IStorageSerializer)new FailingSerializer() : serializer);
+            byte[] primary = (byte[])helper.GetCurrent("future").Clone();
+            byte[] backup = (byte[])helper.GetBackup("future").Clone();
+
+            var result = Await(module.LoadAsync<SaveData>("future"));
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(StorageExceptionReason.MigrationFailed, result.Reason);
+            StringAssert.Contains("newer", result.Message);
+            Assert.AreEqual(0, serializer.DeserializeCalls);
+            Assert.AreEqual(0, helper.BackupReads);
+            CollectionAssert.AreEqual(primary, helper.GetCurrent("future"));
+            CollectionAssert.AreEqual(backup, helper.GetBackup("future"));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void MigrationFailureDoesNotFallBackToCompatibleBackup(bool hasMigration)
+        {
+            Await(module.SaveAsync("migration-failure", new SaveData(8, "backup"), new StorageOptions { Version = 2 }));
+            Await(module.SaveAsync("migration-failure", new SaveData(9, "primary")));
+            byte[] primary = (byte[])helper.GetCurrent("migration-failure").Clone();
+            byte[] backup = (byte[])helper.GetBackup("migration-failure").Clone();
+
+            var result = Await(module.LoadAsync("migration-failure", new StorageOptions { Version = 2 },
+                hasMigration ? new FailingMigration() : (IStorageMigration<SaveData>)null));
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(StorageExceptionReason.MigrationFailed, result.Reason);
+            Assert.AreEqual(0, helper.BackupReads);
+            CollectionAssert.AreEqual(primary, helper.GetCurrent("migration-failure"));
+            CollectionAssert.AreEqual(backup, helper.GetBackup("migration-failure"));
+        }
+
+        [Test]
+        public void UnavailablePrimaryKeyDoesNotSilentlyUseBackupWithAnOlderAvailableKey()
+        {
+            var options = new StorageOptions { ProtectionMode = StorageProtectionMode.EncryptedAndAuthenticated };
+            var oldProtector = new DefaultDataProtector(new TestKeyProvider("SaveKey", CreateKey(3)));
+            module.SetDataProtector(oldProtector);
+            Await(module.SaveAsync("key-change", new SaveData(1, "backup"), options));
+            module.SetDataProtector(new DefaultDataProtector(new TestKeyProvider("NewKey", CreateKey(5))));
+            options.KeyId = "NewKey";
+            Await(module.SaveAsync("key-change", new SaveData(2, "primary"), options));
+            byte[] primary = (byte[])helper.GetCurrent("key-change").Clone();
+            byte[] backup = (byte[])helper.GetBackup("key-change").Clone();
+            module.SetDataProtector(oldProtector);
+
+            var result = Await(module.LoadAsync<SaveData>("key-change", options));
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(StorageExceptionReason.KeyUnavailable, result.Reason);
+            Assert.AreEqual(0, helper.BackupReads);
+            CollectionAssert.AreEqual(primary, helper.GetCurrent("key-change"));
+            CollectionAssert.AreEqual(backup, helper.GetBackup("key-change"));
+            Assert.IsTrue(Await(module.LoadBackupAsync<SaveData>("key-change", options)).Succeeded);
+        }
+
+        [TestCase(StorageExceptionReason.NotFound)]
+        [TestCase(StorageExceptionReason.FormatInvalid)]
+        [TestCase(StorageExceptionReason.SerializationFailed)]
+        [TestCase(StorageExceptionReason.IoFailure)]
+        public void BackupFailureDoesNotReadPrimaryOrReplaceLiveData(StorageExceptionReason reason)
+        {
+            Await(module.SaveAsync("backup-failure", new SaveData(1, "backup")));
+            if (reason != StorageExceptionReason.NotFound)
+                Await(module.SaveAsync("backup-failure", new SaveData(2, "primary")));
+            if (reason == StorageExceptionReason.FormatInvalid) helper.GetBackup("backup-failure")[0] = 0;
+            if (reason == StorageExceptionReason.SerializationFailed) module.SetSerializer(new FailingSerializer());
+            helper.FailBackupReads = reason == StorageExceptionReason.IoFailure;
+            byte[] primary = (byte[])helper.GetCurrent("backup-failure").Clone();
+            byte[] backup = reason == StorageExceptionReason.NotFound ? null : (byte[])helper.GetBackup("backup-failure").Clone();
+            var liveData = new SaveData(99, "live");
+
+            var result = Await(module.LoadBackupAsync<SaveData>("backup-failure"));
+            if (result.Succeeded) liveData = result.Data;
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(reason, result.Reason);
+            Assert.IsNull(result.Data);
+            Assert.IsFalse(result.RecoveredFromBackup);
+            Assert.AreEqual(99, liveData.Number);
+            Assert.AreEqual(0, helper.PrimaryReads);
+            CollectionAssert.AreEqual(primary, helper.GetCurrent("backup-failure"));
+            if (backup != null) CollectionAssert.AreEqual(backup, helper.GetBackup("backup-failure"));
+        }
+
+        [Test]
+        public void BackupSharesSaveLockAndWaitingCancellationDoesNotTouchFiles()
+        {
+            Await(module.SaveAsync("locked", new SaveData(1, "backup")));
+            Await(module.SaveAsync("locked", new SaveData(2, "primary")));
+            byte[] primary = (byte[])helper.GetCurrent("locked").Clone();
+            byte[] backup = (byte[])helper.GetBackup("locked").Clone();
+            helper.WriteDelayMilliseconds = 5000;
+            using (var saveCancellation = new CancellationTokenSource())
+            using (var loadCancellation = new CancellationTokenSource())
+            {
+                var save = module.SaveAsync("locked", new SaveData(3, "pending"), ct: saveCancellation.Token);
+                try
+                {
+                    Assert.IsTrue(SpinWait.SpinUntil(() => helper.ActiveWrites > 0, TimeSpan.FromSeconds(1)));
+                    var load = module.LoadBackupAsync<SaveData>("locked", ct: loadCancellation.Token);
+                    Assert.IsFalse(load.IsCompleted, "备份读取必须等待同槽位的写锁。");
+                    loadCancellation.Cancel();
+                    Assert.AreEqual(StorageExceptionReason.Cancelled, Await(load).Reason);
+                    Assert.AreEqual(0, helper.BackupReads);
+                }
+                finally
+                {
+                    saveCancellation.Cancel();
+                    Await(save);
+                }
+            }
+            CollectionAssert.AreEqual(primary, helper.GetCurrent("locked"));
+            CollectionAssert.AreEqual(backup, helper.GetBackup("locked"));
+            Assert.IsTrue(Await(module.LoadBackupAsync<SaveData>("locked")).Succeeded, "取消后必须释放槽位锁。");
+        }
+
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        public void BackupReadCancellationAndShutdownAreContained(bool stopModule, bool explicitBackup)
+        {
+            Await(module.SaveAsync("cancel-backup", new SaveData(1, "backup")));
+            Await(module.SaveAsync("cancel-backup", new SaveData(2, "primary")));
+            if (!explicitBackup) helper.Corrupt("cancel-backup");
+            byte[] primary = (byte[])helper.GetCurrent("cancel-backup").Clone();
+            byte[] backup = (byte[])helper.GetBackup("cancel-backup").Clone();
+            helper.BackupReadDelayMilliseconds = 5000;
+            using (var cancellation = new CancellationTokenSource())
+            {
+                var load = explicitBackup
+                    ? module.LoadBackupAsync<SaveData>("cancel-backup", ct: cancellation.Token)
+                    : module.LoadAsync<SaveData>("cancel-backup", ct: cancellation.Token);
+                Assert.AreEqual(1, helper.BackupReads);
+                if (stopModule) RFrameworkModuleHost.StopAll();
+                else cancellation.Cancel();
+                var result = Await(load);
+                Assert.IsFalse(result.Succeeded);
+                Assert.AreEqual(StorageExceptionReason.Cancelled, result.Reason);
+            }
+            CollectionAssert.AreEqual(primary, helper.GetCurrent("cancel-backup"));
+            CollectionAssert.AreEqual(backup, helper.GetBackup("cancel-backup"));
+        }
+
+        [TestCase(null)]
+        [TestCase("../slot")]
+        public void BackupRejectsInvalidSlotWithoutReading(string slotName)
+        {
+            var result = Await(module.LoadBackupAsync<SaveData>(slotName));
+            Assert.AreEqual(StorageExceptionReason.InvalidArgument, result.Reason);
+            Assert.AreEqual(0, helper.BackupReads);
+        }
+
         [Test]
         public void EncryptedPrimaryDoesNotFallBackToPlaintextBackupWhenProtectionIsDisabled()
         {
@@ -478,6 +704,54 @@ namespace UnityRFramework.Editor.Tests
             }
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ComponentReadsRealBackupWithDefaultOrEncryptedOptionsWithoutChangingFiles(bool protect)
+        {
+            string root = Path.Combine(Path.GetTempPath(), "UnityRFrameworkStorageTests", Guid.NewGuid().ToString("N"));
+            var gameObject = new GameObject("BackupReadTest");
+            gameObject.SetActive(false);
+            try
+            {
+                var fileHelper = gameObject.AddComponent<DefaultStorageHelper>();
+                fileHelper.Initialize(root);
+                module.SetHelper(fileHelper);
+                Utility.Json.SetJsonHelper(new DefaultJsonHelper());
+                module.SetSerializer(new JsonStorageSerializer());
+                module.SetDataProtector(new DefaultDataProtector(new TestKeyProvider("SaveKey", CreateKey(23))));
+                var options = new StorageOptions
+                {
+                    ProtectionMode = protect ? StorageProtectionMode.EncryptedAndAuthenticated : StorageProtectionMode.None,
+                    CompressionMode = protect ? StorageCompressionMode.GZip : StorageCompressionMode.None,
+                    RecoverFromBackup = false
+                };
+                Assert.IsTrue(Await(module.SaveAutoAsync(new SaveData(4, "backup"), options)).Succeeded);
+                Assert.IsTrue(Await(module.SaveAutoAsync(new SaveData(-1, "primary"), options)).Succeeded);
+                string primaryPath = Path.Combine(root, StorageSlotNames.AutoSave + ".save");
+                byte[] primary = File.ReadAllBytes(primaryPath);
+                byte[] backup = File.ReadAllBytes(primaryPath + ".bak");
+                var component = gameObject.AddComponent<StorageComponent>();
+                options.Version = 2;
+
+                var result = protect
+                    ? Await(component.LoadBackupAsync(StorageSlotNames.AutoSave, options, new IncrementMigration()))
+                    : Await(component.LoadBackupAsync<SaveData>(StorageSlotNames.AutoSave));
+
+                Assert.IsTrue(result.Succeeded, result.Message);
+                Assert.IsTrue(result.RecoveredFromBackup);
+                Assert.AreEqual(protect ? 5 : 4, result.Data.Number);
+                Assert.AreEqual(protect ? 2 : 1, result.Version);
+                CollectionAssert.AreEqual(primary, File.ReadAllBytes(primaryPath));
+                CollectionAssert.AreEqual(backup, File.ReadAllBytes(primaryPath + ".bak"));
+                Assert.IsFalse(File.Exists(primaryPath + ".tmp"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+                if (Directory.Exists(root)) Directory.Delete(root, true);
+            }
+        }
+
         [Serializable]
         private sealed class SaveData
         {
@@ -493,6 +767,8 @@ namespace UnityRFramework.Editor.Tests
 
         private sealed class TestSerializer : IStorageSerializer
         {
+            public int DeserializeCalls { get; private set; }
+
             public byte[] Serialize<T>(T data)
             {
                 SaveData value = data as SaveData;
@@ -502,6 +778,7 @@ namespace UnityRFramework.Editor.Tests
 
             public T Deserialize<T>(byte[] data)
             {
+                DeserializeCalls++;
                 string[] parts = Encoding.UTF8.GetString(data).Split(new[] { '\n' }, 2);
                 return (T)(object)new SaveData(int.Parse(parts[0]), parts[1]);
             }
@@ -526,6 +803,14 @@ namespace UnityRFramework.Editor.Tests
             public T Deserialize<T>(byte[] data)
             {
                 throw new InvalidOperationException("Expected serializer failure.");
+            }
+        }
+
+        private sealed class FailingMigration : IStorageMigration<SaveData>
+        {
+            public SaveData Migrate(SaveData data, int fromVersion, int targetVersion)
+            {
+                throw new InvalidOperationException("Expected migration failure.");
             }
         }
 
@@ -562,6 +847,10 @@ namespace UnityRFramework.Editor.Tests
 
             public int WriteDelayMilliseconds { get; set; }
             public bool FailWrites { get; set; }
+            public bool FailBackupReads { get; set; }
+            public int BackupReadDelayMilliseconds { get; set; }
+            public int PrimaryReads { get; private set; }
+            public int BackupReads { get; private set; }
             public int MaximumConcurrentWrites { get; private set; }
             public int ActiveWrites => Volatile.Read(ref concurrentWrites);
 
@@ -585,13 +874,18 @@ namespace UnityRFramework.Editor.Tests
                 }
             }
 
-            public Task<byte[]> ReadAsync(string slotName, bool backup, CancellationToken ct)
+            public async Task<byte[]> ReadAsync(string slotName, bool backup, CancellationToken ct)
             {
+                if (backup) BackupReads++;
+                else PrimaryReads++;
+                if (backup && BackupReadDelayMilliseconds > 0)
+                    await Task.Delay(BackupReadDelayMilliseconds, ct).ConfigureAwait(false);
                 ct.ThrowIfCancellationRequested();
+                if (backup && FailBackupReads) throw new IOException("Expected backup read failure.");
                 Dictionary<string, byte[]> source = backup ? backups : current;
                 if (!source.TryGetValue(slotName, out byte[] data))
                     throw new FileNotFoundException();
-                return Task.FromResult((byte[])data.Clone());
+                return (byte[])data.Clone();
             }
 
             public Task DeleteAsync(string slotName, CancellationToken ct)
@@ -626,6 +920,11 @@ namespace UnityRFramework.Editor.Tests
             public byte[] GetCurrent(string slotName)
             {
                 return current[slotName];
+            }
+
+            public byte[] GetBackup(string slotName)
+            {
+                return backups[slotName];
             }
 
         }

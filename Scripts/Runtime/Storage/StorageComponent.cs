@@ -156,6 +156,17 @@ namespace UnityRFramework.Runtime
                 slotName, options ?? CreateDefaultOptions(), migration, ct);
         }
 
+        /// <summary>只加载槽位备份并按需迁移，不改写主档或备份；成功后仍需业务校验。</summary>
+        /// <remarks>未提供选项时使用 Inspector 默认值；忽略 RecoverFromBackup，成功结果标记来自备份。</remarks>
+        public Task<StorageLoadResult<T>> LoadBackupAsync<T>(
+            string slotName, StorageOptions options = null,
+            IStorageMigration<T> migration = null,
+            CancellationToken ct = default(CancellationToken))
+        {
+            return GetStorageModule().LoadBackupAsync<T>(
+                slotName, options ?? CreateDefaultOptions(), migration, ct);
+        }
+
         /// <summary>删除槽位及其备份。</summary>
         public Task<StorageResult> DeleteAsync(
             string slotName, CancellationToken ct = default(CancellationToken))
