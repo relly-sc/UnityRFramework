@@ -1,0 +1,20 @@
+{
+    "name": "UnityRFramework.Runtime.Tests",
+    "rootNamespace": "UnityRFramework.Tests",
+    "references": [
+        "UnityRFramework.Runtime",
+        "RFramework.Library"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

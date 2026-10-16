@@ -1,0 +1,238 @@
+# 变更日志
+
+本文件记录 UnityRFramework 面向使用者的重要变更。版本号遵循 [Semantic Versioning 2.0.0](https://semver.org/lang/zh-CN/)，内容结构参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
+
+核心包与 Samples 包独立遵循以下版本规则；仅各自内容变化时递增，核心清单记录推荐 Samples 版本及其最低核心版本，不要求两包版本相等：
+
+- 修复 Bug、小问题或进行兼容性调整：修订号加一，例如 `1.4.0` → `1.4.1`。
+- 新增向后兼容的功能：次版本号加一，例如 `1.4.1` → `1.5.0`。
+- 重构、重写、架构调整或其他不兼容的大改动：主版本号加一，例如 `1.5.0` → `2.0.0`。
+- 每次版本发布都必须在本文件记录新增、变更和修复内容。
+
+Git Tag 与 GitHub Release 由维护者明确指令发布，名称必须与目标 Package 版本完全一致。
+日常补丁只更新 Package，不必逐个创建 Tag/Release；系列收口时发布该系列最新修订版。
+例如 `1.11.x` 最后修订为 `1.11.2`，则发布 Tag/Release `1.11.2`，并汇总该系列改动。
+发布 Tag 时同步创建同名 Release；后续补丁不自动移动已有 Tag，严重 Bug 可按维护者指令单独发布。
+
+## 1.13.0 - 2026-10-17
+
+### 新增
+
+- `IStorageModule` 与 `StorageComponent` 新增 `LoadBackupAsync<T>()`，使用原槽位名称和同一槽位锁，只读取备份并复用认证、解压、反序列化及迁移。成功结果标记 `RecoveredFromBackup`，不会修复、覆盖或删除主档和备份，业务数据是否合法仍由项目判断。
+
+### 修复
+
+- Storage 主档密钥不可用、版本过新或迁移失败时不再自动回退旧备份；取消与保护、压缩模式不匹配继续停止加载，避免静默降级进度。较新业务版本在反序列化前拒绝，继续使用 `MigrationFailed` 原因报告。
+- 自动读取备份期间取消时明确返回 `Cancelled`，不再用主档原始错误掩盖取消。
+
+### 变更
+
+- 核心与 Samples 版本解耦，安装器按独立 Samples 版本选择固定分支并检查最低核心版本；移除 Samples 对核心的精确 UPM 依赖。Samples 扩展源码未变，因解耦调整了包清单与 README，独立修订为 `1.12.2`，避免覆盖已发布的 `1.12.1`；后续仅核心更新不要求 Samples 跟随升版。
+
+## 1.12.1 - 2026-10-15
+
+### 修复
+
+- Tag 自动发布工作流遇到已有 Release 时保留原有标题与说明并成功退出，处理手动创建与工作流同时发布的情况；真正的发布或访问错误仍报告失败。
+
+### 文档
+
+- 明确 Tag/Release 与实际 Package 版本一致，日常修订不强制发布，系列收口时使用最后一个修订版本号。
+
+## 1.12.0 - 2026-10-15
+
+### 新增
+
+- Config 构建步骤支持分别启用 Config 与 Localization 导出，未启用的内容不检查源目录、不读取密钥或改写产物；CSV、Excel、输出路径及保护模式继续由框架配置资产管理。
+- Obfuz 基础扩展支持无 HybridCLR 的普通 Player 构建，与 YooAsset Offline/Host 模式无耦合；构建结束检查混淆回调结果并归档映射，缺少成功回调或混淆失败不报告成功。
+- 将 HybridCLR 联合准备、热更程序集混淆及最终 Player 重建移到可选的 Expansion.Obfuz.HybridCLR，由安装工具按需安装固定版本依赖；基础扩展不再强制安装 HybridCLR 与 Obfuz4HybridCLR。
+
+### 变更
+
+- 已有 HybridCLR 混淆项目更新后需额外导入联合扩展，Profile 仍启用 hybridclr 与 obfuz；普通 Player 项目只启用 obfuz。两种场景均以 Obfuz Settings 为混淆参数事实源。
+
+### 修复
+
+- Release 不再对普通项目强制采用 Player 优先顺序，Config 与 YooAsset 资源先完成再打包 Player，支持 Offline 一次完成发布；仅启用需要 AOT 基线的步骤时保留 Player 优先，YooAsset 开启内置拷贝后自动补建最终 Player。
+
+## 1.11.2 - 2026-10-15
+
+### 修复
+
+- 扩展与示例安装窗口补齐每项用途介绍，未安装 Samples 包时也可查看，长文本随窗口宽度换行；同步修正 Samples 简介中已过期的手动安装插件说明。
+- 移除重复的“安装 Samples”顶部菜单，统一通过“安装扩展与示例”窗口安装或更新 Samples 包，保留底层安装流程。
+- 安装窗口按源码目录结构区分框架开发项目与消费级项目；开发项目显示本地源码状态，不再误报缺少 Samples 包，并阻止重复下载导入。
+
+## 1.11.1 - 2026-10-15
+
+### 修复
+
+- 安装工具批量导入扩展与 Demo 后主动刷新 Unity 资源，避免需要手动刷新才能在 Project 窗口看到导入内容；完成提示改为在资源刷新之后显示。
+
+## 1.11.0 - 2026-10-14
+
+### 新增
+
+- 新增核心“安装扩展与示例”工具，按框架固定版本清单先安装所选扩展的 UPM 依赖，再按依赖顺序导入 Sample 和 Demo；支持显式同步与重新导入，不在启动时自动升级插件。
+- 安装前确认版本更换与覆盖导入，本地及嵌入式插件不自动覆盖；缺少 R3 NuGet 本体或 Obfuz 生成类型时阻止导入代码。安装任务支持 Domain Reload 后继续，失败时不继续导入。
+
+### 变更
+
+- Samples 包安装改为读取 `versions/{框架版本}` 固定版本分支；发布流程维护版本分支，但不自动创建 Git Tag 或 Release。
+- 当前清单固定 YooAsset 3.0.5、UniTask 2.5.11、HybridCLR 8.13.0、Obfuz 3.1.0、Obfuz4HybridCLR 3.0.1、R3.Unity 1.3.1。HybridCLR 9.x 适配不在本次变更范围。
+
+## 1.10.0 - 2026-10-14
+
+### 新增
+
+- 新增可选 `Expansion.R3`，通过 `Observe<T>()` 将框架事件转换为 R3 流，释放订阅时自动退订；提供按打开/显示周期管理订阅的 `R3UIFormLogic` 和 `R3EntityLogic`，覆盖关闭、隐藏、回收、异常和销毁清理。
+- 新增独立 `Expansion.R3.Demo` 中文 UGUI 示例及场景生成工具，演示响应式积分、组合条件、搜索防抖和事件订阅开关；附带 Camera，较小窗口支持纵向滚动。核心不依赖 R3，Demo 不强制依赖 UniTask，也不限定 MVVM。
+- R3 扩展和 Demo 遵循普通 Samples 不创建 asmdef 的规则，源码编入宿主默认程序集；8 项回归检查放在 Demo 编辑器工具中，不增加 NUnit 依赖。
+
+## 1.9.0 - 2026-10-14
+
+### 新增
+
+- 新增“安装 AI 技能”编辑器窗口（UnityRFramework Skills），支持 Claude Code、Codex、Antigravity IDE、Cursor、OpenCode、Kimi Code 的项目或全局目录及自定义目录，提供安装、更新、确认覆盖更新和卸载；同一 Agent 的项目与全局安装互斥，只操作 `unityrframework-skills` 技能目录。
+- 技能安装窗口完整显示“自定义”和安装状态，校验目录重复嵌套、同名文件占用等问题；隔离单个路径错误，并确保带末尾分隔符的安装路径不会将临时目录留在技能扫描目录中。
+- 完善 UnityRFramework Skills：按需提供核心模块选型与用法、业务脚本生命周期规范、API 源码查询、跨模块示例和可选扩展边界，保留业务架构自由。
+
+## 1.8.1 - 2026-10-13
+
+### 文档
+
+- 核心包附带 UnityRFramework AI 开发技能，按当前安装版本引导模块选用、项目接入、构建和可选扩展使用。
+
+### 修复
+
+- 修复框架入口预制体的 Advertisement 子节点引用类型错误，恢复有效的父子层级关系。
+- 补齐 `GameEntry.Advertisement` 专用入口及框架停止、软重启时的组件缓存清理。
+
+## 1.8.0 - 2026-10-12
+
+### 新增
+
+- 新增 Advertisement 核心模块和 Unity 入口组件；核心默认提供空实现，后续可按平台接入广告 SDK。
+- Storage 新增固定自动存档槽位 `StorageSlotNames.AutoSave` 和 `SaveAutoAsync`，普通保存接口不能覆盖自动存档。
+
+### 变更
+
+- Sample.Storage 增加自动存档槽位的使用说明，业务可在重大选择、Boss 结算和地图切换完成后主动保存。
+
+## 1.7.0 - 2026-10-10
+
+### 新增
+
+- 新增独立的 Setting 应用设置模块，默认通过 Unity PlayerPrefs 保存少量非敏感的 bool、int、float 和 string 设置；支持自定义 Helper，不与 Storage 存档共用槽位或密钥。Inspector、Editor Debugger 和 Player 屏幕调试窗口显示实际 Helper 与待保存状态。
+
+### 修复
+
+- Sample.Demo 切换语言后保存设置，软重启或重新启动时在创建大厅前恢复所选语言。
+
+## 1.6.0 - 2026-10-09
+
+### 新增
+
+- CSV 与 Excel 配置表工具新增只读本地化键检查：对照语言表、代码固定键、Config 显式标记字段、Prefab 上的静态文本组件及保留键，报告缺失键、空译文、可能未使用键和动态调用。
+- 新增 `LocalizedText` 组件，在语言加载和切换后自动刷新 UGUI 或 TMP 的静态文字，核心包不强制依赖 TMP。
+
+## 1.5.0 - 2026-10-09
+
+### 新增
+
+- 核心框架菜单新增“安装 Samples”，通过 Package Manager 安装官方 Samples 发布仓库，并检查与核心包的版本是否一致。
+
+## 1.4.5 - 2026-10-09
+
+### 变更
+
+- Config 密钥与 YooAsset 密钥统一为固定的 Resources 路径和自动读取方式；配置表工具、构建步骤及 ConfigComponent 不再要求填写密钥路径或编号。
+- 现有 Config 密钥需原样移动到 `Assets/Resources/UnityRFramework/ConfigKey.bytes`，不要重新生成，否则旧加密配置将无法读取。
+
+## 1.4.4 - 2026-10-09
+
+### 变更
+
+- 编辑器菜单统一归类：CSV 与 Excel 放入配置表工具，第三方扩展及其 Demo 放入 Expansion，普通 Demo 放入 Samples。
+
+### 修复
+
+- 补齐 YooAsset Bundle 加密的默认密钥文件生成与 Player 自动注册流程，避免 Builder 能加密但 Player 未配置解密密钥。
+- Config 和 YooAsset 密钥工具区分首次生成与主动更换，首次生成保留已有密钥，避免小版本更新误使旧资源失效。
+
+## 1.4.3 - 2026-10-08
+
+### 变更
+
+- 新建 Build Profile 的 Player 文件名模板简化为 `{ProductName}`，避免默认文件名重复包含平台、版本和构建号而过长。
+
+## 1.4.2 - 2026-10-08
+
+### 修复
+
+- 修复构建工具新增场景条目时默认未启用，导致已选择场景仍无法通过构建校验的问题。
+
+## 1.4.1 - 2026-10-08
+
+### 新增
+
+- 将核心包与 Samples 拆分为两个独立 UPM 发布产物；Samples 包显式依赖同版本核心包。
+- 增加 GitHub Actions 发布流程，由 `main` 自动生成核心 `upm` 分支并同步 Samples 发布仓库。
+- 增加项目级构建窗口状态隔离，避免不同 Unity 项目共享“最近构建”等 EditorPrefs 数据。
+- 补全 RFramework 纯 C# 核心库 README，并增加独立变更日志。
+
+### 变更
+
+- 新建 Build Profile 时默认读取当前项目的平台、公司名称、产品名称和应用标识。
+- `Sample.Demo` 根据当前 Config Helper 自动选择 JSON 或框架二进制配置路径。
+- `Sample.Demo` 默认恢复为未加密 JSON 配置，附带的二进制配置恢复为可直接读取的标准 URFC 产物。
+
+### 修复
+
+- 修复 UPM 发布包缺少必要 `.meta` 文件导致不可变 Package 目录资源被 Unity 忽略的问题。
+- 修复 Sample 升级后 HybridCLR 官方 Demo 输出路径仍指向旧版本目录的问题。
+- 修复 `Sample.Demo` 导出器沿用旧生成命名空间，重新导出后会改变配置类型的问题。
+- 修复部分 Unity 版本中运行时错误面板使用不可用内置字体的问题。
+- 构建 Profile 允许沿用 Unity 新项目默认的 `DefaultCompany` 公司名称。
+
+## 1.4.0 - 2026-10-08
+
+### 新增
+
+- 增加 Storage 核心模块及 Runtime Component，支持多槽位、原子写入、备份恢复、版本迁移、可选压缩和加密认证。
+- 增加 Config 可选加密认证、`ConfigKey` 文件和构建期正式发布配置泄漏检查。
+- 增加 `DefaultDataProtector`、`IKeyProvider`、`IKeyStore` 与安装级存档密钥管理边界。
+- 增加 Windows DPAPI、Android Keystore、iOS Keychain 和 macOS Keychain 可选平台密钥仓扩展。
+- 增加 `ProtectedInt`、`ProtectedLong`、`ProtectedFloat` 与内存篡改事件，用于基础数值防护。
+- 增加 `Sample.Storage` 和 `Sample.Security` 验收内容。
+- 增加 YooAsset Bundle/Manifest 可选保护实现，并保持其与 Config 加密相互独立。
+- 构建工具路径字段支持从 Project 窗口拖入文件或文件夹，同时保留手动输入和选择按钮。
+
+### 变更
+
+- Config 构建步骤可选择框架 CSV 或 ExcelDataReader 扩展导出器，并统一 JSON、框架二进制和保护配置。
+- UI Component 在未配置全局 Canvas 和 Layer Roots 时可按默认参数自动创建，兼容旧场景和旧 Demo。
+- HybridCLR 与 Obfuz 构建步骤完善首次构建、AOT 基线复用和热更新程序集处理。
+- 构建发布保留 Config 与 Localization JSON 文件，不再因 Release 清理误删开发或多语言数据。
+
+### 修复
+
+- 修复 macOS Player 未正确启用安装级密钥自动管理的问题。
+- 修复 Config 内容格式、Helper 和加密认证路径不一致时产生的加载问题。
+- 修复 Android 存档验收界面连续操作和移动端布局问题。
+
+## 历史版本
+
+| 版本 | 日期 | 说明 |
+| --- | --- | --- |
+| 1.3.0 | 2026-09-09 | 早期功能发布；当时尚未维护独立变更日志，完整差异请查看 Git Tag。 |
+| 1.2.0 | 2026-08-12 | YooAsset Demo 构建读取各 Package 的 Builder 设置，并使用短 Bundle 内部名称规避 UPM Sample 路径过长。 |
+| 1.1.0 | 2026-08-05 | 早期功能发布；完整差异请查看 Git Tag。 |
+| 1.0.0 | 2026-07-29 | 首个公开版本。 |
+
+[未发布]: https://github.com/relly-sc/UnityRFramework/compare/1.4.4...HEAD
+[1.4.4]: https://github.com/relly-sc/UnityRFramework/compare/1.4.3...1.4.4
+[1.4.3]: https://github.com/relly-sc/UnityRFramework/compare/1.4.2...1.4.3
+[1.4.2]: https://github.com/relly-sc/UnityRFramework/compare/1.4.1...1.4.2
+[1.4.1]: https://github.com/relly-sc/UnityRFramework/compare/1.4.0...1.4.1
+[1.4.0]: https://github.com/relly-sc/UnityRFramework/releases/tag/1.4.0
