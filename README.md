@@ -735,6 +735,26 @@ if (loaded.Succeeded)
 }
 ```
 
+框架读取成功只代表认证、封装、反序列化与必要迁移成功，不代表数据符合游戏规则。
+业务校验须先在临时对象上完成，成功后才替换当前对局；校验失败时可显式读取原槽位的备份：
+
+```csharp
+StorageLoadResult<PlayerData> backup =
+    await GameEntry.Storage.LoadBackupAsync<PlayerData>("slot-1");
+// 先检查 backup.Succeeded，再对 backup.Data 执行业务校验；通过后才采用。
+```
+
+`LoadBackupAsync<T>()` 的参数与 `LoadAsync<T>()` 相同，支持 `StorageOptions`、
+`IStorageMigration<T>` 和取消；未传 options 时使用 Inspector 默认值。它只读备份，
+忽略 `RecoverFromBackup`，不回退主档，不改写、删除或修复任何文件。成功时
+`RecoveredFromBackup = true`；备份也可能业务非法，失败原因仍通过 `Reason`、`Message` 返回。
+
+自动恢复不会处理取消、密钥不可用、保护/压缩模式不匹配或 `MigrationFailed`；
+后者包括版本过新、缺少迁移器和迁移异常，较新版本会在反序列化前被拒绝。
+这些情况应停止并保留文件，不要因加载失败就覆盖存档。
+若需要先由业务层决定是否回退，显式设置 `StorageOptions.RecoverFromBackup = false`；
+显式传 options 时应同时填入项目实际使用的版本、保护、压缩等选项，而不是依赖 Inspector 默认值合并。
+
 需要存档加密时，在框架入口 Prefab 的 `StorageComponent` 中将“默认数据保护”设为
 “加密并认证”，并保持“自动管理安装级密钥”启用。框架会为每次安装生成独立 `SaveKey`；
 Windows、Android、iOS、macOS 可按需导入对应 `Expansion.Security.*`，分别使用 DPAPI、
