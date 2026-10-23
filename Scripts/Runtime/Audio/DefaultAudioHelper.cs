@@ -33,6 +33,10 @@ namespace UnityRFramework.Runtime
         /// </summary>
         private Coroutine bgmFadeCoroutine;
 
+        // 音量设置与淡入淡出分开，避免协程用播放时的旧音量覆盖实时设置。
+        private float bgmVolume = 1f;
+        private float bgmFadeMultiplier = 1f;
+
         /// <summary>
         /// BGM 完成回调协程引用。
         /// </summary>
@@ -113,10 +117,12 @@ namespace UnityRFramework.Runtime
 
             bgmSource.clip = clip;
             bgmSource.loop = loop;
+            bgmVolume = volume;
+            bgmFadeMultiplier = 0f;
             bgmSource.volume = 0f;
             bgmSource.Play();
 
-            StartBgmFade(volume, fadeInSeconds);
+            StartBgmFade(fadeInSeconds);
 
             if (onComplete != null)
             {
@@ -155,7 +161,8 @@ namespace UnityRFramework.Runtime
         /// <inheritdoc cref="IAudioHelper.SetBgmVolume"/>
         public override void SetBgmVolume(float volume)
         {
-            bgmSource.volume = volume;
+            bgmVolume = volume;
+            ApplyBgmVolume();
         }
 
         // ====== SFX ======
@@ -266,37 +273,43 @@ namespace UnityRFramework.Runtime
         /// <summary>
         /// 启动 BGM 淡入协程。
         /// </summary>
-        /// <param name="target">目标音量。</param>
         /// <param name="duration">过渡时长。</param>
-        private void StartBgmFade(float target, float duration)
+        private void StartBgmFade(float duration)
         {
             if (duration <= 0f)
             {
-                bgmSource.volume = target;
+                bgmFadeMultiplier = 1f;
+                ApplyBgmVolume();
                 return;
             }
 
-            bgmFadeCoroutine = StartCoroutine(FadeRoutine(target, duration));
+            bgmFadeCoroutine = StartCoroutine(FadeRoutine(duration));
+        }
+
+        private void ApplyBgmVolume()
+        {
+            bgmSource.volume = bgmVolume * bgmFadeMultiplier;
         }
 
         /// <summary>
-        /// BGM 通用淡入淡出协程：从当前音量平滑过渡到目标音量。
+        /// BGM 淡入协程：只更新淡入倍率，始终使用最新目标音量。
         /// </summary>
-        /// <param name="target">目标音量。</param>
         /// <param name="duration">过渡时长。</param>
-        private IEnumerator FadeRoutine(float target, float duration)
+        private IEnumerator FadeRoutine(float duration)
         {
-            float start = bgmSource.volume;
+            float start = bgmFadeMultiplier;
             float elapsed = 0f;
 
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                bgmSource.volume = Mathf.Lerp(start, target, elapsed / duration);
+                bgmFadeMultiplier = Mathf.Lerp(start, 1f, elapsed / duration);
+                ApplyBgmVolume();
                 yield return null;
             }
 
-            bgmSource.volume = target;
+            bgmFadeMultiplier = 1f;
+            ApplyBgmVolume();
             bgmFadeCoroutine = null;
         }
 
@@ -306,17 +319,19 @@ namespace UnityRFramework.Runtime
         /// <param name="fadeOut">淡出时长。</param>
         private IEnumerator FadeOutAndStopRoutine(float fadeOut)
         {
-            float start = bgmSource.volume;
+            float start = bgmFadeMultiplier;
             float elapsed = 0f;
 
             while (elapsed < fadeOut)
             {
                 elapsed += Time.deltaTime;
-                bgmSource.volume = Mathf.Lerp(start, 0f, elapsed / fadeOut);
+                bgmFadeMultiplier = Mathf.Lerp(start, 0f, elapsed / fadeOut);
+                ApplyBgmVolume();
                 yield return null;
             }
 
-            bgmSource.volume = 0f;
+            bgmFadeMultiplier = 0f;
+            ApplyBgmVolume();
             bgmSource.Stop();
             bgmSource.clip = null;
             bgmFadeCoroutine = null;
