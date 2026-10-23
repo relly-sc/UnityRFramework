@@ -943,6 +943,10 @@ GameEntry.Audio.SfxVolume = 1f;
 加载并归还，因此路径规则仍由 Resource Helper 决定。`PlayBgm/PlaySfx` 使用同步资源入口；
 LocalFile 在 Android/WebGL 或文件音频场景应使用 `PlayBgmAsync/PlaySfxAsync`。
 
+`BgmVolume` 会立即作用于正在播放或暂停的 BGM，实际音量为播放倍率 × 分类音量 ×
+淡入淡出倍率；静音时始终为 0，取消静音使用最新分类音量，不需要重播音乐。
+分类音量会限制在 0~1，NaN 会被拒绝。
+
 ### Network
 
 > **使用限制**：内置 `TcpNetworkHelper`、`UdpNetworkHelper` 和
