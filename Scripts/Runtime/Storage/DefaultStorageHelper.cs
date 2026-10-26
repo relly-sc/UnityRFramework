@@ -30,6 +30,15 @@ namespace UnityRFramework.Runtime
             Directory.CreateDirectory(rootDirectory);
         }
 
+        internal bool HasStorageFiles()
+        {
+            if (string.IsNullOrEmpty(rootDirectory))
+                throw new RFrameworkException("Storage helper is not initialized.");
+            // 使用 Helper 的真实目录；无法读取目录时必须失败，不能当作空目录。
+            foreach (string file in Directory.EnumerateFiles(rootDirectory, "*.save*")) return true;
+            return false;
+        }
+
         /// <inheritdoc />
         public override async Task WriteAtomicAsync(
             string slotName, byte[] data, bool createBackup, CancellationToken ct)

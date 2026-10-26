@@ -1,6 +1,6 @@
 {
-  "frameworkVersion": "1.13.1",
-  "samplesVersion": "1.12.2",
+  "frameworkVersion": "1.13.2",
+  "samplesVersion": "1.12.3",
   "samplesMinimumFrameworkVersion": "1.12.1",
   "packages": [
     { "name": "com.tuyoogame.yooasset", "version": "3.0.5", "url": "https://github.com/tuyoogame/YooAsset.git?path=Assets/YooAsset#3.0.5" },
