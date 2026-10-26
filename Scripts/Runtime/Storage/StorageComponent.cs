@@ -60,6 +60,7 @@ namespace UnityRFramework.Runtime
         private bool recoverFromBackupByDefault = true;
 
         private IStorageModule storageModule;
+        private IStorageHelper storageHelper;
 
         /// <summary>由组件自动创建或项目注入密钥仓后建立的安装级存档密钥提供器。</summary>
         public InstallSaveKeyProvider ManagedSaveKeyProvider { get; private set; }
@@ -85,7 +86,8 @@ namespace UnityRFramework.Runtime
         /// <summary>替换平台文件系统辅助器。</summary>
         public void SetHelper(IStorageHelper helper)
         {
-            storageModule.SetHelper(helper);
+            GetStorageModule().SetHelper(helper);
+            storageHelper = helper;
         }
 
         /// <summary>替换存档序列化器。</summary>
@@ -104,6 +106,7 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>使用指定密钥仓确保安装级 SaveKey，并立即接入默认数据保护器。</summary>
+        /// <remarks>缺失密钥仅在默认 Helper 确认存档目录为空时创建；无法确认或已有文件时拒绝创建。</remarks>
         public void SetManagedSaveKeyStore(
             IKeyStore keyStore,
             string keyId = InstallSaveKeyProvider.DefaultKeyId)
@@ -113,10 +116,27 @@ namespace UnityRFramework.Runtime
             ManagedSaveKeyProvider = null;
             ManagedSaveKeyStoreTypeName = string.Empty;
             ManagedSaveKeyStoreError = string.Empty;
+            GetStorageModule().SetDataProtector(null);
             var provider = new InstallSaveKeyProvider(keyStore);
             try
             {
-                provider.EnsureKey(keyId);
+                byte[] existing = null;
+                try
+                {
+                    if (!provider.TryGetKey(keyId, out existing))
+                    {
+                        // 只有确认默认本地存档目录为空，才能将缺失密钥视为首次创建。
+                        if (!(storageHelper is DefaultStorageHelper localHelper))
+                            throw new RFrameworkException("Save key is unavailable. Cannot confirm an empty local storage; install an existing key or provide a custom data protector.");
+                        if (localHelper.HasStorageFiles())
+                            throw new RFrameworkException("Save key is unavailable and storage files already exist. The key will not be regenerated; restore the original key before saving.");
+                        provider.EnsureKey(keyId);
+                    }
+                }
+                finally
+                {
+                    if (existing != null) Array.Clear(existing, 0, existing.Length);
+                }
             }
             catch (Exception exception)
             {
@@ -130,18 +150,22 @@ namespace UnityRFramework.Runtime
         }
 
         /// <summary>保存槽位；未提供选项时使用 Inspector 默认值。</summary>
+        /// <exception cref="RFrameworkException">自动密钥初始化失败尚未解决，拒绝保存，包括显式明文选项。</exception>
         public Task<StorageResult> SaveAsync<T>(
             string slotName, T data, StorageOptions options = null,
             CancellationToken ct = default(CancellationToken))
         {
+            ThrowIfSaveKeyInitializationFailed();
             return storageModule.SaveAsync(slotName, data, options ?? CreateDefaultOptions(), ct);
         }
 
         /// <summary>写入固定的自动存档槽位；普通保存接口不能覆盖该槽位。</summary>
+        /// <exception cref="RFrameworkException">自动密钥初始化失败尚未解决，拒绝保存。</exception>
         public Task<StorageResult> SaveAutoAsync<T>(
             T data, StorageOptions options = null,
             CancellationToken ct = default(CancellationToken))
         {
+            ThrowIfSaveKeyInitializationFailed();
             return GetStorageModule().SaveAutoAsync(
                 data, options ?? CreateDefaultOptions(), ct);
         }
@@ -203,6 +227,12 @@ namespace UnityRFramework.Runtime
             };
         }
 
+        private void ThrowIfSaveKeyInitializationFailed()
+        {
+            if (!string.IsNullOrEmpty(ManagedSaveKeyStoreError))
+                throw new RFrameworkException("Storage key is unavailable; saving is blocked until key initialization is resolved. " + ManagedSaveKeyStoreError);
+        }
+
         private void InstallDefaultDataProtection()
         {
             if (defaultProtectionMode != StorageProtectionMode.EncryptedAndAuthenticated
@@ -220,6 +250,10 @@ namespace UnityRFramework.Runtime
             }
             catch (Exception exception)
             {
+                ManagedSaveKeyProvider = null;
+                ManagedSaveKeyStoreTypeName = string.Empty;
+                ManagedSaveKeyStoreError = exception.Message;
+                GetStorageModule().SetDataProtector(null);
                 Debug.LogError("自动密钥管理初始化失败：" + exception.Message, this);
             }
         }
@@ -273,7 +307,7 @@ namespace UnityRFramework.Runtime
                     "Storage directory must remain inside Application.persistentDataPath.");
             }
             helper.Initialize(StorageRootPath);
-            storageModule.SetHelper(helper);
+            SetHelper(helper);
         }
 
         private void InstallSerializer()

@@ -127,6 +127,8 @@ namespace UnityRFramework.Editor.Tests
         public void StorageComponentCanInstallManagedSaveKeyStore()
         {
             var store = new MemoryKeyStore();
+            // 此测试只验证注入已有密钥，不依赖 EditMode 中是否执行组件 Awake。
+            new InstallSaveKeyProvider(store).EnsureKey("SaveKey.v2");
             var owner = new GameObject("StorageComponentKeyTest");
             try
             {

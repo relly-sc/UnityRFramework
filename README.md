@@ -761,6 +761,19 @@ Windows、Android、iOS、macOS 可按需导入对应 `Expansion.Security.*`，�
 Android Keystore 或 Keychain。卸载重装、清除应用数据或密钥丢失后，旧存档可能无法读取；
 跨设备同步应由项目自行设计账号和密钥迁移方案。
 
+自动管理安装级密钥时，只有确认默认本地存档目录没有存档文件，才会首次创建缺失密钥。
+目录已有主档、备份或临时/回滚文件时，缺失或不可读取的密钥不会被重建。查看
+`ManagedSaveKeyStoreError` 获取初始化错误；未解决错误前，组件保存入口会抛出
+`RFrameworkException` 拦截写入，即使此次保存选项改为不加密也不会绕过。恢复原密钥后
+重新初始化，或由项目显式 `SetDataProtector` 接入已确定的密钥策略；框架不删除存档来自行恢复。
+该检查也覆盖明文存档，已有明文档首次启用加密需显式迁移；轮换应在原密钥可用时调用
+`ManagedSaveKeyProvider.RotateKey`，再切换 KeyId，不将缺失的新 KeyId 当作轮换指令。
+
+安装级 SaveKey、Windows 当前用户 DPAPI 和设备 Keychain 不属于云存档密钥协议。
+仅同步密文及本机密钥文件，不能保证跨设备、不同 Windows 用户或重装后可恢复。
+账号级密钥来源可使用现有 `IKeyProvider` / `SetDataProtector` 接入；账号身份、离线缓存、
+可恢复根材料、冲突和轮换应由产品方案决定，并分别验证。Config/YooAsset 内容密钥不能直接替代存档密钥。
+
 `ProtectedInt`、`ProtectedLong`、`ProtectedFloat` 和 `ProtectedBool` 可用于提高 Cheat Engine
 常规明文扫描和简单内存修改的成本。读取时发现内部校验不一致会返回默认值，并通过 Event 模块
 发布 `MemoryTamperEvent`。它们只适合金币、积分、解锁状态等少量高价值字段，不替代服务端校验，

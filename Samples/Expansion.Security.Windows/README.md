@@ -20,9 +20,11 @@ Windows Editor 与 Windows Player 会自动发现 `WindowsDpapiKeyStore`。未�
 
 - DPAPI 使用当前 Windows 用户范围。同一密钥文件复制到其他用户或其他电脑后不能直接解密。
 - Editor 密钥保存到独立的 `EditorKeys` 目录，不与 Player 的 `Keys` 目录共用。
-- 删除密钥后，旧加密存档会明确报告密钥不可用；框架不会自动生成同名密钥来覆盖该状态。
+- 核心 `1.13.2` 起，自动管理或 `SetManagedSaveKeyStore` 发现缺失密钥且默认本地存档目录已有主档、备份或临时/回滚文件时，不自动重建密钥；读取现有密文会报告 `KeyUnavailable`。初始化错误可通过 `ManagedSaveKeyStoreError` 查询，组件的 `SaveAsync` / `SaveAutoAsync` 会抛出 `RFrameworkException` 阻止写入，直到恢复原密钥或显式接入项目保护器。
+- 该策略保守地检查全部存档文件，包括明文档；首次对已有明文档开启加密，需要显式确认迁移。自定义存档 Helper 无法通过默认目录确认历史数据时，不自动创建密钥。`InstallSaveKeyProvider.EnsureKey` 是显式创建接口，本身不知道是否存在历史存档，不得将它当成丢钥恢复接口。
 - 密钥轮换只创建新 `KeyId`，不会自动删除旧密钥。业务确认旧存档迁移完成后再调用
   `InstallSaveKeyProvider.DeleteKey`。
+- 轮换应在原密钥仍可用时显式调用 `RotateKey("SaveKey.v2")`，再切换保存 KeyId 并完成迁移；不能仅在 Inspector 改一个缺失的新 KeyId 来绕过历史数据检查。
 - DPAPI 只能提高离线提取成本，不能阻止已控制当前用户进程的攻击者在运行时取得明文。
 
 Android Keystore 与 Apple Keychain 不由本扩展实现，后续使用各自独立平台扩展接入
