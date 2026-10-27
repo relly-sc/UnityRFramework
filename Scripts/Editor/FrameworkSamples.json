@@ -1,0 +1,37 @@
+{
+  "frameworkVersion": "1.13.4",
+  "samplesVersion": "1.12.4",
+  "samplesMinimumFrameworkVersion": "1.12.1",
+  "packages": [
+    { "name": "com.tuyoogame.yooasset", "version": "3.0.5", "url": "https://github.com/tuyoogame/YooAsset.git?path=Assets/YooAsset#3.0.5" },
+    { "name": "com.cysharp.unitask", "version": "2.5.11", "url": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask#2.5.11" },
+    { "name": "com.code-philosophy.hybridclr", "version": "8.13.0", "url": "https://github.com/focus-creative-games/hybridclr_unity.git#v8.13.0" },
+    { "name": "com.code-philosophy.obfuz", "version": "3.1.0", "url": "https://github.com/focus-creative-games/obfuz.git#v3.1.0" },
+    { "name": "com.code-philosophy.obfuz4hybridclr", "version": "3.0.1", "url": "https://github.com/focus-creative-games/obfuz4hybridclr.git#v3.0.1" },
+    { "name": "com.cysharp.r3", "version": "1.3.1", "url": "https://github.com/Cysharp/R3.git?path=src/R3.Unity/Assets/R3.Unity#1.3.1" }
+  ],
+  "samples": [
+    { "name": "Sample.Demo", "description": "官方可运行 Demo，使用内置辅助器串通全部框架模块。不依赖第三方包；导入后需执行 Export Config and Localization，将配置、本地化、音频和公告同步到项目级 StreamingAssets。" },
+    { "name": "Sample.Download", "description": "内置 DownloadModule 的独立轻量验收场景，覆盖进度、取消、断点续传、大小与 SHA-256 校验、ZIP 解压和软重启。" },
+    { "name": "Sample.Storage", "description": "内置 Storage 模块的独立轻量验收场景，覆盖普通与加密存档、多槽位、压缩、备份恢复、密钥丢失和软重启。" },
+    { "name": "Sample.UI", "description": "内置 UI 模块的独立 UGUI 验收场景，覆盖实际层级、同层顺序、栈顶返回、全屏遮挡、场景 UI 和强类型参数。" },
+    { "name": "Expansion.UI", "description": "可选 UGUI 通用组件与编辑器工具，包含自动绑定、Prefab 检查、SpriteAtlas、模态弹窗、Toast、Safe Area、虚拟列表和红点树；不含验收场景。" },
+    { "name": "Expansion.UI.Demo", "description": "Expansion.UI 的 UI 绑定与工具、交互与列表、红点树功能示例和验收场景，不依赖第三方插件。", "dependencies": ["Expansion.UI"] },
+    { "name": "Expansion.HybridCLR", "description": "HybridCLR 代码热更新通用加载扩展，提供清单、AOT 元数据、程序集入口契约与产物准备工具。安装工具自动安装固定版本插件，本机原生环境仍需通过 HybridCLR/Installer 初始化。", "packages": ["com.code-philosophy.hybridclr"], "notice": "适配 HybridCLR 8.13.0，不支持 9.x。安装插件后仍需执行 HybridCLR/Installer 完成本机原生环境初始化。" },
+    { "name": "Expansion.HybridCLR.Demo", "description": "在 Expansion.YooAsset.Demo 资源热更闭环上叠加 HybridCLR 代码热更新的完整 Demo 与验收覆盖层。", "dependencies": ["Expansion.YooAsset.Demo", "Expansion.HybridCLR"] },
+    { "name": "Expansion.Obfuz", "description": "Obfuz 普通 Player 代码混淆扩展，不依赖 HybridCLR 或 YooAsset 模式；自动检查混淆回调结果并归档符号映射。安装工具只安装 Obfuz，需先生成加密虚拟机及密钥。", "packages": ["com.code-philosophy.obfuz"], "requiredType": "Obfuz.EncryptionVM.GeneratedEncryptionVirtualMachine", "notice": "安装插件后先按 Obfuz 官方流程生成加密虚拟机及密钥，再导入此扩展。", "helpUrl": "https://www.obfuz.com/docs/beginner/quickstart" },
+    { "name": "Expansion.Obfuz.HybridCLR", "description": "Obfuz 与 HybridCLR 的可选联合构建扩展，处理热更程序集混淆、AOT 基线和最终 Player 重建；自动安装基础扩展及固定版本 Obfuz4HybridCLR。普通 Player 无需导入。", "dependencies": ["Expansion.Obfuz", "Expansion.HybridCLR"], "packages": ["com.code-philosophy.obfuz4hybridclr"] },
+    { "name": "Expansion.Security.Android", "description": "Android 本地存档密钥保护扩展，使用 Android Keystore 的不可导出 AES 密钥保护 Storage 安装级 SaveKey；仅适用于 Android Player。" },
+    { "name": "Expansion.Security.iOS", "description": "iOS 本地存档密钥保护扩展，使用系统 Keychain 保存 Storage 安装级 SaveKey；仅适用于 iOS Player。" },
+    { "name": "Expansion.Security.macOS", "description": "macOS 本地存档密钥保护扩展，使用数据保护 Keychain 保存 Storage 安装级 SaveKey；适用于 macOS IL2CPP Player。" },
+    { "name": "Expansion.Security.Windows", "description": "Windows 本地存档密钥保护扩展，使用当前用户 DPAPI 保护 Storage 安装级 SaveKey；仅适用于 Windows Editor 与 Player。" },
+    { "name": "Expansion.YooAsset", "description": "YooAsset 资源辅助器桥接，支持资源热更新、AssetBundle 加载、内置资源清单及可选包加密。安装工具自动安装固定版本 YooAsset，不包含 Demo 场景。" , "packages": ["com.tuyoogame.yooasset"] },
+    { "name": "Expansion.UniTask", "description": "UniTask Web 请求辅助器桥接，为框架提供异步 Web 请求实现。安装工具自动安装固定版本 UniTask，不改变核心业务架构。", "packages": ["com.cysharp.unitask"] },
+    { "name": "Expansion.YooAsset.Demo", "description": "基于 YooAsset 与 UniTask 的完整资源热更 Demo，内含资源更新、按需加载和专项 Acceptance 验收场景。", "dependencies": ["Sample.Demo", "Expansion.YooAsset", "Expansion.UniTask"] },
+    { "name": "Expansion.R3", "description": "可选 R3 响应式桥接：观察框架事件，自动管理 UI 打开和实体显示周期内的订阅。R3.Unity 由安装工具自动安装，R3 本体及其 .NET 依赖需先通过 NuGetForUnity 安装；不改变核心模块接口。", "packages": ["com.cysharp.r3"], "requiredAssembly": "R3", "assemblyVersion": "1.3.1.0", "notice": "R3.Unity 可以自动安装；R3 本体须先通过 NuGetForUnity 安装 R3 1.3.1 及其 .NET 依赖。", "helpUrl": "https://github.com/Cysharp/R3#unity" },
+    { "name": "Expansion.R3.Demo", "description": "R3 中文 UGUI 示例，包含积分绑定、组合条件、搜索防抖、框架事件及界面反复开关。依赖 Expansion.R3、R3 和 R3.Unity，不依赖 UniTask。", "dependencies": ["Expansion.R3"] },
+    { "name": "Expansion.SharpZipLib", "description": "基于 SharpZipLib 1.4.2 的 DownloadModule 可选 ZIP 解压辅助器，支持 Zip64、加密 ZIP 和解压进度；已内置 Runtime DLL 与 MIT 许可证。", "notice": "已内置 SharpZipLib 1.4.2 及许可证。" },
+    { "name": "Expansion.SharpCompress", "description": "基于 SharpCompress 0.50.1 的 DownloadModule 可选多格式解压辅助器，支持 ZIP、RAR、7z、TAR、GZip 和 BZip2；已内置 Runtime DLL、必要依赖与许可证。", "notice": "已内置 SharpCompress 0.50.1、必要依赖及许可证。" },
+    { "name": "Expansion.ExcelDataReader", "description": "ExcelDataReader 配置表导出工具，支持从 XLSX/XLS 生成 Config 与 Localization 数据；已内置 EditorOnly 依赖 DLL。", "notice": "已内置 ExcelDataReader 的编辑器依赖及许可证。" }
+  ]
+}
