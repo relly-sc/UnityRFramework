@@ -16,11 +16,7 @@ namespace UnityRFramework.Editor
         public string version;
         public string url;
 
-        internal bool Matches(string installedVersion, PackageSource source, string revision)
-        {
-            if (installedVersion != version) return false;
-            return source != PackageSource.Git || revision == url.Substring(url.LastIndexOf('#') + 1);
-        }
+        internal bool Matches(string installedVersion) => installedVersion == version;
 
         internal static bool IsProtected(PackageSource source) =>
             source == PackageSource.Local || source == PackageSource.Embedded;

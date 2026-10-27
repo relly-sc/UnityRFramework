@@ -85,13 +85,12 @@ namespace UnityRFramework.Editor.Tests
         }
 
         [Test]
-        public void PackageVersion_RejectsNewerVersionsAndUnpinnedGitBranches()
+        public void PackageVersion_OnlyRequiresMatchingVersion()
         {
             var dependency = catalog.packages.Single(p => p.name == "com.code-philosophy.hybridclr");
-            Assert.That(dependency.Matches("8.13.0", PackageSource.Git, "v8.13.0"), Is.True);
-            Assert.That(dependency.Matches("9.0.3", PackageSource.Git, "v9.0.3"), Is.False);
-            Assert.That(dependency.Matches("8.13.0", PackageSource.Git, "main"), Is.False);
-            Assert.That(dependency.Matches("8.13.0", PackageSource.Embedded, null), Is.True);
+            Assert.That(dependency.Matches("8.13.0"), Is.True);
+            Assert.That(dependency.Matches("9.0.3"), Is.False);
+            Assert.That(dependency.Matches(null), Is.False);
         }
 
         [Test]
@@ -183,6 +182,45 @@ namespace UnityRFramework.Editor.Tests
             finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
         }
 
+        [Test]
+        public void ImportedVersions_KeepOldImportsAcrossPackageUpdatesAndSortNumerically()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "FrameworkSamplesTests", Guid.NewGuid().ToString("N"));
+            try
+            {
+                Assert.That(FrameworkSamplesInstaller.GetImportedVersions(root), Is.Empty);
+                string old = Path.Combine(root, "1.12.2", "Expansion.UI");
+                Directory.CreateDirectory(old);
+                File.WriteAllText(Path.Combine(old, "User.cs"), "user-owned");
+                Directory.CreateDirectory(Path.Combine(root, "1.12.10", "Expansion.UI"));
+                Directory.CreateDirectory(Path.Combine(root, "1.12.10", "Sample.Demo"));
+                Directory.CreateDirectory(Path.Combine(root, "backup", "Expansion.UI"));
+                var imported = FrameworkSamplesInstaller.GetImportedVersions(root);
+                CollectionAssert.AreEqual(new[] { "1.12.10", "1.12.2" }, imported["Expansion.UI"]);
+                CollectionAssert.AreEqual(new[] { "1.12.10" }, imported["Sample.Demo"]);
+                Assert.That(imported.ContainsKey("Sample.UI"), Is.False);
+                Directory.Delete(Path.Combine(root, "1.12.10"), true);
+                CollectionAssert.AreEqual(new[] { "1.12.2" },
+                    FrameworkSamplesInstaller.GetImportedVersions(root)["Expansion.UI"]);
+                Assert.That(File.ReadAllText(Path.Combine(old, "User.cs")), Is.EqualTo("user-owned"));
+                Assert.Throws<InvalidOperationException>(() => FrameworkSamplesInstaller.EnsureNoPreviousImports(
+                    Path.Combine(root, "1.12.3", "Expansion.UI")));
+            }
+            finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+        }
+
+        [TestCase("", "1.12.3", "未导入")]
+        [TestCase("1.12.3", "1.12.3", "已导入 1.12.3（与推荐版本一致）")]
+        [TestCase("1.12.2", "1.12.3", "已导入 1.12.2（旧版，可更新至 1.12.3）")]
+        [TestCase("1.12.3", "1.12.2", "已导入 1.12.3（与推荐版本 1.12.2 不同）")]
+        [TestCase("1.12.3,1.12.2", "1.12.3", "已导入 1.12.3、1.12.2（多个版本，请检查重复脚本）")]
+        public void ImportStatus_ShowsInstalledVersionsInsteadOfCallingOldImportsMissing(
+            string versions, string availableVersion, string expected)
+        {
+            Assert.That(FrameworkSamplesWindow.GetImportStatus(
+                versions.Length == 0 ? Array.Empty<string>() : versions.Split(','), availableVersion), Is.EqualTo(expected));
+        }
+
         [UnityTest]
         public IEnumerator Window_RepaintsAtSmallAndLargeSizesWithoutGuiErrors()
         {
@@ -198,6 +236,20 @@ namespace UnityRFramework.Editor.Tests
                     (width: 480, height: 360, scroll: 650) })
                 {
                     sourceField.SetValue(window, sourceRoot);
+                    if (sourceRoot == null)
+                    {
+                        string packageName = UnityEditor.PackageManager.PackageInfo.FindForPackageName(
+                            FrameworkSampleCatalog.SamplesPackage)?.displayName ?? "UnityRFramework Samples";
+                        typeof(FrameworkSamplesWindow).GetField("importedSamplesRoot", BindingFlags.Instance | BindingFlags.NonPublic)
+                            .SetValue(window, Path.Combine(Application.dataPath, "Samples", packageName));
+                        typeof(FrameworkSamplesWindow).GetField("importedVersions", BindingFlags.Instance | BindingFlags.NonPublic)
+                            .SetValue(window, new System.Collections.Generic.Dictionary<string, string[]>
+                            {
+                                ["Sample.Demo"] = new[] { catalog.samplesVersion },
+                                ["Expansion.UI"] = new[] { "1.12.2" },
+                                ["Sample.Download"] = new[] { catalog.samplesVersion, "1.12.2" }
+                            });
+                    }
                     window.position = new Rect(80, 80, view.width, view.height);
                     typeof(FrameworkSamplesWindow).GetField("scroll", BindingFlags.Instance | BindingFlags.NonPublic)
                         .SetValue(window, new Vector2(0, view.scroll));
