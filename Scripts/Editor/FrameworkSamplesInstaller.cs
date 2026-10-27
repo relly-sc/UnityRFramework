@@ -123,7 +123,28 @@ namespace UnityRFramework.Editor
 
         internal static bool Matches(FrameworkPackageDependency dependency, PackageInfo installed) =>
             installed != null && (installed.errors == null || installed.errors.Length == 0)
-            && dependency.Matches(installed.version, installed.source, installed.git?.revision);
+            && dependency.Matches(installed.version);
+
+        /// <summary>读取标准导入目录中仍存在的全部版本，不依赖当前安装的 Samples 包版本。</summary>
+        internal static Dictionary<string, string[]> GetImportedVersions(string packageRoot)
+        {
+            var imports = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            if (!Directory.Exists(packageRoot)) return new Dictionary<string, string[]>();
+            foreach (string directory in Directory.GetDirectories(packageRoot)
+                .Where(p => FrameworkSampleCatalog.IsVersionAtLeast(Path.GetFileName(p), "0.0.0"))
+                .OrderByDescending(p => Version.Parse(Path.GetFileName(p))))
+            {
+                string version = Path.GetFileName(directory);
+                foreach (string sample in Directory.GetDirectories(directory))
+                {
+                    string name = Path.GetFileName(sample);
+                    if (!imports.TryGetValue(name, out var versions))
+                        imports.Add(name, versions = new List<string>());
+                    versions.Add(version);
+                }
+            }
+            return imports.ToDictionary(p => p.Key, p => p.Value.ToArray(), StringComparer.Ordinal);
+        }
 
         internal static void EnsureNoPreviousImports(string importPath)
         {
