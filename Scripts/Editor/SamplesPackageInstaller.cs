@@ -28,8 +28,8 @@ namespace UnityRFramework.Editor
 
         internal static string GetSamplesUrl(string version)
         {
-            if (string.IsNullOrWhiteSpace(version)) throw new ArgumentException("框架版本不能为空。", nameof(version));
-            return "https://github.com/relly-sc/UnityRFramework-Samples.git#versions/" + Uri.EscapeDataString(version);
+            if (string.IsNullOrWhiteSpace(version)) throw new ArgumentException("Samples 版本不能为空。", nameof(version));
+            return "https://github.com/relly-sc/UnityRFramework-Samples.git#" + Uri.EscapeDataString(version);
         }
 
         internal static void Install()

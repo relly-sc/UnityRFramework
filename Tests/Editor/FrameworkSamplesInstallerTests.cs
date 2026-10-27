@@ -158,9 +158,10 @@ namespace UnityRFramework.Editor.Tests
         }
 
         [Test]
-        public void SamplesUrl_PinsSamplesVersionInsteadOfLatestMain()
+        public void SamplesUrl_PinsSamplesTagInsteadOfVersionBranchOrLatestMain()
         {
-            Assert.That(SamplesPackageInstaller.GetSamplesUrl("1.11.0"), Does.EndWith("#versions/1.11.0"));
+            Assert.That(SamplesPackageInstaller.GetSamplesUrl("1.12.3"),
+                Is.EqualTo("https://github.com/relly-sc/UnityRFramework-Samples.git#1.12.3"));
             Assert.Throws<ArgumentException>(() => SamplesPackageInstaller.GetSamplesUrl(" "));
         }
 
