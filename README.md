@@ -101,8 +101,9 @@ Sample 手写脚本同样遵循框架注释规范：全部注释使用中文，�
 > 不包含示例和可选扩展；请勿从开发仓库的 `main` 分支直接安装。
 
 **Samples（可选）**：安装核心包后，打开 `UnityRFramework → 安装扩展与示例`，在窗口中
-点击“安装 Samples”。工具从官方 Samples 仓库的 `versions/{Samples 版本}` 分支安装核心清单推荐的
+点击“安装 Samples”。工具从官方 Samples 仓库的 `{Samples 版本}` Tag 安装核心清单推荐的
 独立包，不跟随最新 `main`。核心与 Samples 独立管理版本，核心更新不代表必须重新导入示例。
+例如 Samples `1.12.3` 使用 `https://github.com/relly-sc/UnityRFramework-Samples.git#1.12.3`。
 安装完成后在同一窗口选择需要的功能，点击“安装并导入”。
 工具会先安装固定版本的 UPM 插件，再按依赖顺序导入所需扩展和 Demo；不会默认安装全部插件。
 首次安装需能访问 GitHub，并在本机安装可供 Unity 使用的 Git。仅用核心时不需要 Samples。

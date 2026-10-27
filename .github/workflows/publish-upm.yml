@@ -6,7 +6,7 @@ on:
       - main
   workflow_dispatch:
 
-# This workflow force-updates only the generated `upm` branch.
+# Only generated package branches may be force-updated; published Samples tags stay unchanged.
 permissions:
   contents: write
 
@@ -23,6 +23,9 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Test Samples tag publication
+        run: python3 -m unittest discover -s Tools~ -p 'test_*.py'
+
       - name: Generate core and Samples packages
         shell: bash
         run: |
@@ -36,7 +39,7 @@ jobs:
           path: ${{ runner.temp }}/release/com.relly-sc.unityrframework.samples
           if-no-files-found: error
 
-      - name: Publish core UPM branch
+      - name: Prepare core UPM branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -70,7 +73,6 @@ jobs:
           git commit -F "$commit_message_file"
           git branch -M upm
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push --force origin upm
 
       - name: Configure Samples deploy key
         env:
@@ -103,16 +105,8 @@ jobs:
           git commit -F "$commit_message_file"
           git branch -M main
           git remote add origin "git@github.com:relly-sc/UnityRFramework-Samples.git"
-          # Version branches pin Samples without creating user-controlled release tags.
-          package_version="$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
-          version_branch="versions/$package_version"
-          if [[ -n "$(git ls-remote --heads origin "refs/heads/$version_branch")" ]]; then
-            git fetch origin "$version_branch"
-            if ! git diff --quiet FETCH_HEAD HEAD -- .; then
-              echo "Samples version $package_version is already published with different content. Increment the package version." >&2
-              exit 1
-            fi
-          else
-            git push origin "HEAD:refs/heads/$version_branch"
-          fi
-          git push --force origin main
+          python3 "$GITHUB_WORKSPACE/Tools~/publish_samples.py" "$release_dir"
+
+      - name: Publish core UPM branch
+        shell: bash
+        run: git -C "$RUNNER_TEMP/release/com.relly-sc.unityrframework" push --force origin upm
